@@ -173,10 +173,10 @@ func (conn *Connection) doHandle(msg *Message) {
 		if (reply == nil && errmsg == nil) || (reply != nil && errmsg != nil) {
 			return
 		}
-		if msg.Flags&NoReplyExpected != 0 {
+		if msg.Flags&NoReplyExpected == 0 {
 			if reply != nil {
 				conn.sendReply(msg.Serial,
-					msg.Headers[FieldSender].value.(string))
+					msg.Headers[FieldSender].value.(string), reply...)
 				return
 			}
 			nmsg := new(Message)
