@@ -27,7 +27,7 @@ func main() {
 }
 ```
 
-See the [documentation](godoc.org/github.com/guelfey/go.dbus) and _examples for
+See the [documentation](http://godoc.org/github.com/guelfey/go.dbus) and _examples for
 more information.
 
 ### License
