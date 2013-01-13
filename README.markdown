@@ -17,12 +17,14 @@ package main
 
 import "github.com/guelfey/go.dbus"
 
-conn, err := dbus.ConnectSessionBus()
-if err != nil {
-	panic(err)
-}
+func main() {
+	conn, err := dbus.ConnectSessionBus()
+	if err != nil {
+		panic(err)
+	}
 
-// do stuff with conn
+	// do stuff with conn
+}
 ```
 
 See the [documentation](godoc.org/github.com/guelfey/go.dbus) and _examples for
