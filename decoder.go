@@ -1,0 +1,278 @@
+package dbus
+
+import (
+	"encoding/binary"
+	"io"
+	"reflect"
+	"unicode"
+)
+
+/*
+A Decoder reads values that are encoded in the DBus wire format.
+
+Decoding behaviour is usually just the reverse of the encoding behavrious,
+except for the handling of variants. If a struct is wrapped in a variant,
+its decoded value will be a slice of interfaces which contain the struct
+fields in the correct order.
+*/
+type Decoder struct {
+	in    io.Reader
+	order binary.ByteOrder
+	pos   int
+}
+
+// NewDecoder returns a new decoder that reads values from the Reader
+// in the given byte order.
+func NewDecoder(in io.Reader, order binary.ByteOrder) *Decoder {
+	dec := new(Decoder)
+	dec.in = in
+	dec.order = order
+	return dec
+}
+
+func (dec *Decoder) align(n int) error {
+	newpos := dec.pos
+	if newpos%n != 0 {
+		newpos += (n - (newpos % n))
+		empty := make([]byte, newpos-dec.pos)
+		n, err := dec.in.Read(empty)
+		if err != nil {
+			return err
+		}
+		if n != len(empty) {
+			return io.ErrUnexpectedEOF
+		}
+		dec.pos = newpos
+	}
+	return nil
+}
+
+// Decode decodes a single value from the decoder and stores it
+// in v. If v isn't a pointer, Decode panics. For the details of decoding,
+// see the package-level documentation.
+//
+// The input is expected to be aligned as required by the DBus spec.
+func (dec *Decoder) Decode(v interface{}) error {
+	return dec.decode(reflect.ValueOf(v))
+}
+
+// DecodeMulti is a shorthand for decoding multiple values.
+func (dec *Decoder) DecodeMulti(vs ...interface{}) error {
+	for _, v := range vs {
+		if err := dec.decode(reflect.ValueOf(v)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (dec *Decoder) decode(v reflect.Value) error {
+	if v.Kind() != reflect.Ptr {
+		panic("(*dbus.Decoder): parameter is not a pointer")
+	}
+
+	v = v.Elem()
+	err := dec.align(alignment(v.Type()))
+	if err != nil {
+		return err
+	}
+	switch v.Kind() {
+	case reflect.Uint8:
+		b := make([]byte, 1)
+		if _, err = dec.in.Read(b); err != nil {
+			return err
+		}
+		dec.pos++
+		v.SetUint(uint64(b[0]))
+	case reflect.Bool:
+		var i uint32
+		if err = dec.decode(reflect.ValueOf(&i)); err != nil {
+			return err
+		}
+		if i == 0 {
+			v.SetBool(false)
+		} else {
+			// XXX: official spec recommends to only accept 0 or 1; should we
+			// return an error here?
+			v.SetBool(true)
+		}
+	case reflect.Int16:
+		var i int16
+		if err = binary.Read(dec.in, dec.order, &i); err != nil {
+			return err
+		}
+		dec.pos += 2
+		v.SetInt(int64(i))
+	case reflect.Int32:
+		var i int32
+		if err = binary.Read(dec.in, dec.order, &i); err != nil {
+			return err
+		}
+		dec.pos += 4
+		v.SetInt(int64(i))
+	case reflect.Int64:
+		var i int64
+		if err = binary.Read(dec.in, dec.order, &i); err != nil {
+			return err
+		}
+		dec.pos += 8
+		v.SetInt(i)
+	case reflect.Uint16:
+		var i uint16
+		if err = binary.Read(dec.in, dec.order, &i); err != nil {
+			return err
+		}
+		dec.pos += 2
+		v.SetUint(uint64(i))
+	case reflect.Uint32:
+		var i uint32
+		if err = binary.Read(dec.in, dec.order, &i); err != nil {
+			return err
+		}
+		dec.pos += 4
+		v.SetUint(uint64(i))
+	case reflect.Uint64:
+		var i uint64
+		if err = binary.Read(dec.in, dec.order, &i); err != nil {
+			return err
+		}
+		dec.pos += 8
+		v.SetUint(i)
+	case reflect.Float64:
+		var f float64
+		if err = binary.Read(dec.in, dec.order, &f); err != nil {
+			return err
+		}
+		dec.pos += 8
+		v.SetFloat(f)
+	case reflect.String:
+		var length uint32
+		if err = dec.decode(reflect.ValueOf(&length)); err != nil {
+			return err
+		}
+		b := make([]byte, int(length)+1)
+		if n, err := dec.in.Read(b); err != nil {
+			return err
+		} else if n != int(length)+1 {
+			return io.ErrUnexpectedEOF
+		}
+		dec.pos += int(length) + 1
+		v.SetString(string(b[:len(b)-1]))
+	case reflect.Ptr:
+		nv := reflect.New(v.Type().Elem())
+		if err = dec.decode(nv); err != nil {
+			return err
+		}
+		v.Set(nv)
+	case reflect.Slice:
+		var length uint32
+		if err = dec.decode(reflect.ValueOf(&length)); err != nil {
+			return err
+		}
+		slice := reflect.MakeSlice(v.Type(), 0, 0)
+		spos := dec.pos
+		for dec.pos < spos+int(length) {
+			nv := reflect.New(v.Type().Elem())
+			if err = dec.decode(nv); err != nil {
+				return err
+			}
+			slice = reflect.Append(slice, nv.Elem())
+		}
+		v.Set(slice)
+	case reflect.Struct:
+		switch t := v.Type(); t {
+		case variantType:
+			var variant Variant
+			var sig Signature
+			if err = dec.decode(reflect.ValueOf(&sig)); err != nil {
+				return err
+			}
+			variant.sig = sig
+			if len(sig.str) == 0 {
+				return SignatureError{sig.str, "signature is empty"}
+			}
+			t = value(sig.str)
+			if t == interfacesType {
+				if err = dec.align(8); err != nil {
+					return err
+				}
+				s := sig.str[1 : len(sig.str)-1]
+				slice := reflect.MakeSlice(t, 0, 0)
+				for len(s) != 0 {
+					err, rem := validSingle(s)
+					if err != nil {
+						return err
+					}
+					t = value(s[:len(s)-len(rem)])
+					nv := reflect.New(t)
+					if err = dec.decode(nv); err != nil {
+						return err
+					}
+					slice = reflect.Append(slice, nv.Elem())
+					s = rem
+				}
+				variant.value = slice.Interface()
+			} else {
+				nv := reflect.New(t)
+				if err = dec.decode(nv); err != nil {
+					return err
+				}
+				variant.value = nv.Elem().Interface()
+			}
+			v.Set(reflect.ValueOf(variant))
+		case signatureType:
+			var length uint8
+			if err = dec.decode(reflect.ValueOf(&length)); err != nil {
+				return err
+			}
+			b := make([]byte, int(length)+1)
+			if n, err := dec.in.Read(b); err != nil {
+				return err
+			} else if n != int(length)+1 {
+				return io.ErrUnexpectedEOF
+			}
+			dec.pos += int(length) + 1
+			sig, err := StringToSig(string(b[:len(b)-1]))
+			if err != nil {
+				return err
+			}
+			v.Set(reflect.ValueOf(sig))
+		default:
+			for i := 0; i < v.NumField(); i++ {
+				field := t.Field(i)
+				if unicode.IsUpper([]rune(field.Name)[0]) &&
+					field.Tag.Get("dbus") != "-" {
+					if err = dec.decode(v.Field(i).Addr()); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	case reflect.Map:
+		var length uint32
+		if err = dec.decode(reflect.ValueOf(&length)); err != nil {
+			return err
+		}
+		m := reflect.MakeMap(v.Type())
+		spos := dec.pos
+		for dec.pos < spos+int(length) {
+			if err = dec.align(8); err != nil {
+				return err
+			}
+			kv := reflect.New(v.Type().Key())
+			// TODO: check that v.Type().Key() is a valid key type for DBus
+			vv := reflect.New(v.Type().Elem())
+			if err = dec.decode(kv); err != nil {
+				return err
+			}
+			if err = dec.decode(vv); err != nil {
+				return err
+			}
+			m.SetMapIndex(kv.Elem(), vv.Elem())
+		}
+		v.Set(m)
+	default:
+		panic("(*dbus.Decoder): can't decode" + v.Type().String())
+	}
+	return nil
+}
