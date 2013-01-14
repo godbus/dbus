@@ -6,9 +6,11 @@ import (
 	"os"
 )
 
-func handler(msg *dbus.CallMessage) (dbus.ReplyMessage, *dbus.ErrorMessage) {
-	fmt.Println(msg)
-	return []interface{}{}, nil
+type foo string
+
+func (f foo) Foo() string {
+	fmt.Println(f)
+	return string(f)
 }
 
 func main() {
@@ -24,6 +26,8 @@ func main() {
 		fmt.Fprintln(os.Stderr, "name already taken")
 		os.Exit(1)
 	}
-	conn.HandleCall("/com/github/guelfey/Demo", dbus.Handler(handler))
+	f := foo("Bar!")
+	conn.Handle(f, "/com/github/guelfey/Demo", "com.github.guelfey.Demo")
+	fmt.Println("Listening on com.github.guelfey.Demo / /com/github/guelfey/Demo ...")
 	select {}
 }

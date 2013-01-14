@@ -34,7 +34,7 @@ type Connection struct {
 	lastSerialLck sync.Mutex
 	replies       map[uint32]chan interface{}
 	repliesLck    sync.RWMutex
-	handlers      map[string]Handler
+	handlers      map[string]map[string]interface{}
 	handlersLck   sync.RWMutex
 	out           chan *Message
 	signals       chan SignalMessage
@@ -94,7 +94,7 @@ func NewConnection(address string) (*Connection, error) {
 	conn.replies = make(map[uint32]chan interface{})
 	conn.out = make(chan *Message, 10)
 	conn.signals = make(chan SignalMessage, 10)
-	conn.handlers = make(map[string]Handler)
+	conn.handlers = make(map[string]map[string]interface{})
 	go conn.inWorker()
 	go conn.outWorker()
 	if err = conn.hello(); err != nil {
@@ -164,52 +164,56 @@ func (conn *Connection) doHandle(msg *Message) {
 		}
 		vs = dereferenceAll(vs)
 	}
-	call := &CallMessage{msg.Headers[FieldMember].value.(string),
-		string(msg.Headers[FieldPath].value.(ObjectPath)),
-		msg.Headers[FieldInterface].value.(string), vs}
-	h := conn.getHandler(call.Path)
-	if h != nil {
-		reply, errmsg := h(call)
-		if (reply == nil && errmsg == nil) || (reply != nil && errmsg != nil) {
+	name := msg.Headers[FieldMember].value.(string)
+	path := msg.Headers[FieldPath].value.(ObjectPath)
+	iface := msg.Headers[FieldInterface].value.(string)
+	conn.handlersLck.RLock()
+	v := conn.handlers[string(path)][iface]
+	conn.handlersLck.RUnlock()
+	if v == nil {
+		return
+	}
+	m := reflect.ValueOf(v).MethodByName(name)
+	if !m.IsValid() {
+		return
+	}
+	t := m.Type()
+	if t.NumIn() != len(vs) {
+		// TODO: return an error reply
+		return
+	}
+	for i := 0; i < t.NumIn(); i++ {
+		if t.In(i) != reflect.TypeOf(vs[i]) {
+			// TODO: return an error reply
 			return
 		}
-		if msg.Flags&NoReplyExpected == 0 {
-			if reply != nil {
-				conn.sendReply(msg.Serial,
-					msg.Headers[FieldSender].value.(string), reply...)
-				return
-			}
-			nmsg := new(Message)
-			nmsg.Order = binary.LittleEndian
-			nmsg.Type = TypeError
-			nmsg.Serial = conn.getSerial()
-			nmsg.Headers = make(map[HeaderField]Variant)
-			nmsg.Headers[FieldDestination] = msg.Headers[FieldSender]
-			nmsg.Headers[FieldReplySerial] = MakeVariant(msg.Serial)
-			nmsg.Headers[FieldErrorName] = MakeVariant(errmsg.Name)
-			buf := new(bytes.Buffer)
-			if len(errmsg.Values) != 0 {
-				nmsg.Headers[FieldSignature] = MakeVariant(GetSignature(errmsg.Values...))
-				NewEncoder(buf, binary.LittleEndian).EncodeMulti(errmsg.Values...)
-			}
-			nmsg.Body = buf.Bytes()
-			conn.out <- nmsg
-		}
 	}
-}
-
-func (conn *Connection) getHandler(path string) Handler {
-	var n int
-	var h Handler
-	conn.handlersLck.RLock()
-	for k, v := range conn.handlers {
-		if strings.HasPrefix(path, k) && len(k) > n {
-			n = len(k)
-			h = v
-		}
+	params := make([]reflect.Value, len(vs))
+	for i := 0; i < len(vs); i++ {
+		params[i] = reflect.ValueOf(vs[i])
 	}
-	conn.handlersLck.RUnlock()
-	return h
+	ret := m.Call(params)
+	if msg.Flags&NoReplyExpected == 0 {
+		body := new(bytes.Buffer)
+		sig := ""
+		enc := NewEncoder(body, binary.LittleEndian)
+		for i := 0; i < len(ret); i++ {
+			enc.encode(ret[i])
+			sig += getSignature(ret[i].Type())
+		}
+		reply := new(Message)
+		reply.Order = binary.LittleEndian
+		reply.Type = TypeMethodReply
+		reply.Serial = conn.getSerial()
+		reply.Headers = make(map[HeaderField]Variant)
+		reply.Headers[FieldDestination] = msg.Headers[FieldSender]
+		reply.Headers[FieldReplySerial] = MakeVariant(msg.Serial)
+		if len(ret) != 0 {
+			reply.Headers[FieldSignature] = MakeVariant(Signature{sig})
+			reply.Body = body.Bytes()
+		}
+		conn.out <- reply
+	}
 }
 
 func (conn *Connection) getSerial() uint32 {
@@ -229,13 +233,20 @@ func (conn *Connection) getSerial() uint32 {
 	return i
 }
 
-// Register the given function to be executed for method calls on objects that
-// match pattern. The function will run in its own goroutine.
+// Translate DBus method calls on the given path and interface to actual method
+// calls on the given interface. If a method call on the given path and
+// interface is received, a exported method with the same name is searched and
+// called if the parameters match. The method is executed in a new goroutine.
 //
-// Pattern matching is similar to http.(*ServeMux); i.e., longest pattern wins.
-func (conn *Connection) HandleCall(pattern string, handler Handler) {
+// If you need to implement multiple interfaces on one object, wrap them with
+// (Go) interfaces.
+func (conn *Connection) Handle(v interface{}, path, iface string) {
 	conn.handlersLck.Lock()
-	conn.handlers[pattern] = handler
+	if conn.handlers[path] == nil {
+		conn.handlers[path] = make(map[string]interface{})
+	}
+	// TODO: maybe we could do basic sanity checks on the methods of v here
+	conn.handlers[path][iface] = v
 	conn.handlersLck.Unlock()
 }
 
@@ -524,8 +535,6 @@ func (e ErrorMessage) Error() string {
 	}
 	return e.Name
 }
-
-type Handler func(*CallMessage) (ReplyMessage, *ErrorMessage)
 
 // ReplyMessage represents a DBus message of type MethodReply.
 type ReplyMessage []interface{}
