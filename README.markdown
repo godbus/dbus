@@ -35,6 +35,9 @@ func main() {
 See the [documentation](http://godoc.org/github.com/guelfey/go.dbus) and _examples for
 more information.
 
+Please note the the API is considered unstable for now and may change without
+further notice.
+
 ### License
 
 go.dbus is available under the Simplified BSD License; see LICENSE for the full
