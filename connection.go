@@ -252,7 +252,7 @@ func (conn *Connection) hello() error {
 
 func (conn *Connection) inWorker() {
 	for {
-		msg, err := DecodeMessage(conn.transport)
+		msg, err := conn.readMessage()
 		if err == nil {
 			switch msg.Type {
 			case TypeMethodReply, TypeError:
@@ -312,14 +312,51 @@ func (conn *Connection) inWorker() {
 }
 
 func (conn *Connection) outWorker() {
+	buf := new(bytes.Buffer)
 	for msg := range conn.out {
-		err := msg.EncodeTo(conn.transport)
+		msg.EncodeTo(buf)
+		_, err := buf.WriteTo(conn.transport)
 		conn.repliesLck.RLock()
 		if err != nil && conn.replies[msg.Serial] != nil {
 			conn.replies[msg.Serial] <- err
 		}
 		conn.repliesLck.RUnlock()
+		buf.Reset()
 	}
+}
+
+func (conn *Connection) readMessage() (*Message, error) {
+	// read the first 16 bytes, from which we can figure out the length of the
+	// rest of the message
+	var header [16]byte
+	if _, err := conn.transport.Read(header[:]); err != nil {
+		return nil, err
+	}
+	var order binary.ByteOrder
+	switch header[0] {
+	case 'l':
+		order = binary.LittleEndian
+	case 'B':
+		order = binary.BigEndian
+	default:
+		return nil, InvalidMessageError("invalid byte order")
+	}
+	// header[4:8] -> length of message body, header[12:16] -> length of header
+	// fields (without alignment)
+	var blen, hlen uint32
+	binary.Read(bytes.NewBuffer(header[4:8]), order, &blen)
+	binary.Read(bytes.NewBuffer(header[12:16]), order, &hlen)
+	if hlen % 8 != 0 {
+		hlen += 8 - (hlen % 8)
+	}
+	rest := make([]byte, int(blen + hlen))
+	if _, err := conn.transport.Read(rest); err != nil {
+		return nil, err
+	}
+	all := make([]byte, 16 + len(rest))
+	copy(all, header[:])
+	copy(all[16:], rest)
+	return DecodeMessage(bytes.NewBuffer(all))
 }
 
 // Request name calls org.freedesktop.DBus.RequestName.
