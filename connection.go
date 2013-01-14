@@ -346,14 +346,14 @@ func (conn *Connection) readMessage() (*Message, error) {
 	var blen, hlen uint32
 	binary.Read(bytes.NewBuffer(header[4:8]), order, &blen)
 	binary.Read(bytes.NewBuffer(header[12:16]), order, &hlen)
-	if hlen % 8 != 0 {
+	if hlen%8 != 0 {
 		hlen += 8 - (hlen % 8)
 	}
-	rest := make([]byte, int(blen + hlen))
+	rest := make([]byte, int(blen+hlen))
 	if _, err := conn.transport.Read(rest); err != nil {
 		return nil, err
 	}
-	all := make([]byte, 16 + len(rest))
+	all := make([]byte, 16+len(rest))
 	copy(all, header[:])
 	copy(all[16:], rest)
 	return DecodeMessage(bytes.NewBuffer(all))

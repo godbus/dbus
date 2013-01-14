@@ -2,12 +2,12 @@ package main
 
 import (
 	"fmt"
-    "github.com/guelfey/go.dbus"
+	"github.com/guelfey/go.dbus"
 	"os"
 )
 
 func main() {
-    conn, err := dbus.ConnectSessionBus()
+	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Failed to connect to session bus:", err)
 		os.Exit(1)
