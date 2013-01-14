@@ -2,11 +2,11 @@ go.dbus
 -------
 
 go.dbus is a simple library that implements native Go client bindings for the
-DBus message bus system
+DBus message bus system.
 
 ### Installation
 
-Because this package need some new reflection features, it currently requires a
+Because this package needs some new reflection features, it currently requires a
 Go runtime built from the hg tip. (This will change once Go 1.1 is released.)
 
 If you have this, just run:
