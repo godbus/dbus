@@ -35,7 +35,7 @@ func main() {
 See the [documentation](http://godoc.org/github.com/guelfey/go.dbus) and _examples for
 more information.
 
-Please note the the API is considered unstable for now and may change without
+Please note that the API is considered unstable for now and may change without
 further notice.
 
 ### License
