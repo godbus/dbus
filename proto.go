@@ -8,6 +8,7 @@ import (
 var (
 	byteType       = reflect.TypeOf(byte(0))
 	boolType       = reflect.TypeOf(false)
+	uint8Type      = reflect.TypeOf(uint8(0))
 	int16Type      = reflect.TypeOf(int16(0))
 	uint16Type     = reflect.TypeOf(uint16(0))
 	int32Type      = reflect.TypeOf(int32(0))
@@ -21,6 +22,14 @@ var (
 	variantType    = reflect.TypeOf(Variant{Signature{""}, nil})
 	interfacesType = reflect.TypeOf([]interface{}{})
 )
+
+type invalidTypeError struct {
+	reflect.Type
+}
+
+func (err invalidTypeError) Error() string {
+	return "dbus: invalid type " + err.Type.String()
+}
 
 var sigToType = map[byte]reflect.Type{
 	'y': byteType,
@@ -190,17 +199,7 @@ func (v Variant) Value() interface{} {
 
 func alignment(t reflect.Type) int {
 	n, ok := map[reflect.Type]int{
-		byteType:       1,
-		boolType:       4,
-		int16Type:      2,
-		uint16Type:     2,
-		int32Type:      4,
-		uint32Type:     4,
-		int64Type:      8,
-		uint64Type:     8,
-		float64Type:    8,
 		variantType:    1,
-		stringType:     4,
 		objectPathType: 4,
 		signatureType:  1,
 	}[t]
@@ -208,10 +207,14 @@ func alignment(t reflect.Type) int {
 		return n
 	}
 	switch t.Kind() {
-	case reflect.Struct:
-		return 8
-	case reflect.Array, reflect.Slice:
+	case reflect.Uint8:
+		return 1
+	case reflect.Uint16, reflect.Int16:
+		return 2
+	case reflect.Uint32, reflect.Int32, reflect.String, reflect.Array, reflect.Slice:
 		return 4
+	case reflect.Uint64, reflect.Int64, reflect.Float64, reflect.Struct:
+		return 8
 	case reflect.Ptr:
 		return alignment(t.Elem())
 	}

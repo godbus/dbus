@@ -1,6 +1,7 @@
 package dbus
 
 import (
+	"bytes"
 	"encoding/binary"
 	"io"
 	"reflect"
@@ -165,20 +166,15 @@ func (message *Message) EncodeTo(out io.Writer) error {
 		headers = append(headers, header{k, v})
 	}
 	vs[6] = headers
-	enc := NewEncoder(out, binary.LittleEndian)
-	if err := enc.EncodeMulti(vs...); err != nil {
-		return err
-	}
+	buf := new(bytes.Buffer)
+	enc := NewEncoder(buf, binary.LittleEndian)
+	enc.EncodeMulti(vs...)
 	enc.align(8)
-	if err := enc.flush(); err != nil {
-		return err
-	}
 	if len(message.Body) != 0 {
-		if n, err := out.Write(message.Body); err != nil {
-			return err
-		} else if n < len(message.Body) {
-			return io.ErrUnexpectedEOF
-		}
+		buf.Write(message.Body)
+	}
+	if _, err := buf.WriteTo(out); err != nil {
+		return err
 	}
 	return nil
 }

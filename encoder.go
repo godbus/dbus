@@ -27,7 +27,6 @@ and Variant. Also, fields whose tag contains dbus:"-" will be skipped.
 in a panic.
 */
 type Encoder struct {
-	buf   *bytes.Buffer
 	out   io.Writer
 	order binary.ByteOrder
 	pos   int
@@ -37,46 +36,66 @@ type Encoder struct {
 // byte order.
 func NewEncoder(out io.Writer, order binary.ByteOrder) *Encoder {
 	enc := new(Encoder)
-	enc.buf = new(bytes.Buffer)
 	enc.out = out
 	enc.order = order
 	return enc
 }
 
+// Aligns the next output to be on a multiple of n. Panics on write errors.
 func (enc *Encoder) align(n int) {
 	newpos := enc.pos
 	if newpos%n != 0 {
 		newpos += (n - (newpos % n))
 	}
 	empty := make([]byte, newpos-enc.pos)
-	enc.buf.Write(empty)
+	if _, err := enc.out.Write(empty); err != nil {
+		panic(err)
+	}
 	enc.pos = newpos
+}
+
+// Calls binary.Write(enc.out, enc.order, v) and panics on write errors.
+func (enc *Encoder) binwrite(v interface{}) {
+	if err := binary.Write(enc.out, enc.order, v); err != nil {
+		panic(err)
+	}
 }
 
 // Encode encodes a single value to the underyling reader. All written values
 // are aligned properly as required by the DBus spec.
-func (enc *Encoder) Encode(v interface{}) error {
+func (enc *Encoder) Encode(v interface{}) (err error) {
+	defer func() {
+		err, ok := recover().(error)
+		if ok {
+			// invalidTypeErrors are errors in the program and can't really be
+			// recovered from
+			if _, ok := err.(invalidTypeError); ok {
+				panic(err)
+			}
+		}
+	}()
 	enc.encode(reflect.ValueOf(v))
-	return enc.flush()
+	return nil
 }
 
 // Encode is a shorthand for multiple Encode calls.
 func (enc *Encoder) EncodeMulti(vs ...interface{}) error {
 	for _, v := range vs {
-		enc.encode(reflect.ValueOf(v))
+		if err := enc.Encode(v); err != nil {
+			return err
+		}
 	}
-	return enc.flush()
+	return nil
 }
 
-// Encode the given value to the internal buffer.
+// Encode the given value to the internal buffer. Panics on error.
 func (enc *Encoder) encode(v reflect.Value) {
-	n := alignment(v.Type())
-	if n != -1 {
-		enc.align(n)
-	}
+	enc.align(alignment(v.Type()))
 	switch v.Kind() {
 	case reflect.Uint8:
-		enc.buf.Write([]byte{byte(v.Uint())})
+		if _, err := enc.out.Write([]byte{byte(v.Uint())}); err != nil {
+			panic(err)
+		}
 		enc.pos++
 	case reflect.Bool:
 		if v.Bool() {
@@ -85,31 +104,33 @@ func (enc *Encoder) encode(v reflect.Value) {
 			enc.encode(reflect.ValueOf(uint32(0)))
 		}
 	case reflect.Int16:
-		binary.Write(enc.buf, enc.order, int16(v.Int()))
+		enc.binwrite(int16(v.Int()))
 		enc.pos += 2
 	case reflect.Uint16:
-		binary.Write(enc.buf, enc.order, uint16(v.Uint()))
+		enc.binwrite(uint16(v.Uint()))
 		enc.pos += 2
 	case reflect.Int32:
-		binary.Write(enc.buf, enc.order, int32(v.Int()))
+		enc.binwrite(int32(v.Int()))
 		enc.pos += 4
 	case reflect.Uint32:
-		binary.Write(enc.buf, enc.order, uint32(v.Uint()))
+		enc.binwrite(uint32(v.Uint()))
 		enc.pos += 4
 	case reflect.Int64:
-		binary.Write(enc.buf, enc.order, int64(v.Int()))
+		enc.binwrite(v.Int())
 		enc.pos += 8
 	case reflect.Uint64:
-		binary.Write(enc.buf, enc.order, uint64(v.Uint()))
+		enc.binwrite(v.Uint())
 		enc.pos += 8
 	case reflect.Float64:
-		binary.Write(enc.buf, enc.order, v.Float())
+		enc.binwrite(v.Float())
 		enc.pos += 8
 	case reflect.String:
 		enc.encode(reflect.ValueOf(uint32(len(v.String()))))
-		n, _ := enc.buf.Write([]byte(v.String()))
-		enc.buf.Write([]byte{0})
-		enc.pos += n + 1
+		n, err := enc.out.Write([]byte(v.String() + "\x00"))
+		if err != nil {
+			panic(err)
+		}
+		enc.pos += n
 	case reflect.Ptr:
 		enc.encode(v.Elem())
 	case reflect.Slice, reflect.Array:
@@ -119,20 +140,23 @@ func (enc *Encoder) encode(v reflect.Value) {
 		for i := 0; i < v.Len(); i++ {
 			bufenc.encode(v.Index(i))
 		}
-		bufenc.flush()
 		enc.encode(reflect.ValueOf(uint32(buf.Len())))
 		length := buf.Len()
 		enc.align(alignment(v.Type().Elem()))
-		buf.WriteTo(enc.buf)
+		if _, err := buf.WriteTo(enc.out); err != nil {
+			panic(err)
+		}
 		enc.pos += length
 	case reflect.Struct:
 		switch t := v.Type(); t {
 		case signatureType:
 			str := v.Field(0)
 			enc.encode(reflect.ValueOf(byte(str.Len())))
-			n, _ := enc.buf.Write([]byte(str.String()))
-			enc.buf.Write([]byte{0})
-			enc.pos += n + 1
+			n, err := enc.out.Write([]byte(str.String() + "\x00"))
+			if err != nil {
+				panic(err)
+			}
+			enc.pos += n
 		case variantType:
 			variant := v.Interface().(Variant)
 			enc.encode(reflect.ValueOf(variant.sig))
@@ -156,26 +180,14 @@ func (enc *Encoder) encode(v reflect.Value) {
 			bufenc.encode(k)
 			bufenc.encode(v.MapIndex(k))
 		}
-		bufenc.flush()
 		enc.encode(reflect.ValueOf(uint32(buf.Len())))
 		length := buf.Len()
 		enc.align(8)
-		buf.WriteTo(enc.buf)
+		if _, err := buf.WriteTo(enc.out); err != nil {
+			panic(err)
+		}
 		enc.pos += length
 	default:
-		panic("(*dbus.Encoder): can't encode " + v.Type().String())
+		panic(invalidTypeError{v.Type()})
 	}
-}
-
-func (enc *Encoder) flush() error {
-	expected := enc.buf.Len()
-	n, err := io.Copy(enc.out, enc.buf)
-	defer enc.buf.Reset()
-	if err != nil {
-		return err
-	}
-	if int(n) != expected {
-		return io.ErrShortWrite
-	}
-	return nil
 }
