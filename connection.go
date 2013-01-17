@@ -157,10 +157,9 @@ func NewConnection(address string) (*Connection, error) {
 	return conn, nil
 }
 
-// Call invokes the method named name on the object specified by destination,
-// path and iface with the given parameters. If iface is empty, it is not sent
-// in the message. If flags does not contain NoReplyExpected, a cookie
-// is returned that can be used for querying the reply. Otherwise, nil is returned.
+// Call invokes the method represented by cm with the given flags. If the flags
+// do not contain NoReplyExpected, a cookie is returned that can be used for
+// querying the reply. Otherwise, nil is returned.
 func (conn *Connection) Call(cm *CallMessage, flags Flags) *Cookie {
 	msg := cm.toMessage(conn)
 	msg.Flags = flags & (NoAutoStart | NoReplyExpected)
