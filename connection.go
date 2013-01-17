@@ -198,24 +198,28 @@ func (conn *Connection) doHandle(msg *Message) {
 	name := msg.Headers[FieldMember].value.(string)
 	path := msg.Headers[FieldPath].value.(ObjectPath)
 	iface := msg.Headers[FieldInterface].value.(string)
+	sender := msg.Headers[FieldSender].value.(string)
+	serial := msg.Serial
 	conn.handlersLck.RLock()
 	v := conn.handlers[string(path)][iface]
 	conn.handlersLck.RUnlock()
 	if v == nil {
+		conn.out <- errmsgUnknownMethod.toMessage(conn, sender, serial)
 		return
 	}
 	m := reflect.ValueOf(v).MethodByName(name)
 	if !m.IsValid() {
+		conn.out <- errmsgUnknownMethod.toMessage(conn, sender, serial)
 		return
 	}
 	t := m.Type()
 	if t.NumIn() != len(vs) {
-		// TODO: return an error reply
+		conn.out <- errmsgInvalidArg.toMessage(conn, sender, serial)
 		return
 	}
 	for i := 0; i < t.NumIn(); i++ {
 		if t.In(i) != reflect.TypeOf(vs[i]) {
-			// TODO: return an error reply
+			conn.out <- errmsgInvalidArg.toMessage(conn, sender, serial)
 			return
 		}
 	}
