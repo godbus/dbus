@@ -61,6 +61,8 @@ func ConnectSystemBus() (*Connection, error) {
 	return NewConnection(defaultSystemBusAddress)
 }
 
+// NewConnection establishes a new connection to the message bus specified by
+// address.
 func NewConnection(address string) (*Connection, error) {
 	// BUG(guelfey): Only the "unix" transport is supported right now.
 	var err error
@@ -238,7 +240,7 @@ func (conn *Connection) getSerial() uint32 {
 // interface is received, a exported method with the same name is searched and
 // called if the parameters match. The method is executed in a new goroutine.
 //
-// If you need to implement multiple interfaces on one object, wrap them with
+// If you need to implement multiple interfaces on one object, wrap it with
 // (Go) interfaces.
 func (conn *Connection) Handle(v interface{}, path, iface string) {
 	conn.handlersLck.Lock()
@@ -539,6 +541,7 @@ func (e ErrorMessage) Error() string {
 // ReplyMessage represents a DBus message of type MethodReply.
 type ReplyMessage []interface{}
 
+// RequestNameFlags represents the possible flags for the RequestName call.
 type RequestNameFlags uint32
 
 const (
@@ -547,6 +550,7 @@ const (
 	FlagDoNotQueue
 )
 
+// RequestNameReply is the reply to a RequestName call.
 type RequestNameReply uint32
 
 const (

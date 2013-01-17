@@ -4,7 +4,9 @@ corresponding encoding format.
 
 For the message bus API, you first need to connect to a bus (usually the Session
 or System bus). Then, you can call methods with Call() and receive signals over
-the channel returned by Signals().
+the channel returned by Signals(). Handling method calls is even easier; using
+Handle(), you can arrange DBus message calls to be directly translated to method
+calls on a Go value.
 
 Decoder and Encoder provide direct access to the DBus wire format. You usually
 don't need to use them directly. For the rules and caveats, see their respective

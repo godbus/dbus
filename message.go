@@ -45,6 +45,8 @@ const (
 	fieldMax
 )
 
+// An InvalidMessageError describes the reason why a DBus message is regarded as
+// invalid.
 type InvalidMessageError string
 
 func (e InvalidMessageError) Error() string {

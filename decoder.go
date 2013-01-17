@@ -21,8 +21,8 @@ type Decoder struct {
 	pos   int
 }
 
-// NewDecoder returns a new decoder that reads values from the Reader
-// in the given byte order.
+// NewDecoder returns a new decoder that reads values from in. The input is
+// expected to be in the given byte order.
 func NewDecoder(in io.Reader, order binary.ByteOrder) *Decoder {
 	dec := new(Decoder)
 	dec.in = in

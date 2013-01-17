@@ -165,6 +165,8 @@ func (s Signature) Values() []interface{} {
 	return slice
 }
 
+// A SignatureError indicates that a signature passed to a function or received
+// on a connection is not a valid signature.
 type SignatureError struct {
 	Sig    string
 	Reason string
@@ -174,6 +176,7 @@ func (err SignatureError) Error() string {
 	return "invalid signature: '" + err.Sig + "' (" + err.Reason + ")"
 }
 
+// An ObjectPath is an object path as defined by the DBus spec.
 type ObjectPath string
 
 // Variant represents a DBus variant type.
