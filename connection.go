@@ -13,12 +13,64 @@ import (
 
 const defaultSystemBusAddress = "unix:path=/var/run/dbus/system_bus_socket"
 
+var (
+	errmsgInvalidArg = ErrorMessage{
+		"org.freedesktop.DBus.Error.InvalidArgs",
+		[]interface{}{"Invalid type / number of args"},
+	}
+	errmsgUnknownMethod = ErrorMessage{
+		"org.freedesktop.DBus.Error.UnknownMethod",
+		[]interface{}{"Unkown / invalid method"},
+	}
+)
+
+var (
+	helloMsg = &CallMessage{
+		Destination: "org.freedesktop.DBus",
+		Path:        "/org/freedesktop/DBus",
+		Interface:   "org.freedesktop.DBus",
+		Name:        "Hello",
+	}
+	requestNameMsg = &CallMessage{
+		Destination: "org.freedesktop.DBus",
+		Path:        "/org/freedesktop/DBus",
+		Interface:   "org.freedesktop.DBus",
+		Name:        "RequestName",
+		Args:        []interface{}{nil, nil},
+	}
+)
+
 // CallMessage represents a DBus message of type MethodCall.
 type CallMessage struct {
-	Name      string
-	Path      string
-	Interface string
-	Args      []interface{}
+	Destination string
+	Path        string
+	Interface   string
+	Name        string
+	Args        []interface{}
+}
+
+func (cm *CallMessage) toMessage(conn *Connection) *Message {
+	msg := new(Message)
+	msg.Order = binary.LittleEndian
+	msg.Type = TypeMethodCall
+	msg.Serial = conn.getSerial()
+	msg.Headers = make(map[HeaderField]Variant)
+	msg.Headers[FieldPath] = MakeVariant(ObjectPath(cm.Path))
+	msg.Headers[FieldDestination] = MakeVariant(cm.Destination)
+	msg.Headers[FieldMember] = MakeVariant(cm.Name)
+	if cm.Interface != "" {
+		msg.Headers[FieldInterface] = MakeVariant(cm.Interface)
+	}
+	if len(cm.Args) > 0 {
+		msg.Headers[FieldSignature] = MakeVariant(GetSignature(cm.Args...))
+		buf := new(bytes.Buffer)
+		enc := NewEncoder(buf, binary.LittleEndian)
+		enc.EncodeMulti(cm.Args...)
+		msg.Body = buf.Bytes()
+	} else {
+		msg.Body = []byte{}
+	}
+	return msg
 }
 
 // BUG(guelfey): Object paths should be verified and passed as ObjectPaths where
@@ -109,32 +161,9 @@ func NewConnection(address string) (*Connection, error) {
 // path and iface with the given parameters. If iface is empty, it is not sent
 // in the message. If flags does not contain NoReplyExpected, a cookie
 // is returned that can be used for querying the reply. Otherwise, nil is returned.
-//
-// TODO: maybe this should take a CallMessage
-func (conn *Connection) Call(destination, path, iface, name string,
-	flags Flags, params ...interface{}) *Cookie {
-
-	msg := new(Message)
-	msg.Order = binary.LittleEndian
-	msg.Type = TypeMethodCall
+func (conn *Connection) Call(cm *CallMessage, flags Flags) *Cookie {
+	msg := cm.toMessage(conn)
 	msg.Flags = flags & (NoAutoStart | NoReplyExpected)
-	msg.Serial = conn.getSerial()
-	msg.Headers = make(map[HeaderField]Variant)
-	msg.Headers[FieldPath] = MakeVariant(ObjectPath(path))
-	msg.Headers[FieldDestination] = MakeVariant(destination)
-	msg.Headers[FieldMember] = MakeVariant(name)
-	if iface != "" {
-		msg.Headers[FieldInterface] = MakeVariant(iface)
-	}
-	if params != nil && len(params) > 0 {
-		msg.Headers[FieldSignature] = MakeVariant(GetSignature(params...))
-		buf := new(bytes.Buffer)
-		enc := NewEncoder(buf, binary.LittleEndian)
-		enc.EncodeMulti(params...)
-		msg.Body = buf.Bytes()
-	} else {
-		msg.Body = []byte{}
-	}
 	if msg.Flags&NoReplyExpected == 0 {
 		conn.repliesLck.Lock()
 		conn.replies[msg.Serial] = make(chan interface{}, 1)
@@ -254,8 +283,7 @@ func (conn *Connection) Handle(v interface{}, path, iface string) {
 
 func (conn *Connection) hello() error {
 	var s string
-	err := conn.Call("org.freedesktop.DBus", "/org/freedesktop/DBus",
-		"org.freedesktop.DBus", "Hello", 0).StoreReply(&s)
+	err := conn.Call(helloMsg, 0).StoreReply(&s)
 	if err != nil {
 		return err
 	}
@@ -303,9 +331,11 @@ func (conn *Connection) inWorker() {
 					sender := msg.Headers[FieldSender].value.(string)
 					switch msg.Headers[FieldMember].value.(string) {
 					case "Ping":
-						conn.sendReply(serial, sender)
+						rm := ReplyMessage(nil)
+						conn.out <- rm.toMessage(conn, sender, serial)
 					case "GetMachineId":
-						conn.sendReply(serial, sender, conn.uuid)
+						rm := ReplyMessage([]interface{}{conn.uuid})
+						conn.out <- rm.toMessage(conn, sender, serial)
 					}
 				} else {
 					go conn.doHandle(msg)
@@ -376,8 +406,10 @@ func (conn *Connection) readMessage() (*Message, error) {
 func (conn *Connection) RequestName(name string, flags RequestNameFlags) (RequestNameReply, error) {
 
 	var r uint32
-	err := conn.Call("org.freedesktop.DBus", "/org/freedesktop/DBus",
-		"org.freedesktop.DBus", "RequestName", 0, name, flags).StoreReply(&r)
+	msg := requestNameMsg
+	msg.Args[0] = name
+	msg.Args[1] = flags
+	err := conn.Call(msg, 0).StoreReply(&r)
 	if err != nil {
 		return 0, err
 	}
@@ -392,29 +424,6 @@ func (conn *Connection) RequestName(name string, flags RequestNameFlags) (Reques
 // signal named ".Closed" is returned and the channel is closed.
 func (conn *Connection) Signals() <-chan SignalMessage {
 	return conn.signals
-}
-
-func (conn *Connection) sendReply(serial uint32, destination string,
-	vs ...interface{}) {
-
-	msg := new(Message)
-	msg.Order = binary.LittleEndian
-	msg.Type = TypeMethodReply
-	msg.Flags = 0
-	msg.Serial = conn.getSerial()
-	msg.Headers = make(map[HeaderField]Variant)
-	msg.Headers[FieldDestination] = MakeVariant(destination)
-	msg.Headers[FieldReplySerial] = MakeVariant(serial)
-	if len(vs) > 0 {
-		msg.Headers[FieldSignature] = MakeVariant(GetSignature(vs...))
-		buf := new(bytes.Buffer)
-		enc := NewEncoder(buf, binary.LittleEndian)
-		enc.EncodeMulti(vs...)
-		msg.Body = buf.Bytes()
-	} else {
-		msg.Body = []byte{}
-	}
-	conn.out <- msg
 }
 
 // Cookie represents a pending message reply. Each reply can only be queried
@@ -538,8 +547,48 @@ func (e ErrorMessage) Error() string {
 	return e.Name
 }
 
+func (em ErrorMessage) toMessage(conn *Connection, dest string, serial uint32) *Message {
+	msg := new(Message)
+	msg.Order = binary.LittleEndian
+	msg.Type = TypeError
+	msg.Serial = conn.getSerial()
+	msg.Headers = make(map[HeaderField]Variant)
+	msg.Headers[FieldDestination] = MakeVariant(dest)
+	msg.Headers[FieldErrorName] = MakeVariant(em.Name)
+	msg.Headers[FieldReplySerial] = MakeVariant(serial)
+	if len(em.Values) > 0 {
+		msg.Headers[FieldSignature] = MakeVariant(GetSignature(em.Values...))
+		buf := new(bytes.Buffer)
+		enc := NewEncoder(buf, binary.LittleEndian)
+		enc.EncodeMulti(em.Values...)
+		msg.Body = buf.Bytes()
+	} else {
+		msg.Body = []byte{}
+	}
+	return msg
+}
+
 // ReplyMessage represents a DBus message of type MethodReply.
 type ReplyMessage []interface{}
+
+func (rm ReplyMessage) toMessage(conn *Connection, dest string, serial uint32) *Message {
+	msg := new(Message)
+	msg.Order = binary.LittleEndian
+	msg.Type = TypeMethodReply
+	msg.Headers = make(map[HeaderField]Variant)
+	msg.Headers[FieldDestination] = MakeVariant(dest)
+	msg.Headers[FieldReplySerial] = MakeVariant(serial)
+	if len(rm) > 0 {
+		msg.Headers[FieldSignature] = MakeVariant(GetSignature(rm...))
+		buf := new(bytes.Buffer)
+		enc := NewEncoder(buf, binary.LittleEndian)
+		enc.EncodeMulti(rm...)
+		msg.Body = buf.Bytes()
+	} else {
+		msg.Body = []byte{}
+	}
+	return msg
+}
 
 // RequestNameFlags represents the possible flags for the RequestName call.
 type RequestNameFlags uint32

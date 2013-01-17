@@ -5,6 +5,11 @@ import (
 	"strings"
 )
 
+var introspectMsg = &CallMessage{
+	Interface: "org.freedesktop.DBus.Introspectable",
+	Name:      "Introspect",
+}
+
 // Node is the root element of an introspection.
 type Node struct {
 	XMLName    xml.Name    `xml:"node"`
@@ -66,8 +71,10 @@ func (conn *Connection) Introspect(path, dest string) (*Node, error) {
 	var xmldata string
 	var node Node
 
-	err := conn.Call(dest, path, "org.freedesktop.DBus.Introspectable",
-		"Introspect", 0).StoreReply(&xmldata)
+	msg := introspectMsg
+	msg.Path = path
+	msg.Destination = dest
+	err := conn.Call(msg, 0).StoreReply(&xmldata)
 	if err != nil {
 		return nil, err
 	}

@@ -7,11 +7,16 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	err = conn.Call("org.freedesktop.Notifications",
-		"/org/freedesktop/Notifications", "org.freedesktop.Notifications",
-		"Notify", 0, "", uint32(0), "", "Test",
-		"This is a test of the DBus bindings for Go.", []string{},
-		map[string]dbus.Variant{}, int32(5000)).WaitReply()
+	msg := &dbus.CallMessage{
+		Destination: "org.freedesktop.Notifications",
+		Path:        "/org/freedesktop/Notifications",
+		Interface:   "org.freedesktop.Notifications",
+		Name:        "Notify",
+		Args: []interface{}{"", uint32(0), "", "Test",
+			"This is a test of the DBus bindings for go.", []string{},
+			map[string]dbus.Variant{}, int32(5000)},
+	}
+	err = conn.Call(msg, 0).WaitReply()
 	if err != nil {
 		panic(err)
 	}
