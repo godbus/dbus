@@ -8,9 +8,9 @@ import (
 
 type foo string
 
-func (f foo) Foo() string {
+func (f foo) Foo() (string, *dbus.ErrorMessage) {
 	fmt.Println(f)
-	return string(f)
+	return string(f), nil
 }
 
 func main() {

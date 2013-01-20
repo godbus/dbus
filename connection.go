@@ -212,6 +212,12 @@ func (conn *Connection) doHandle(msg *Message) {
 		return
 	}
 	t := m.Type()
+	if t.NumOut() == 0 ||
+		t.Out(t.NumOut()-1) != reflect.TypeOf(&errmsgInvalidArg) {
+
+		conn.out <- errmsgUnknownMethod.toMessage(conn, sender, serial)
+		return
+	}
 	if t.NumIn() != len(vs) {
 		conn.out <- errmsgInvalidArg.toMessage(conn, sender, serial)
 		return
@@ -227,11 +233,15 @@ func (conn *Connection) doHandle(msg *Message) {
 		params[i] = reflect.ValueOf(vs[i])
 	}
 	ret := m.Call(params)
+	if em := ret[t.NumOut()-1].Interface().(*ErrorMessage); em != nil {
+		conn.out<-em.toMessage(conn, msg.Headers[FieldSender].value.(string), msg.Serial)
+		return
+	}
 	if msg.Flags&NoReplyExpected == 0 {
 		body := new(bytes.Buffer)
 		sig := ""
 		enc := NewEncoder(body, binary.LittleEndian)
-		for i := 0; i < len(ret); i++ {
+		for i := 0; i < len(ret)-1; i++ {
 			enc.encode(ret[i])
 			sig += getSignature(ret[i].Type())
 		}
@@ -242,9 +252,11 @@ func (conn *Connection) doHandle(msg *Message) {
 		reply.Headers = make(map[HeaderField]Variant)
 		reply.Headers[FieldDestination] = msg.Headers[FieldSender]
 		reply.Headers[FieldReplySerial] = MakeVariant(msg.Serial)
-		if len(ret) != 0 {
+		if len(ret) != 1 {
 			reply.Headers[FieldSignature] = MakeVariant(Signature{sig})
 			reply.Body = body.Bytes()
+		} else {
+			reply.Body = []byte{}
 		}
 		conn.out <- reply
 	}
@@ -270,7 +282,12 @@ func (conn *Connection) getSerial() uint32 {
 // Translate DBus method calls on the given path and interface to actual method
 // calls on the given interface. If a method call on the given path and
 // interface is received, a exported method with the same name is searched and
-// called if the parameters match. The method is executed in a new goroutine.
+// called if the parameters match and the last return value is of type
+// *ErrorMessage. If this value is not nil, it is sent back to the caller as an
+// error. Otherwise, a method reply is sent with the other parameters as its
+// body.
+//
+// The method is executed in a new goroutine.
 //
 // If you need to implement multiple interfaces on one object, wrap it with
 // (Go) interfaces.
