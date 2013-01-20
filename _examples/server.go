@@ -27,7 +27,7 @@ func main() {
 		os.Exit(1)
 	}
 	f := foo("Bar!")
-	conn.Handle(f, "/com/github/guelfey/Demo", "com.github.guelfey.Demo")
+	conn.Export(f, "/com/github/guelfey/Demo", "com.github.guelfey.Demo")
 	fmt.Println("Listening on com.github.guelfey.Demo / /com/github/guelfey/Demo ...")
 	select {}
 }

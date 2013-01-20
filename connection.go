@@ -14,64 +14,13 @@ import (
 const defaultSystemBusAddress = "unix:path=/var/run/dbus/system_bus_socket"
 
 var (
-	errmsgInvalidArg = ErrorMessage{
-		"org.freedesktop.DBus.Error.InvalidArgs",
-		[]interface{}{"Invalid type / number of args"},
-	}
-	errmsgUnknownMethod = ErrorMessage{
-		"org.freedesktop.DBus.Error.UnknownMethod",
-		[]interface{}{"Unkown / invalid method"},
-	}
-)
-
-var (
 	helloMsg = &CallMessage{
 		Destination: "org.freedesktop.DBus",
 		Path:        "/org/freedesktop/DBus",
 		Interface:   "org.freedesktop.DBus",
 		Name:        "Hello",
 	}
-	requestNameMsg = &CallMessage{
-		Destination: "org.freedesktop.DBus",
-		Path:        "/org/freedesktop/DBus",
-		Interface:   "org.freedesktop.DBus",
-		Name:        "RequestName",
-		Args:        []interface{}{nil, nil},
-	}
 )
-
-// CallMessage represents a DBus message of type MethodCall.
-type CallMessage struct {
-	Destination string
-	Path        string
-	Interface   string
-	Name        string
-	Args        []interface{}
-}
-
-func (cm *CallMessage) toMessage(conn *Connection) *Message {
-	msg := new(Message)
-	msg.Order = binary.LittleEndian
-	msg.Type = TypeMethodCall
-	msg.Serial = conn.getSerial()
-	msg.Headers = make(map[HeaderField]Variant)
-	msg.Headers[FieldPath] = MakeVariant(ObjectPath(cm.Path))
-	msg.Headers[FieldDestination] = MakeVariant(cm.Destination)
-	msg.Headers[FieldMember] = MakeVariant(cm.Name)
-	if cm.Interface != "" {
-		msg.Headers[FieldInterface] = MakeVariant(cm.Interface)
-	}
-	if len(cm.Args) > 0 {
-		msg.Headers[FieldSignature] = MakeVariant(GetSignature(cm.Args...))
-		buf := new(bytes.Buffer)
-		enc := NewEncoder(buf, binary.LittleEndian)
-		enc.EncodeMulti(cm.Args...)
-		msg.Body = buf.Bytes()
-	} else {
-		msg.Body = []byte{}
-	}
-	return msg
-}
 
 // BUG(guelfey): Object paths should be verified and passed as ObjectPaths where
 // possible.
@@ -157,23 +106,6 @@ func NewConnection(address string) (*Connection, error) {
 	return conn, nil
 }
 
-// Call invokes the method represented by cm with the given flags. If the flags
-// do not contain NoReplyExpected, a cookie is returned that can be used for
-// querying the reply. Otherwise, nil is returned.
-func (conn *Connection) Call(cm *CallMessage, flags Flags) *Cookie {
-	msg := cm.toMessage(conn)
-	msg.Flags = flags & (NoAutoStart | NoReplyExpected)
-	if msg.Flags&NoReplyExpected == 0 {
-		conn.repliesLck.Lock()
-		conn.replies[msg.Serial] = make(chan interface{}, 1)
-		conn.repliesLck.Unlock()
-		conn.out <- msg
-		return &Cookie{conn, msg.Serial}
-	}
-	conn.out <- msg
-	return nil
-}
-
 // Close closes the underlying transport of the connection and stops all
 // related goroutines.
 func (conn *Connection) Close() error {
@@ -181,85 +113,6 @@ func (conn *Connection) Close() error {
 	close(conn.out)
 	close(conn.signals)
 	return conn.transport.Close()
-}
-
-func (conn *Connection) doHandle(msg *Message) {
-	var vs []interface{}
-	if len(msg.Body) != 0 {
-		vs := msg.Headers[FieldSignature].value.(Signature).Values()
-		dec := NewDecoder(bytes.NewBuffer(msg.Body), msg.Order)
-		err := dec.DecodeMulti(vs...)
-		if err != nil {
-			return
-		}
-		vs = dereferenceAll(vs)
-	}
-	name := msg.Headers[FieldMember].value.(string)
-	path := msg.Headers[FieldPath].value.(ObjectPath)
-	iface := msg.Headers[FieldInterface].value.(string)
-	sender := msg.Headers[FieldSender].value.(string)
-	serial := msg.Serial
-	conn.handlersLck.RLock()
-	v := conn.handlers[string(path)][iface]
-	conn.handlersLck.RUnlock()
-	if v == nil {
-		conn.out <- errmsgUnknownMethod.toMessage(conn, sender, serial)
-		return
-	}
-	m := reflect.ValueOf(v).MethodByName(name)
-	if !m.IsValid() {
-		conn.out <- errmsgUnknownMethod.toMessage(conn, sender, serial)
-		return
-	}
-	t := m.Type()
-	if t.NumOut() == 0 ||
-		t.Out(t.NumOut()-1) != reflect.TypeOf(&errmsgInvalidArg) {
-
-		conn.out <- errmsgUnknownMethod.toMessage(conn, sender, serial)
-		return
-	}
-	if t.NumIn() != len(vs) {
-		conn.out <- errmsgInvalidArg.toMessage(conn, sender, serial)
-		return
-	}
-	for i := 0; i < t.NumIn(); i++ {
-		if t.In(i) != reflect.TypeOf(vs[i]) {
-			conn.out <- errmsgInvalidArg.toMessage(conn, sender, serial)
-			return
-		}
-	}
-	params := make([]reflect.Value, len(vs))
-	for i := 0; i < len(vs); i++ {
-		params[i] = reflect.ValueOf(vs[i])
-	}
-	ret := m.Call(params)
-	if em := ret[t.NumOut()-1].Interface().(*ErrorMessage); em != nil {
-		conn.out<-em.toMessage(conn, msg.Headers[FieldSender].value.(string), msg.Serial)
-		return
-	}
-	if msg.Flags&NoReplyExpected == 0 {
-		body := new(bytes.Buffer)
-		sig := ""
-		enc := NewEncoder(body, binary.LittleEndian)
-		for i := 0; i < len(ret)-1; i++ {
-			enc.encode(ret[i])
-			sig += getSignature(ret[i].Type())
-		}
-		reply := new(Message)
-		reply.Order = binary.LittleEndian
-		reply.Type = TypeMethodReply
-		reply.Serial = conn.getSerial()
-		reply.Headers = make(map[HeaderField]Variant)
-		reply.Headers[FieldDestination] = msg.Headers[FieldSender]
-		reply.Headers[FieldReplySerial] = MakeVariant(msg.Serial)
-		if len(ret) != 1 {
-			reply.Headers[FieldSignature] = MakeVariant(Signature{sig})
-			reply.Body = body.Bytes()
-		} else {
-			reply.Body = []byte{}
-		}
-		conn.out <- reply
-	}
 }
 
 func (conn *Connection) getSerial() uint32 {
@@ -277,28 +130,6 @@ func (conn *Connection) getSerial() uint32 {
 	}
 	conn.lastSerial = i
 	return i
-}
-
-// Translate DBus method calls on the given path and interface to actual method
-// calls on the given interface. If a method call on the given path and
-// interface is received, a exported method with the same name is searched and
-// called if the parameters match and the last return value is of type
-// *ErrorMessage. If this value is not nil, it is sent back to the caller as an
-// error. Otherwise, a method reply is sent with the other parameters as its
-// body.
-//
-// The method is executed in a new goroutine.
-//
-// If you need to implement multiple interfaces on one object, wrap it with
-// (Go) interfaces.
-func (conn *Connection) Handle(v interface{}, path, iface string) {
-	conn.handlersLck.Lock()
-	if conn.handlers[path] == nil {
-		conn.handlers[path] = make(map[string]interface{})
-	}
-	// TODO: maybe we could do basic sanity checks on the methods of v here
-	conn.handlers[path][iface] = v
-	conn.handlersLck.Unlock()
 }
 
 func (conn *Connection) hello() error {
@@ -358,7 +189,7 @@ func (conn *Connection) inWorker() {
 						conn.out <- rm.toMessage(conn, sender, serial)
 					}
 				} else {
-					go conn.doHandle(msg)
+					go conn.handleCall(msg)
 				}
 			}
 		} else if _, ok := err.(InvalidMessageError); !ok {
@@ -422,20 +253,6 @@ func (conn *Connection) readMessage() (*Message, error) {
 	return DecodeMessage(bytes.NewBuffer(all))
 }
 
-// Request name calls org.freedesktop.DBus.RequestName.
-func (conn *Connection) RequestName(name string, flags RequestNameFlags) (RequestNameReply, error) {
-
-	var r uint32
-	msg := requestNameMsg
-	msg.Args[0] = name
-	msg.Args[1] = flags
-	err := conn.Call(msg, 0).StoreReply(&r)
-	if err != nil {
-		return 0, err
-	}
-	return RequestNameReply(r), nil
-}
-
 // Signals returns a channel to which all received signal messages are forwarded.
 // The channel is buffered, but package dbus will not block when it is full, but
 // discard the signal.
@@ -445,112 +262,6 @@ func (conn *Connection) RequestName(name string, flags RequestNameFlags) (Reques
 func (conn *Connection) Signals() <-chan SignalMessage {
 	return conn.signals
 }
-
-// Cookie represents a pending message reply. Each reply can only be queried
-// once.
-type Cookie struct {
-	conn   *Connection
-	serial uint32
-}
-
-// Reply blocks until a reply to this cookie is received and returns the
-// unmarshalled representation of the body, treated as if it was wrapped in a
-// Variant. If the error is not nil, it is either an error on the underlying
-// transport or an ErrorMessage.
-//
-// If you know the type of the response, use StoreReply().
-func (c *Cookie) Reply() (ReplyMessage, error) {
-	msg, err := c.reply()
-	if err != nil {
-		return nil, err
-	}
-	sig := msg.Headers[FieldSignature].value.(Signature)
-	rvs := sig.Values()
-	dec := NewDecoder(bytes.NewBuffer(msg.Body), msg.Order)
-	err = dec.DecodeMulti(rvs...)
-	if err != nil {
-		return nil, err
-	}
-	rvs = dereferenceAll(rvs)
-	if msg.Type == TypeError {
-		name, _ := msg.Headers[FieldErrorName].value.(string)
-		return nil, ErrorMessage{name, rvs}
-	}
-	return ReplyMessage(rvs), nil
-}
-
-// reply blocks waiting for the reply and returns either the reply or a
-// transport error. It can only be called once for every cookie.
-func (c *Cookie) reply() (*Message, error) {
-	if c == nil || c.conn == nil {
-		return nil, errors.New("invalid cookie")
-	}
-	c.conn.repliesLck.RLock()
-	if c.conn.replies[c.serial] == nil {
-		return nil, errors.New("invalid cookie")
-	}
-	resp := <-c.conn.replies[c.serial]
-	c.conn.repliesLck.RUnlock()
-	defer func() {
-		c.conn.repliesLck.Lock()
-		c.conn.replies[c.serial] = nil
-		c.conn.repliesLck.Unlock()
-		c.conn = nil
-	}()
-	if msg, ok := resp.(*Message); ok {
-		return msg, nil
-	}
-	return nil, resp.(error)
-}
-
-// StoreReply behaves like Reply, but decodes the values into provided pointers
-// It panics if one of retvalues is not a pointer to a DBus-representable value
-// and returns an error if the signatures of the body and retvalues don't match.
-func (c *Cookie) StoreReply(retvalues ...interface{}) error {
-	msg, err := c.reply()
-	if err != nil {
-		return err
-	}
-	esig := GetSignature(retvalues...)
-	rsig := msg.Headers[FieldSignature].value.(Signature)
-	dec := NewDecoder(bytes.NewBuffer(msg.Body), msg.Order)
-	if msg.Type == TypeError {
-		rvs := rsig.Values()
-		err := dec.DecodeMulti(rvs...)
-		if err != nil {
-			return err
-		}
-		return ErrorMessage{msg.Headers[FieldErrorName].value.(string), rvs}
-	}
-	if esig != rsig {
-		return errors.New("mismatched signature")
-	}
-	err = dec.DecodeMulti(retvalues...)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// WaitReply behaves like Reply, except that it discards the reply after it
-// arrived.
-func (c *Cookie) WaitReply() error {
-	msg, err := c.reply()
-	if err != nil {
-		return err
-	}
-	if msg.Type == TypeError {
-		rvs := msg.Headers[FieldSignature].value.(Signature).Values()
-		dec := NewDecoder(bytes.NewBuffer(msg.Body), msg.Order)
-		err := dec.DecodeMulti(rvs...)
-		if err != nil {
-			return err
-		}
-		return ErrorMessage{msg.Headers[FieldErrorName].value.(string), rvs}
-	}
-	return nil
-}
-
 // ErrorMessage represents a DBus message of type Error.
 type ErrorMessage struct {
 	Name   string
@@ -609,25 +320,6 @@ func (rm ReplyMessage) toMessage(conn *Connection, dest string, serial uint32) *
 	}
 	return msg
 }
-
-// RequestNameFlags represents the possible flags for the RequestName call.
-type RequestNameFlags uint32
-
-const (
-	FlagAllowReplacement RequestNameFlags = 1 << iota
-	FlagReplaceExisting
-	FlagDoNotQueue
-)
-
-// RequestNameReply is the reply to a RequestName call.
-type RequestNameReply uint32
-
-const (
-	NameReplyPrimaryOwner RequestNameReply = 1 + iota
-	NameReplyInQueue
-	NameReplyExists
-	NameReplyAlreadyOwner
-)
 
 // Signal represents a DBus message of type Signal.
 type SignalMessage struct {
