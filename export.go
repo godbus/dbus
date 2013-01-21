@@ -3,6 +3,7 @@ package dbus
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/xml"
 	"reflect"
 )
 
@@ -37,17 +38,36 @@ func (conn *Connection) handleCall(msg *Message) {
 	}
 	name := msg.Headers[FieldMember].value.(string)
 	path := msg.Headers[FieldPath].value.(ObjectPath)
-	iface := msg.Headers[FieldInterface].value.(string)
+	ifacename := msg.Headers[FieldInterface].value.(string)
 	sender := msg.Headers[FieldSender].value.(string)
 	serial := msg.Serial
 	conn.handlersLck.RLock()
-	v := conn.handlers[string(path)][iface]
+	obj := conn.handlers[string(path)]
+	if obj == nil {
+		conn.out <- errmsgUnknownMethod.toMessage(conn, sender, serial)
+		conn.handlersLck.RUnlock()
+		return
+	}
+	iface := obj[ifacename]
 	conn.handlersLck.RUnlock()
-	if v == nil {
+	if ifacename == "org.freedesktop.DBus.Introspectable" && name == "Introspect" {
+		var n Node
+		n.Interfaces = make([]Interface, 0)
+		conn.handlersLck.RLock()
+		for _, v := range obj {
+			n.Interfaces = append(n.Interfaces, *v)
+		}
+		conn.handlersLck.RUnlock()
+		b, _ := xml.Marshal(n)
+		rmsg := ReplyMessage([]interface{}{string(b)})
+		conn.out <- rmsg.toMessage(conn, sender, serial)
+		return
+	}
+	if iface == nil {
 		conn.out <- errmsgUnknownMethod.toMessage(conn, sender, serial)
 		return
 	}
-	m := reflect.ValueOf(v).MethodByName(name)
+	m := reflect.ValueOf(iface.v).MethodByName(name)
 	if !m.IsValid() {
 		conn.out <- errmsgUnknownMethod.toMessage(conn, sender, serial)
 		return
@@ -103,25 +123,31 @@ func (conn *Connection) handleCall(msg *Message) {
 	}
 }
 
-// Translate DBus method calls on the given path and interface to actual method
-// calls on the given interface. If a method call on the given path and
-// interface is received, a exported method with the same name is searched and
-// called if the parameters match and the last return value is of type
-// *ErrorMessage. If this value is not nil, it is sent back to the caller as an
-// error. Otherwise, a method reply is sent with the other parameters as its
-// body.
+// Export the given value as an object on the message bus. Package dbus will
+// translate method calls on path to actual method calls. The iface parameter
+// gives the name of the interface and the other introspection data that is
+// passed to any peer calling org.freedesktop.Introspectable.Introspect.
+//
+// If a method call on the given path and interface is received, an exported
+// method with the same name is called if the parameters match and the last
+// return value is of type *ErrorMessage. If this value is not nil, it is
+// sent back to the caller as an error. Otherwise, a method reply is sent
+// with the other parameters as its body.
 //
 // The method is executed in a new goroutine.
 //
-// If you need to implement multiple interfaces on one object, wrap it with
+// If you need to implement multiple interfaces on one "object", wrap it with
 // (Go) interfaces.
-func (conn *Connection) Export(v interface{}, path, iface string) {
+func (conn *Connection) Export(v interface{}, path string, iface *Interface) {
+	iface.v = v
+	iface.Methods = genMethods(v)
+	// TODO: check that iface is valid (valid name, valid signatures ...)
 	conn.handlersLck.Lock()
 	if conn.handlers[path] == nil {
-		conn.handlers[path] = make(map[string]interface{})
+		conn.handlers[path] = make(map[string]*Interface)
 	}
 	// TODO: maybe we could do basic sanity checks on the methods of v here
-	conn.handlers[path][iface] = v
+	conn.handlers[path][iface.Name] = iface
 	conn.handlersLck.Unlock()
 }
 
@@ -158,3 +184,29 @@ const (
 	NameReplyAlreadyOwner
 )
 
+
+func genMethods(v interface{}) []Method {
+	rv := reflect.ValueOf(v)
+	ms := make([]Method, 0)
+	for i := 0; i < rv.NumMethod(); i++ {
+		m := rv.Type().Method(i)
+		t := m.Type
+		args := make([]Arg, 0)
+		if t.NumOut() == 0 ||
+			t.Out(t.NumOut()-1) != reflect.TypeOf(&errmsgInvalidArg) {
+
+			continue
+		}
+		// t.In(0) is receiver, so start at 1
+		for j := 1; j < t.NumIn(); j++ {
+			// TODO: maybe use the name here
+			args = append(args, Arg{Type: getSignature(t.In(j)), Direction: "in"})
+		}
+		for j := 0; j < t.NumOut()-1; j++ {
+			// TODO: dito
+			args = append(args, Arg{Type: getSignature(t.Out(j)), Direction: "out"})
+		}
+		ms = append(ms, Method{Name: m.Name, Args: args})
+	}
+	return ms
+}

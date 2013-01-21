@@ -13,18 +13,26 @@ var introspectMsg = &CallMessage{
 // Node is the root element of an introspection.
 type Node struct {
 	XMLName    xml.Name    `xml:"node"`
-	Name       string      `xml:"name,attr"`
+	Name       string      `xml:"name,attr,omitempty"`
 	Interfaces []Interface `xml:"interface"`
-	Children   []Node      `xml:"node"`
+	Children   []Node      `xml:"node,omitempty"`
 }
 
-// Interface describes a DBus interface as returned by an introspection.
+// Interface describes a DBus interface that is available on the message bus. It
+// is returned by Introspect (as a member of Node) or passed to Export which
+// uses it to generate the Introspection data.
 type Interface struct {
-	Name        string       `xml:"name,attr"`
-	Methods     []Method     `xml:"method"`
+	Name string `xml:"name,attr"`
+
+	// This field is currently ignored by Export.
+	Methods []Method `xml:"method"`
+
 	Signals     []Signal     `xml:"signal"`
 	Properties  []Property   `xml:"property"`
 	Annotations []Annotation `xml:"annotation"`
+
+	// Value that methods are invoked on (for Export).
+	v interface{}
 }
 
 // Method describes a Method on an Interface as retured by an introspection.
@@ -34,29 +42,34 @@ type Method struct {
 	Annotations []Annotation `xml:"annotation"`
 }
 
-// Signal describes a Signal emitted on an Interface as returned by an
-// introspection.
+// Signal describes a Signal emitted on an Interface.
 type Signal struct {
 	Name        string       `xml:"name,attr"`
 	Args        []Arg        `xml:"arg"`
 	Annotations []Annotation `xml:"annotation"`
 }
 
-// Property describes a property of an Interface as returned by an
-// introspection.
+// Property describes a property of an Interface.
 type Property struct {
-	Name        string       `xml:"name,attr"`
-	Type        string       `xml:"type,attr"`
+	Name string `xml:"name,attr"`
+
+	// Must be a valid signature.
+	Type string `xml:"type,attr"`
+
 	Access      string       `xml:"access,attr"`
 	Annotations []Annotation `xml:"annotation"`
 }
 
-// Arg represents an argument of a method or a signal as returned by an
-// introspection.
+// Arg represents an argument of a method or a signal.
 type Arg struct {
-	Name      string `xml:"name,attr"` // can be empty
-	Type      string `xml:"type,attr"`
-	Direction string `xml:"direction,attr"` // "in"/"out", can be empty for signals,
+	// May be empty.
+	Name string `xml:"name,attr"`
+
+	// Must be a valid signature.
+	Type string `xml:"type,attr"`
+
+	// Must be "in" or "out" for methods and "out" or "" for signals.
+	Direction string `xml:"direction,attr"`
 }
 
 // Annotation is a annotation in the introspection format.
