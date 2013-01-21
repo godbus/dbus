@@ -8,24 +8,7 @@ import (
 	"unicode"
 )
 
-/*
-An Encoder encodes values to the DBus wire format. Rules for encoding are as
-follows:
-
-1. Any primitive Go type that has a direct equivalent in the wire format
-is directly converted. This includes all fixed size integers
-except for int8, as well as float64, bool and string.
-
-2. Slices and maps are converted to arrays and dicts, respectively.
-
-3. Most structs are converted to the expected DBus struct. The
-exceptions are all types and structs defined in this package
-that have a custom wire format. These are ObjectPath, Signature
-and Variant. Also, fields whose tag contains dbus:"-" will be skipped.
-
-4. Trying to encode any other type (including int and uint!) will result
-in a panic.
-*/
+// An Encoder encodes values to the DBus wire format.
 type Encoder struct {
 	out   io.Writer
 	order binary.ByteOrder

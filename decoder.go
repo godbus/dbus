@@ -7,14 +7,7 @@ import (
 	"unicode"
 )
 
-/*
-A Decoder reads values that are encoded in the DBus wire format.
-
-Decoding behaviour is usually just the reverse of the encoding behavrious,
-except for the handling of variants. If a struct is wrapped in a variant,
-its decoded value will be a slice of interfaces which contain the struct
-fields in the correct order.
-*/
+// A Decoder reads values that are encoded in the DBus wire format.
 type Decoder struct {
 	in    io.Reader
 	order binary.ByteOrder
