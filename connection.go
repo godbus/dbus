@@ -109,7 +109,6 @@ func NewConnection(address string) (*Connection, error) {
 // Close closes the underlying transport of the connection and stops all
 // related goroutines.
 func (conn *Connection) Close() error {
-	conn.signals <- SignalMessage{Name: ".Closed"}
 	close(conn.out)
 	close(conn.signals)
 	return conn.transport.Close()
@@ -257,8 +256,8 @@ func (conn *Connection) readMessage() (*Message, error) {
 // The channel is buffered, but package dbus will not block when it is full, but
 // discard the signal.
 //
-// If the connection is closed by the server or a call to Close, the special
-// signal named ".Closed" is returned and the channel is closed.
+// If the connection is closed by the server or a call to Close, the channel is
+// also closed.
 func (conn *Connection) Signals() <-chan SignalMessage {
 	return conn.signals
 }
