@@ -165,6 +165,13 @@ func (dec *Decoder) decode(v reflect.Value) {
 			if len(sig.str) == 0 {
 				panic(SignatureError{sig.str, "signature is empty"})
 			}
+			err, rem := validSingle(sig.str)
+			if err != nil {
+				panic(err)
+			}
+			if rem != "" {
+				panic(SignatureError{sig.str, "got multiple types, but expected one"})
+			}
 			t = value(sig.str)
 			if t == interfacesType {
 				dec.align(8)

@@ -155,6 +155,7 @@ func (conn *Connection) inWorker() {
 				signal.Name = msg.Headers[FieldMember].value.(string)
 				signal.Interface = msg.Headers[FieldInterface].value.(string)
 				signal.Path = msg.Headers[FieldPath].value.(ObjectPath)
+				// if the signature is present, it is guaranteed to be valid
 				sig, _ := msg.Headers[FieldSignature].value.(Signature)
 				if sig.str != "" {
 					rvs := sig.Values()

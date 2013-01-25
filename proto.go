@@ -316,16 +316,16 @@ func validSingle(s string) (err error, rem string) {
 	return SignatureError{Sig: s, Reason: "invalid type character"}, ""
 }
 
-// value returns the type of the given signature. It panics
-// if s doesn't represent a single, complete type.
+// value returns the type of the given signature. It ignores any left over
+// characters and panics if s doesn't start with a valid type signature.
 func value(s string) (t reflect.Type) {
-	err, rem := validSingle(s)
-	if err != nil || rem != "" {
-		panic("dbus.value: not a single, complete type")
+	err, _ := validSingle(s)
+	if err != nil {
+		panic(err)
 	}
 
-	if len(s) == 1 {
-		return sigToType[s[0]]
+	if t, ok := sigToType[s[0]]; ok {
+		return t
 	}
 	switch s[0] {
 	case 'a':
