@@ -174,22 +174,7 @@ func (conn *Connection) inWorker() {
 				default:
 				}
 			case TypeMethodCall:
-				if msg.Headers[FieldInterface].value.(string) ==
-					"org.freedesktop.DBus.Peer" {
-
-					serial := msg.Serial
-					sender := msg.Headers[FieldSender].value.(string)
-					switch msg.Headers[FieldMember].value.(string) {
-					case "Ping":
-						rm := ReplyMessage(nil)
-						conn.out <- rm.toMessage(conn, sender, serial)
-					case "GetMachineId":
-						rm := ReplyMessage([]interface{}{conn.uuid})
-						conn.out <- rm.toMessage(conn, sender, serial)
-					}
-				} else {
-					go conn.handleCall(msg)
-				}
+				go conn.handleCall(msg)
 			}
 		} else if _, ok := err.(InvalidMessageError); !ok {
 			conn.Close()

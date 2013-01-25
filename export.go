@@ -50,7 +50,17 @@ func (conn *Connection) handleCall(msg *Message) {
 	}
 	iface := obj[ifacename]
 	conn.handlersLck.RUnlock()
-	if ifacename == "org.freedesktop.DBus.Introspectable" && name == "Introspect" {
+	if ifacename == "org.freedesktop.DBus.Peer" {
+		switch name {
+		case "Ping":
+			rm := ReplyMessage(nil)
+			conn.out <- rm.toMessage(conn, sender, serial)
+		case "GetMachineId":
+			rm := ReplyMessage([]interface{}{conn.uuid})
+			conn.out <- rm.toMessage(conn, sender, serial)
+		}
+		return
+	} else if ifacename == "org.freedesktop.DBus.Introspectable" && name == "Introspect" {
 		var n Node
 		n.Interfaces = make([]Interface, 0)
 		conn.handlersLck.RLock()
@@ -95,7 +105,7 @@ func (conn *Connection) handleCall(msg *Message) {
 	}
 	ret := m.Call(params)
 	if em := ret[t.NumOut()-1].Interface().(*ErrorMessage); em != nil {
-		conn.out<-em.toMessage(conn, msg.Headers[FieldSender].value.(string), msg.Serial)
+		conn.out <- em.toMessage(conn, msg.Headers[FieldSender].value.(string), msg.Serial)
 		return
 	}
 	if msg.Flags&NoReplyExpected == 0 {
@@ -183,7 +193,6 @@ const (
 	NameReplyExists
 	NameReplyAlreadyOwner
 )
-
 
 func genMethods(v interface{}) []Method {
 	rv := reflect.ValueOf(v)

@@ -39,7 +39,6 @@ func (cm *CallMessage) toMessage(conn *Connection) *Message {
 	return msg
 }
 
-
 // Call invokes the method represented by cm with the given flags. If the flags
 // do not contain NoReplyExpected, a cookie is returned that can be used for
 // querying the reply. Otherwise, nil is returned.
@@ -56,7 +55,6 @@ func (conn *Connection) Call(cm *CallMessage, flags Flags) *Cookie {
 	conn.out <- msg
 	return nil
 }
-
 
 // Cookie represents a pending message reply. Each reply can only be queried
 // once.
@@ -162,4 +160,3 @@ func (c *Cookie) WaitReply() error {
 	}
 	return nil
 }
-
