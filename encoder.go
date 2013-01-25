@@ -155,6 +155,9 @@ func (enc *Encoder) encode(v reflect.Value) {
 			}
 		}
 	case reflect.Map:
+		if !isKeyType(v.Type().Key()) {
+			panic(invalidTypeError{v.Type()})
+		}
 		keys := v.MapKeys()
 		buf := new(bytes.Buffer)
 		bufenc := NewEncoder(buf, enc.order)

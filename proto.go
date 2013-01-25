@@ -256,6 +256,17 @@ func alignment(t reflect.Type) int {
 	return 1
 }
 
+func isKeyType(t reflect.Type) bool {
+	switch t.Kind() {
+	case reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Int16, reflect.Int32, reflect.Int64, reflect.Float64,
+		reflect.String:
+
+		return true
+	}
+	return false
+}
+
 // Try to read a single type from this string. If it was successfull, valid is
 // true and r is the remaining unparsed part. Otherwise, valid is false and r is
 // "".

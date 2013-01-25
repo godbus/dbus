@@ -218,8 +218,10 @@ func (dec *Decoder) decode(v reflect.Value) {
 		spos := dec.pos
 		for dec.pos < spos+int(length) {
 			dec.align(8)
+			if !isKeyType(v.Type().Key()) {
+				panic(invalidTypeError{v.Type()})
+			}
 			kv := reflect.New(v.Type().Key())
-			// TODO: check that v.Type().Key() is a valid key type for DBus
 			vv := reflect.New(v.Type().Elem())
 			dec.decode(kv)
 			dec.decode(vv)
@@ -227,6 +229,6 @@ func (dec *Decoder) decode(v reflect.Value) {
 		}
 		v.Set(m)
 	default:
-		panic("(*dbus.Decoder): can't decode" + v.Type().String())
+		panic(invalidTypeError{v.Type()})
 	}
 }
