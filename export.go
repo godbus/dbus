@@ -42,7 +42,7 @@ func (conn *Connection) handleCall(msg *Message) {
 	sender := msg.Headers[FieldSender].value.(string)
 	serial := msg.Serial
 	conn.handlersLck.RLock()
-	obj := conn.handlers[string(path)]
+	obj := conn.handlers[path]
 	if obj == nil {
 		conn.out <- errmsgUnknownMethod.toMessage(conn, sender, serial)
 		conn.handlersLck.RUnlock()
@@ -148,7 +148,7 @@ func (conn *Connection) handleCall(msg *Message) {
 //
 // If you need to implement multiple interfaces on one "object", wrap it with
 // (Go) interfaces.
-func (conn *Connection) Export(v interface{}, path string, iface *Interface) {
+func (conn *Connection) Export(v interface{}, path ObjectPath, iface *Interface) {
 	iface.v = v
 	iface.Methods = genMethods(v)
 	// TODO: check that iface is valid (valid name, valid signatures ...)
@@ -156,7 +156,6 @@ func (conn *Connection) Export(v interface{}, path string, iface *Interface) {
 	if conn.handlers[path] == nil {
 		conn.handlers[path] = make(map[string]*Interface)
 	}
-	// TODO: maybe we could do basic sanity checks on the methods of v here
 	conn.handlers[path][iface.Name] = iface
 	conn.handlersLck.Unlock()
 }

@@ -22,9 +22,6 @@ var (
 	}
 )
 
-// BUG(guelfey): Object paths should be verified and passed as ObjectPaths where
-// possible.
-
 // Connection represents a connection to a message bus (usually, the system or
 // session bus).
 type Connection struct {
@@ -35,7 +32,7 @@ type Connection struct {
 	lastSerialLck sync.Mutex
 	replies       map[uint32]chan interface{}
 	repliesLck    sync.RWMutex
-	handlers      map[string]map[string]*Interface
+	handlers      map[ObjectPath]map[string]*Interface
 	handlersLck   sync.RWMutex
 	out           chan *Message
 	signals       chan SignalMessage
@@ -97,7 +94,7 @@ func NewConnection(address string) (*Connection, error) {
 	conn.replies = make(map[uint32]chan interface{})
 	conn.out = make(chan *Message, 10)
 	conn.signals = make(chan SignalMessage, 10)
-	conn.handlers = make(map[string]map[string]*Interface)
+	conn.handlers = make(map[ObjectPath]map[string]*Interface)
 	go conn.inWorker()
 	go conn.outWorker()
 	if err = conn.hello(); err != nil {

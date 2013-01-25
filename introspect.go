@@ -80,7 +80,7 @@ type Annotation struct {
 
 // Introspect calls Introspect on the object identified by path and dest and
 // returns the resulting data or any error.
-func (conn *Connection) Introspect(path, dest string) (*Node, error) {
+func (conn *Connection) Introspect(path ObjectPath, dest string) (*Node, error) {
 	var xmldata string
 	var node Node
 
@@ -96,7 +96,7 @@ func (conn *Connection) Introspect(path, dest string) (*Node, error) {
 		return nil, err
 	}
 	if node.Name == "" {
-		node.Name = path
+		node.Name = string(path)
 	}
 	return &node, nil
 }

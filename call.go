@@ -9,7 +9,7 @@ import (
 // CallMessage represents a DBus message of type MethodCall.
 type CallMessage struct {
 	Destination string
-	Path        string
+	Path        ObjectPath
 	Interface   string
 	Name        string
 	Args        []interface{}
@@ -21,7 +21,7 @@ func (cm *CallMessage) toMessage(conn *Connection) *Message {
 	msg.Type = TypeMethodCall
 	msg.Serial = conn.getSerial()
 	msg.Headers = make(map[HeaderField]Variant)
-	msg.Headers[FieldPath] = MakeVariant(ObjectPath(cm.Path))
+	msg.Headers[FieldPath] = MakeVariant(cm.Path)
 	msg.Headers[FieldDestination] = MakeVariant(cm.Destination)
 	msg.Headers[FieldMember] = MakeVariant(cm.Name)
 	if cm.Interface != "" {
