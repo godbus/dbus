@@ -179,6 +179,38 @@ func (err SignatureError) Error() string {
 // An ObjectPath is an object path as defined by the DBus spec.
 type ObjectPath string
 
+// IsValid returns whether the path is valid.
+func (o ObjectPath) IsValid() bool {
+	s := string(o)
+	if len(s) == 0 {
+		return false
+	}
+	if s[0] != '/' {
+		return false
+	}
+	if s[len(s)-1] == '/' && len(s) != 1 {
+		return false
+	}
+	// probably not used, but technically possible
+	if s == "/" {
+		return true
+	}
+	split := strings.Split(s[1:], "/")
+	for _, v := range split {
+		if len(v) == 0 {
+			return false
+		}
+		for _, c := range v {
+			if !((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') ||
+				(c >= 'a' && c <= 'z') || c == '_') {
+
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // Variant represents a DBus variant type.
 type Variant struct {
 	sig   Signature

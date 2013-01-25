@@ -208,6 +208,11 @@ func (message *Message) IsValid() error {
 			return InvalidMessageError("missing required header")
 		}
 	}
+	if path, ok := message.Headers[FieldPath]; ok {
+		if !path.value.(ObjectPath).IsValid() {
+			return InvalidMessageError("invalid path")
+		}
+	}
 	if len(message.Body) != 0 {
 		if _, ok := message.Headers[FieldSignature]; !ok {
 			return InvalidMessageError("missing signature")

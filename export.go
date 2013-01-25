@@ -148,7 +148,12 @@ func (conn *Connection) handleCall(msg *Message) {
 //
 // If you need to implement multiple interfaces on one "object", wrap it with
 // (Go) interfaces.
+//
+// If path is not a valid object path, Export panics.
 func (conn *Connection) Export(v interface{}, path ObjectPath, iface *Interface) {
+	if !path.IsValid() {
+		panic("(*dbus.Connection).Export: invalid path name")
+	}
 	iface.v = v
 	iface.Methods = genMethods(v)
 	// TODO: check that iface is valid (valid name, valid signatures ...)
