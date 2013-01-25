@@ -40,13 +40,5 @@ implemented here.
 */
 package dbus
 
-// BUG(guelfey): Unix file descriptor passing is not implemented.
-
-// BUG(guelfey): The implementation does not conform to the official
-// specification in that most restrictions of the protocol (structure depth,
-// maximum message size etc.) are not checked.
-
-// BUG(guelfey): Emitting signals is not implemented yet.
-
 // BUG(guelfey): This package needs new reflection features that are only
 // availabe from the hg tip until Go 1.1 is released.
