@@ -309,9 +309,9 @@ func (rm ReplyMessage) toMessage(conn *Connection, dest string, serial uint32) *
 
 // Signal represents a DBus message of type Signal.
 type SignalMessage struct {
-	Name      string
 	Path      ObjectPath
 	Interface string
+	Name      string
 	Values    []interface{}
 }
 
