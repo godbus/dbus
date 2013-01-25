@@ -133,6 +133,11 @@ func (conn *Connection) handleCall(msg *Message) {
 	}
 }
 
+// Emit emits the given signal on the message bus.
+func (conn *Connection) Emit(sm *SignalMessage) {
+	conn.out <- sm.toMessage(conn)
+}
+
 // Export the given value as an object on the message bus. Package dbus will
 // translate method calls on path to actual method calls. The iface parameter
 // gives the name of the interface and the other introspection data that is

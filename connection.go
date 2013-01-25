@@ -153,6 +153,8 @@ func (conn *Connection) inWorker() {
 			case TypeSignal:
 				var signal SignalMessage
 				signal.Name = msg.Headers[FieldMember].value.(string)
+				signal.Interface = msg.Headers[FieldInterface].value.(string)
+				signal.Path = msg.Headers[FieldPath].value.(ObjectPath)
 				sig, _ := msg.Headers[FieldSignature].value.(Signature)
 				if sig.str != "" {
 					rvs := sig.Values()
@@ -306,8 +308,31 @@ func (rm ReplyMessage) toMessage(conn *Connection, dest string, serial uint32) *
 
 // Signal represents a DBus message of type Signal.
 type SignalMessage struct {
-	Name   string
-	Values []interface{}
+	Name      string
+	Path      ObjectPath
+	Interface string
+	Values    []interface{}
+}
+
+func (sm *SignalMessage) toMessage(conn *Connection) *Message{
+	msg := new(Message)
+	msg.Order = binary.LittleEndian
+	msg.Type = TypeSignal
+	msg.Serial = conn.getSerial()
+	msg.Headers = make(map[HeaderField]Variant)
+	msg.Headers[FieldInterface] = MakeVariant(sm.Interface)
+	msg.Headers[FieldMember] = MakeVariant(sm.Name)
+	msg.Headers[FieldPath] = MakeVariant(sm.Path)
+	if len(sm.Values) > 0 {
+		msg.Headers[FieldSignature] = MakeVariant(GetSignature(sm.Values...))
+		buf := new(bytes.Buffer)
+		enc := NewEncoder(buf, binary.LittleEndian)
+		enc.EncodeMulti(sm.Values...)
+		msg.Body = buf.Bytes()
+	} else {
+		msg.Body = []byte{}
+	}
+	return msg
 }
 
 func getKey(s, key string) string {
