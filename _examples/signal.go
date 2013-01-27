@@ -13,9 +13,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = conn.Call(&dbus.CallMessage{"org.freedesktop.DBus", "/org/freedesktop/DBus",
-		"org.freedesktop.DBus", "AddMatch",
-		[]interface{}{"type='signal',path='/org/freedesktop/DBus'"}}, 0).WaitReply()
+	err = conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, "type='signal',path='/org/freedesktop/DBus'").WaitReply()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Failed to add match:", err)
 		os.Exit(1)

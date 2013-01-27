@@ -5,11 +5,6 @@ import (
 	"strings"
 )
 
-var introspectMsg = &CallMessage{
-	Interface: "org.freedesktop.DBus.Introspectable",
-	Name:      "Introspect",
-}
-
 // Node is the root element of an introspection.
 type Node struct {
 	XMLName    xml.Name    `xml:"node"`
@@ -27,7 +22,7 @@ type Interface struct {
 	// This field is currently ignored by Export.
 	Methods []Method `xml:"method"`
 
-	Signals     []Signal     `xml:"signal"`
+	Signals     []SignalInfo `xml:"signal"`
 	Properties  []Property   `xml:"property"`
 	Annotations []Annotation `xml:"annotation"`
 
@@ -42,8 +37,8 @@ type Method struct {
 	Annotations []Annotation `xml:"annotation"`
 }
 
-// Signal describes a Signal emitted on an Interface.
-type Signal struct {
+// SignalInfo describes a Signal emitted on an Interface.
+type SignalInfo struct {
 	Name        string       `xml:"name,attr"`
 	Args        []Arg        `xml:"arg"`
 	Annotations []Annotation `xml:"annotation"`
@@ -78,16 +73,13 @@ type Annotation struct {
 	Value string `xml:"value,attr"`
 }
 
-// Introspect calls Introspect on the object identified by path and dest and
-// returns the resulting data or any error.
-func (conn *Connection) Introspect(path ObjectPath, dest string) (*Node, error) {
+// Introspect calls org.freedesktop.Introspectable.Introspect on the given
+// object and returns the introspection data.
+func (o *Object) Introspect() (*Node, error) {
 	var xmldata string
 	var node Node
 
-	msg := introspectMsg
-	msg.Path = path
-	msg.Destination = dest
-	err := conn.Call(msg, 0).StoreReply(&xmldata)
+	err := o.Call("org.freedesktop.DBus.Introspectable.Introspect", 0).StoreReply(&xmldata)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +88,7 @@ func (conn *Connection) Introspect(path ObjectPath, dest string) (*Node, error) 
 		return nil, err
 	}
 	if node.Name == "" {
-		node.Name = string(path)
+		node.Name = string(o.path)
 	}
 	return &node, nil
 }

@@ -4,57 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"strings"
 )
-
-// CallMessage represents a DBus message of type MethodCall.
-type CallMessage struct {
-	Destination string
-	Path        ObjectPath
-	Interface   string
-	Name        string
-	Args        []interface{}
-}
-
-func (cm *CallMessage) toMessage(conn *Connection) *Message {
-	msg := new(Message)
-	msg.Order = binary.LittleEndian
-	msg.Type = TypeMethodCall
-	msg.Serial = conn.getSerial()
-	msg.Headers = make(map[HeaderField]Variant)
-	msg.Headers[FieldPath] = MakeVariant(cm.Path)
-	msg.Headers[FieldDestination] = MakeVariant(cm.Destination)
-	msg.Headers[FieldMember] = MakeVariant(cm.Name)
-	if cm.Interface != "" {
-		msg.Headers[FieldInterface] = MakeVariant(cm.Interface)
-	}
-	if len(cm.Args) > 0 {
-		msg.Headers[FieldSignature] = MakeVariant(GetSignature(cm.Args...))
-		buf := new(bytes.Buffer)
-		enc := NewEncoder(buf, binary.LittleEndian)
-		enc.EncodeMulti(cm.Args...)
-		msg.Body = buf.Bytes()
-	} else {
-		msg.Body = []byte{}
-	}
-	return msg
-}
-
-// Call invokes the method represented by cm with the given flags. If the flags
-// do not contain NoReplyExpected, a cookie is returned that can be used for
-// querying the reply. Otherwise, nil is returned.
-func (conn *Connection) Call(cm *CallMessage, flags Flags) *Cookie {
-	msg := cm.toMessage(conn)
-	msg.Flags = flags & (NoAutoStart | NoReplyExpected)
-	if msg.Flags&NoReplyExpected == 0 {
-		conn.repliesLck.Lock()
-		conn.replies[msg.Serial] = make(chan interface{}, 1)
-		conn.repliesLck.Unlock()
-		conn.out <- msg
-		return &Cookie{conn, msg.Serial}
-	}
-	conn.out <- msg
-	return nil
-}
 
 // Cookie represents a pending message reply. Each reply can only be queried
 // once.
@@ -69,7 +20,7 @@ type Cookie struct {
 // transport or an ErrorMessage.
 //
 // If you know the type of the response, use StoreReply().
-func (c *Cookie) Reply() (ReplyMessage, error) {
+func (c *Cookie) Reply() ([]interface{}, error) {
 	msg, err := c.reply()
 	if err != nil {
 		return nil, err
@@ -84,9 +35,9 @@ func (c *Cookie) Reply() (ReplyMessage, error) {
 	rvs = dereferenceAll(rvs)
 	if msg.Type == TypeError {
 		name, _ := msg.Headers[FieldErrorName].value.(string)
-		return nil, ErrorMessage{name, rvs}
+		return nil, Error{name, rvs}
 	}
-	return ReplyMessage(rvs), nil
+	return rvs, nil
 }
 
 // reply blocks waiting for the reply and returns either the reply or a
@@ -130,7 +81,7 @@ func (c *Cookie) StoreReply(retvalues ...interface{}) error {
 		if err != nil {
 			return err
 		}
-		return ErrorMessage{msg.Headers[FieldErrorName].value.(string), rvs}
+		return Error{msg.Headers[FieldErrorName].value.(string), rvs}
 	}
 	if esig != rsig {
 		return errors.New("mismatched signature")
@@ -156,7 +107,56 @@ func (c *Cookie) WaitReply() error {
 		if err != nil {
 			return err
 		}
-		return ErrorMessage{msg.Headers[FieldErrorName].value.(string), rvs}
+		return Error{msg.Headers[FieldErrorName].value.(string), rvs}
 	}
+	return nil
+}
+
+// Object represents a remote object on which methods can be invoked.
+type Object struct {
+	conn *Connection
+	dest string
+	path ObjectPath
+}
+
+// Call calls a method with the given arguments. The method parameter must be
+// formatted as "interface.method" (e.g., "org.freedesktop.DBus.Hello"). The
+// returned cookie can be used to get the reply later.
+func (o *Object) Call(method string, flags Flags, args ...interface{}) *Cookie {
+	i := strings.LastIndex(method, ".")
+	if i == -1 {
+		panic("invalid method parameter")
+	}
+	iface := method[:i]
+	method = method[i+1:]
+	msg := new(Message)
+	msg.Order = binary.LittleEndian
+	msg.Type = TypeMethodCall
+	msg.Serial = o.conn.getSerial()
+	msg.Flags = flags & (NoAutoStart | NoReplyExpected)
+	msg.Headers = make(map[HeaderField]Variant)
+	msg.Headers[FieldPath] = MakeVariant(o.path)
+	msg.Headers[FieldDestination] = MakeVariant(o.dest)
+	msg.Headers[FieldMember] = MakeVariant(method)
+	if iface != "" {
+		msg.Headers[FieldInterface] = MakeVariant(iface)
+	}
+	if len(args) > 0 {
+		msg.Headers[FieldSignature] = MakeVariant(GetSignature(args...))
+		buf := new(bytes.Buffer)
+		enc := NewEncoder(buf, binary.LittleEndian)
+		enc.EncodeMulti(args...)
+		msg.Body = buf.Bytes()
+	} else {
+		msg.Body = []byte{}
+	}
+	if msg.Flags&NoReplyExpected == 0 {
+		o.conn.repliesLck.Lock()
+		o.conn.replies[msg.Serial] = make(chan interface{}, 1)
+		o.conn.repliesLck.Unlock()
+		o.conn.out <- msg
+		return &Cookie{o.conn, msg.Serial}
+	}
+	o.conn.out <- msg
 	return nil
 }

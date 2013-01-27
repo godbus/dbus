@@ -13,15 +13,6 @@ import (
 
 const defaultSystemBusAddress = "unix:path=/var/run/dbus/system_bus_socket"
 
-var (
-	helloMsg = &CallMessage{
-		Destination: "org.freedesktop.DBus",
-		Path:        "/org/freedesktop/DBus",
-		Interface:   "org.freedesktop.DBus",
-		Name:        "Hello",
-	}
-)
-
 // Connection represents a connection to a message bus (usually, the system or
 // session bus).
 type Connection struct {
@@ -35,7 +26,8 @@ type Connection struct {
 	handlers      map[ObjectPath]map[string]*Interface
 	handlersLck   sync.RWMutex
 	out           chan *Message
-	signals       chan SignalMessage
+	signals       chan Signal
+	busObj        *Object
 }
 
 // ConnectSessionBus connects to the session message bus and returns the
@@ -93,14 +85,22 @@ func NewConnection(address string) (*Connection, error) {
 	}
 	conn.replies = make(map[uint32]chan interface{})
 	conn.out = make(chan *Message, 10)
-	conn.signals = make(chan SignalMessage, 10)
+	conn.signals = make(chan Signal, 10)
 	conn.handlers = make(map[ObjectPath]map[string]*Interface)
+	conn.busObj = conn.Object("org.freedesktop.DBus", "/org/freedesktop/DBus")
 	go conn.inWorker()
 	go conn.outWorker()
 	if err = conn.hello(); err != nil {
+		conn.transport.Close()
 		return nil, err
 	}
 	return conn, nil
+}
+
+// BusObject returns the message bus object (i.e.
+// conn.Object("org.freedesktop.DBus", "/org/freedesktop/DBus")).
+func (conn *Connection) BusObject() *Object {
+	return conn.busObj
 }
 
 // Close closes the underlying transport of the connection and stops all
@@ -130,7 +130,7 @@ func (conn *Connection) getSerial() uint32 {
 
 func (conn *Connection) hello() error {
 	var s string
-	err := conn.Call(helloMsg, 0).StoreReply(&s)
+	err := conn.busObj.Call("org.freedesktop.DBus.Hello", 0).StoreReply(&s)
 	if err != nil {
 		return err
 	}
@@ -151,10 +151,8 @@ func (conn *Connection) inWorker() {
 				}
 				conn.repliesLck.RUnlock()
 			case TypeSignal:
-				var signal SignalMessage
+				var signal Signal
 				signal.Name = msg.Headers[FieldMember].value.(string)
-				signal.Interface = msg.Headers[FieldInterface].value.(string)
-				signal.Path = msg.Headers[FieldPath].value.(ObjectPath)
 				// if the signature is present, it is guaranteed to be valid
 				sig, _ := msg.Headers[FieldSignature].value.(Signature)
 				if sig.str != "" {
@@ -237,23 +235,72 @@ func (conn *Connection) readMessage() (*Message, error) {
 	return DecodeMessage(bytes.NewBuffer(all))
 }
 
+func (conn *Connection) sendError(e Error, dest string, serial uint32) {
+	msg := new(Message)
+	msg.Order = binary.LittleEndian
+	msg.Type = TypeError
+	msg.Serial = conn.getSerial()
+	msg.Headers = make(map[HeaderField]Variant)
+	msg.Headers[FieldDestination] = MakeVariant(dest)
+	msg.Headers[FieldErrorName] = MakeVariant(e.Name)
+	msg.Headers[FieldReplySerial] = MakeVariant(serial)
+	if len(e.Values) > 0 {
+		msg.Headers[FieldSignature] = MakeVariant(GetSignature(e.Values...))
+		buf := new(bytes.Buffer)
+		enc := NewEncoder(buf, binary.LittleEndian)
+		enc.EncodeMulti(e.Values...)
+		msg.Body = buf.Bytes()
+	} else {
+		msg.Body = []byte{}
+	}
+	conn.out <- msg
+}
+
+func (conn *Connection) sendReply(dest string, serial uint32, values ...interface{}) {
+	msg := new(Message)
+	msg.Order = binary.LittleEndian
+	msg.Type = TypeMethodReply
+	msg.Serial = conn.getSerial()
+	msg.Headers = make(map[HeaderField]Variant)
+	msg.Headers[FieldDestination] = MakeVariant(dest)
+	msg.Headers[FieldReplySerial] = MakeVariant(serial)
+	if len(values) > 0 {
+		msg.Headers[FieldSignature] = MakeVariant(GetSignature(values...))
+		buf := new(bytes.Buffer)
+		enc := NewEncoder(buf, binary.LittleEndian)
+		enc.EncodeMulti(values...)
+		msg.Body = buf.Bytes()
+	} else {
+		msg.Body = []byte{}
+	}
+	conn.out <- msg
+}
+
+// Object returns the object identified by the given destination name and path.
+func (conn *Connection) Object(dest string, path ObjectPath) *Object {
+	if !path.IsValid() {
+		panic("invalid DBus path")
+	}
+	return &Object{conn, dest, path}
+}
+
 // Signals returns a channel to which all received signal messages are forwarded.
 // The channel is buffered, but package dbus will not block when it is full, but
 // discard the signal.
 //
 // If the connection is closed by the server or a call to Close, the channel is
 // also closed.
-func (conn *Connection) Signals() <-chan SignalMessage {
+func (conn *Connection) Signals() <-chan Signal {
 	return conn.signals
 }
 
-// ErrorMessage represents a DBus message of type Error.
-type ErrorMessage struct {
+// Error represents a DBus message of type Error.
+type Error struct {
 	Name   string
 	Values []interface{}
 }
 
-func (e ErrorMessage) Error() string {
+func (e Error) Error() string {
 	if len(e.Values) > 1 {
 		s, ok := e.Values[0].(string)
 		if ok {
@@ -263,77 +310,10 @@ func (e ErrorMessage) Error() string {
 	return e.Name
 }
 
-func (em ErrorMessage) toMessage(conn *Connection, dest string, serial uint32) *Message {
-	msg := new(Message)
-	msg.Order = binary.LittleEndian
-	msg.Type = TypeError
-	msg.Serial = conn.getSerial()
-	msg.Headers = make(map[HeaderField]Variant)
-	msg.Headers[FieldDestination] = MakeVariant(dest)
-	msg.Headers[FieldErrorName] = MakeVariant(em.Name)
-	msg.Headers[FieldReplySerial] = MakeVariant(serial)
-	if len(em.Values) > 0 {
-		msg.Headers[FieldSignature] = MakeVariant(GetSignature(em.Values...))
-		buf := new(bytes.Buffer)
-		enc := NewEncoder(buf, binary.LittleEndian)
-		enc.EncodeMulti(em.Values...)
-		msg.Body = buf.Bytes()
-	} else {
-		msg.Body = []byte{}
-	}
-	return msg
-}
-
-// ReplyMessage represents a DBus message of type MethodReply.
-type ReplyMessage []interface{}
-
-func (rm ReplyMessage) toMessage(conn *Connection, dest string, serial uint32) *Message {
-	msg := new(Message)
-	msg.Order = binary.LittleEndian
-	msg.Type = TypeMethodReply
-	msg.Serial = conn.getSerial()
-	msg.Headers = make(map[HeaderField]Variant)
-	msg.Headers[FieldDestination] = MakeVariant(dest)
-	msg.Headers[FieldReplySerial] = MakeVariant(serial)
-	if len(rm) > 0 {
-		msg.Headers[FieldSignature] = MakeVariant(GetSignature(rm...))
-		buf := new(bytes.Buffer)
-		enc := NewEncoder(buf, binary.LittleEndian)
-		enc.EncodeMulti(rm...)
-		msg.Body = buf.Bytes()
-	} else {
-		msg.Body = []byte{}
-	}
-	return msg
-}
-
 // Signal represents a DBus message of type Signal.
-type SignalMessage struct {
-	Path      ObjectPath
-	Interface string
+type Signal struct {
 	Name      string
 	Values    []interface{}
-}
-
-func (sm *SignalMessage) toMessage(conn *Connection) *Message{
-	msg := new(Message)
-	msg.Order = binary.LittleEndian
-	msg.Type = TypeSignal
-	msg.Serial = conn.getSerial()
-	msg.Headers = make(map[HeaderField]Variant)
-	msg.Headers[FieldInterface] = MakeVariant(sm.Interface)
-	msg.Headers[FieldMember] = MakeVariant(sm.Name)
-	msg.Headers[FieldPath] = MakeVariant(sm.Path)
-	if len(sm.Values) > 0 {
-		msg.Headers[FieldSignature] = MakeVariant(GetSignature(sm.Values...))
-		buf := new(bytes.Buffer)
-		enc := NewEncoder(buf, binary.LittleEndian)
-		enc.EncodeMulti(sm.Values...)
-		msg.Body = buf.Bytes()
-	} else {
-		msg.Body = []byte{}
-	}
-	return msg
 }
 
 func getKey(s, key string) string {

@@ -11,7 +11,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	node, err := conn.Introspect("/org/freedesktop/DBus", "org.freedesktop.DBus")
+	node, err := conn.Object("org.freedesktop.DBus", "/org/freedesktop/DBus").Introspect()
 	if err != nil {
 		panic(err)
 	}

@@ -8,20 +8,13 @@ import (
 )
 
 var (
-	errmsgInvalidArg = ErrorMessage{
+	errmsgInvalidArg = Error{
 		"org.freedesktop.DBus.Error.InvalidArgs",
 		[]interface{}{"Invalid type / number of args"},
 	}
-	errmsgUnknownMethod = ErrorMessage{
+	errmsgUnknownMethod = Error{
 		"org.freedesktop.DBus.Error.UnknownMethod",
 		[]interface{}{"Unkown / invalid method"},
-	}
-	requestNameMsg = &CallMessage{
-		Destination: "org.freedesktop.DBus",
-		Path:        "/org/freedesktop/DBus",
-		Interface:   "org.freedesktop.DBus",
-		Name:        "RequestName",
-		Args:        []interface{}{nil, nil},
 	}
 )
 
@@ -44,7 +37,7 @@ func (conn *Connection) handleCall(msg *Message) {
 	conn.handlersLck.RLock()
 	obj := conn.handlers[path]
 	if obj == nil {
-		conn.out <- errmsgUnknownMethod.toMessage(conn, sender, serial)
+		conn.sendError(errmsgUnknownMethod, sender, serial)
 		conn.handlersLck.RUnlock()
 		return
 	}
@@ -53,11 +46,9 @@ func (conn *Connection) handleCall(msg *Message) {
 	if ifacename == "org.freedesktop.DBus.Peer" {
 		switch name {
 		case "Ping":
-			rm := ReplyMessage(nil)
-			conn.out <- rm.toMessage(conn, sender, serial)
+			conn.sendReply(sender, serial)
 		case "GetMachineId":
-			rm := ReplyMessage([]interface{}{conn.uuid})
-			conn.out <- rm.toMessage(conn, sender, serial)
+			conn.sendReply(sender, serial, conn.uuid)
 		}
 		return
 	} else if ifacename == "org.freedesktop.DBus.Introspectable" && name == "Introspect" {
@@ -69,33 +60,32 @@ func (conn *Connection) handleCall(msg *Message) {
 		}
 		conn.handlersLck.RUnlock()
 		b, _ := xml.Marshal(n)
-		rmsg := ReplyMessage([]interface{}{string(b)})
-		conn.out <- rmsg.toMessage(conn, sender, serial)
+		conn.sendReply(sender, serial, string(b))
 		return
 	}
 	if iface == nil {
-		conn.out <- errmsgUnknownMethod.toMessage(conn, sender, serial)
+		conn.sendError(errmsgUnknownMethod, sender, serial)
 		return
 	}
 	m := reflect.ValueOf(iface.v).MethodByName(name)
 	if !m.IsValid() {
-		conn.out <- errmsgUnknownMethod.toMessage(conn, sender, serial)
+		conn.sendError(errmsgUnknownMethod, sender, serial)
 		return
 	}
 	t := m.Type()
 	if t.NumOut() == 0 ||
 		t.Out(t.NumOut()-1) != reflect.TypeOf(&errmsgInvalidArg) {
 
-		conn.out <- errmsgUnknownMethod.toMessage(conn, sender, serial)
+		conn.sendError(errmsgUnknownMethod, sender, serial)
 		return
 	}
 	if t.NumIn() != len(vs) {
-		conn.out <- errmsgInvalidArg.toMessage(conn, sender, serial)
+		conn.sendError(errmsgInvalidArg, sender, serial)
 		return
 	}
 	for i := 0; i < t.NumIn(); i++ {
 		if t.In(i) != reflect.TypeOf(vs[i]) {
-			conn.out <- errmsgInvalidArg.toMessage(conn, sender, serial)
+			conn.sendError(errmsgInvalidArg, sender, serial)
 			return
 		}
 	}
@@ -104,8 +94,8 @@ func (conn *Connection) handleCall(msg *Message) {
 		params[i] = reflect.ValueOf(vs[i])
 	}
 	ret := m.Call(params)
-	if em := ret[t.NumOut()-1].Interface().(*ErrorMessage); em != nil {
-		conn.out <- em.toMessage(conn, msg.Headers[FieldSender].value.(string), msg.Serial)
+	if em := ret[t.NumOut()-1].Interface().(*Error); em != nil {
+		conn.sendError(*em, sender, serial)
 		return
 	}
 	if msg.Flags&NoReplyExpected == 0 {
@@ -134,8 +124,25 @@ func (conn *Connection) handleCall(msg *Message) {
 }
 
 // Emit emits the given signal on the message bus.
-func (conn *Connection) Emit(sm *SignalMessage) {
-	conn.out <- sm.toMessage(conn)
+func (conn *Connection) Emit(path ObjectPath, iface string, name string, values ...interface{}) {
+	msg := new(Message)
+	msg.Order = binary.LittleEndian
+	msg.Type = TypeSignal
+	msg.Serial = conn.getSerial()
+	msg.Headers = make(map[HeaderField]Variant)
+	msg.Headers[FieldInterface] = MakeVariant(iface)
+	msg.Headers[FieldMember] = MakeVariant(name)
+	msg.Headers[FieldPath] = MakeVariant(path)
+	if len(values) > 0 {
+		msg.Headers[FieldSignature] = MakeVariant(GetSignature(values...))
+		buf := new(bytes.Buffer)
+		enc := NewEncoder(buf, binary.LittleEndian)
+		enc.EncodeMulti(values...)
+		msg.Body = buf.Bytes()
+	} else {
+		msg.Body = []byte{}
+	}
+	conn.out <- msg
 }
 
 // Export the given value as an object on the message bus. Package dbus will
@@ -172,12 +179,8 @@ func (conn *Connection) Export(v interface{}, path ObjectPath, iface *Interface)
 
 // Request name calls org.freedesktop.DBus.RequestName.
 func (conn *Connection) RequestName(name string, flags RequestNameFlags) (RequestNameReply, error) {
-
 	var r uint32
-	msg := requestNameMsg
-	msg.Args[0] = name
-	msg.Args[1] = flags
-	err := conn.Call(msg, 0).StoreReply(&r)
+	err := conn.busObj.Call("org.freedesktop.DBus.RequestName", 0, name, flags).StoreReply(&r)
 	if err != nil {
 		return 0, err
 	}

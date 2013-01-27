@@ -13,13 +13,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	msg := &dbus.CallMessage{
-		Destination: "org.freedesktop.DBus",
-		Path:        "/org/freedesktop/DBus",
-		Interface:   "org.freedesktop.DBus",
-		Name:        "ListNames",
-	}
-	reply, err := conn.Call(msg, 0).Reply()
+	reply, err := conn.BusObject().Call("org.freedesktop.DBus.ListNames", 0).Reply()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Failed to get list of owned names:", err)
 		os.Exit(1)

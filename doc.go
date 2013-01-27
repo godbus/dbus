@@ -3,13 +3,15 @@ Package dbus implements bindings to the DBus message bus system, as well as the
 corresponding encoding format.
 
 For the message bus API, you first need to connect to a bus (usually the Session
-or System bus). Then, you can call methods with Call() and receive signals over
-the channel returned by Signals(). Handling method calls is even easier; using
-Export(), you can arrange DBus message calls to be directly translated to method
-calls on a Go value.
+or System bus). Then, call methods by first getting an Object and then using
+Call(). Signals can be received with the channel returned by Signals() and can
+be emitted via Emit().
+
+Handling method calls is even easier; using Export(), you can arrange DBus
+message calls to be directly translated to method calls on a Go value.
 
 Decoder and Encoder provide direct access to the DBus wire format. You usually
-don't need to use them directly. While you may use them directly on the socket
+don't need to use them. While you may use them directly on the socket
 as they accept the standard io interfaces, it is not advised to do so as this
 would generate many small reads / writes that could limit performance.
 
@@ -22,9 +24,9 @@ except for int8, as well as float64, bool and string.
 2. Slices and maps are converted to arrays and dicts, respectively.
 
 3. Most structs are converted to the expected DBus struct (all exported members
-are marshalled as a DBus struct). The exceptions are all types and structs
-defined in this package that have a custom wire format. These are ObjectPath,
-Signature and Variant. Also, fields whose tag contains dbus:"-" will be skipped.
+are marshalled as a DBus struct). The exceptions are the structs defined in this
+package that have a custom wire format. These are ObjectPath, Signature and
+Variant. Also, fields whose tag contains dbus:"-" will be skipped.
 
 4. Trying to encode any other type (including int and uint!) will result
 in a panic. This applies to all functions that call (*Encoder).Encode somewhere.

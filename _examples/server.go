@@ -8,7 +8,7 @@ import (
 
 type foo string
 
-func (f foo) Foo() (string, *dbus.ErrorMessage) {
+func (f foo) Foo() (string, *dbus.Error) {
 	fmt.Println(f)
 	return string(f), nil
 }
