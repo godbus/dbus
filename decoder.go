@@ -2,6 +2,7 @@ package dbus
 
 import (
 	"encoding/binary"
+	"errors"
 	"io"
 	"reflect"
 	"unicode"
@@ -73,7 +74,7 @@ func (dec *Decoder) DecodeMulti(vs ...interface{}) error {
 
 func (dec *Decoder) decode(v reflect.Value) {
 	if v.Kind() != reflect.Ptr {
-		panic("(*dbus.Decoder): parameter is not a pointer")
+		panic(invalidTypeError{v.Type()})
 	}
 
 	v = v.Elem()
@@ -89,12 +90,13 @@ func (dec *Decoder) decode(v reflect.Value) {
 	case reflect.Bool:
 		var i uint32
 		dec.decode(reflect.ValueOf(&i))
-		if i == 0 {
+		switch {
+		case i == 0:
 			v.SetBool(false)
-		} else {
-			// XXX: official spec recommends to only accept 0 or 1; should we
-			// return an error here?
+		case i == 1:
 			v.SetBool(true)
+		default:
+			panic(errors.New("invalid value for boolean"))
 		}
 	case reflect.Int16:
 		var i int16
