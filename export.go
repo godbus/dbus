@@ -18,6 +18,11 @@ var (
 	}
 )
 
+type expObject struct {
+	intro string
+	interfaces map[string]interface{}
+}
+
 func (conn *Connection) handleCall(msg *Message) {
 	var vs []interface{}
 	if len(msg.Body) != 0 {
@@ -35,13 +40,13 @@ func (conn *Connection) handleCall(msg *Message) {
 	sender := msg.Headers[FieldSender].value.(string)
 	serial := msg.Serial
 	conn.handlersLck.RLock()
-	obj := conn.handlers[path]
-	if obj == nil {
+	obj, ok := conn.handlers[path]
+	if !ok {
 		conn.sendError(errmsgUnknownMethod, sender, serial)
 		conn.handlersLck.RUnlock()
 		return
 	}
-	iface := obj[ifacename]
+	iface := obj.interfaces[ifacename]
 	conn.handlersLck.RUnlock()
 	if ifacename == "org.freedesktop.DBus.Peer" {
 		switch name {
@@ -52,22 +57,18 @@ func (conn *Connection) handleCall(msg *Message) {
 		}
 		return
 	} else if ifacename == "org.freedesktop.DBus.Introspectable" && name == "Introspect" {
-		var n Node
-		n.Interfaces = make([]Interface, 0)
-		conn.handlersLck.RLock()
-		for _, v := range obj {
-			n.Interfaces = append(n.Interfaces, *v)
+		if intro := obj.intro; intro != "" {
+			conn.sendReply(sender, serial, intro)
+		} else {
+			conn.sendError(errmsgUnknownMethod, sender, serial)
 		}
-		conn.handlersLck.RUnlock()
-		b, _ := xml.Marshal(n)
-		conn.sendReply(sender, serial, string(b))
 		return
 	}
 	if iface == nil {
 		conn.sendError(errmsgUnknownMethod, sender, serial)
 		return
 	}
-	m := reflect.ValueOf(iface.v).MethodByName(name)
+	m := reflect.ValueOf(iface).MethodByName(name)
 	if !m.IsValid() {
 		conn.sendError(errmsgUnknownMethod, sender, serial)
 		return
@@ -162,18 +163,16 @@ func (conn *Connection) Emit(path ObjectPath, iface string, name string, values 
 // (Go) interfaces.
 //
 // If path is not a valid object path, Export panics.
-func (conn *Connection) Export(v interface{}, path ObjectPath, iface *Interface) {
+func (conn *Connection) Export(v interface{}, path ObjectPath, iface string) {
 	if !path.IsValid() {
 		panic("(*dbus.Connection).Export: invalid path name")
 	}
-	iface.v = v
-	iface.Methods = genMethods(v)
-	// TODO: check that iface is valid (valid name, valid signatures ...)
 	conn.handlersLck.Lock()
-	if conn.handlers[path] == nil {
-		conn.handlers[path] = make(map[string]*Interface)
+	if _, ok := conn.handlers[path]; !ok {
+		conn.handlers[path] = new(expObject)
+		conn.handlers[path].interfaces = make(map[string]interface{})
 	}
-	conn.handlers[path][iface.Name] = iface
+	conn.handlers[path].interfaces[iface] = v
 	conn.handlersLck.Unlock()
 }
 
@@ -185,6 +184,27 @@ func (conn *Connection) RequestName(name string, flags RequestNameFlags) (Reques
 		return 0, err
 	}
 	return RequestNameReply(r), nil
+}
+
+// SetIntrospect sets the introspection data that is returned if a peer calls
+// org.freedesktop.Introspectable.Introspect on the given object path. If the
+// string is "", an error is returned to peers that try to call Introspect.
+//
+// An error is returned if the given string is not valid introspection data.
+func (conn *Connection) SetIntrospect(path ObjectPath, intro string) error {
+	var n Node
+	if err := xml.Unmarshal([]byte(intro), &n); err != nil {
+		return err
+	}
+	// TODO: check that n is valid
+	conn.handlersLck.Lock()
+	if _, ok := conn.handlers[path]; !ok {
+		conn.handlers[path] = new(expObject)
+		conn.handlers[path].interfaces = make(map[string]interface{})
+	}
+	conn.handlers[path].intro = intro
+	conn.handlersLck.Unlock()
+	return nil
 }
 
 // RequestNameFlags represents the possible flags for the RequestName call.
@@ -205,29 +225,3 @@ const (
 	NameReplyExists
 	NameReplyAlreadyOwner
 )
-
-func genMethods(v interface{}) []Method {
-	rv := reflect.ValueOf(v)
-	ms := make([]Method, 0)
-	for i := 0; i < rv.NumMethod(); i++ {
-		m := rv.Type().Method(i)
-		t := m.Type
-		args := make([]Arg, 0)
-		if t.NumOut() == 0 ||
-			t.Out(t.NumOut()-1) != reflect.TypeOf(&errmsgInvalidArg) {
-
-			continue
-		}
-		// t.In(0) is receiver, so start at 1
-		for j := 1; j < t.NumIn(); j++ {
-			// TODO: maybe use the name here
-			args = append(args, Arg{Type: getSignature(t.In(j)), Direction: "in"})
-		}
-		for j := 0; j < t.NumOut()-1; j++ {
-			// TODO: dito
-			args = append(args, Arg{Type: getSignature(t.Out(j)), Direction: "out"})
-		}
-		ms = append(ms, Method{Name: m.Name, Args: args})
-	}
-	return ms
-}

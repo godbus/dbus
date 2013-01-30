@@ -23,7 +23,7 @@ type Connection struct {
 	lastSerialLck sync.Mutex
 	replies       map[uint32]chan interface{}
 	repliesLck    sync.RWMutex
-	handlers      map[ObjectPath]map[string]*Interface
+	handlers      map[ObjectPath]*expObject
 	handlersLck   sync.RWMutex
 	out           chan *Message
 	signals       chan Signal
@@ -86,7 +86,7 @@ func NewConnection(address string) (*Connection, error) {
 	conn.replies = make(map[uint32]chan interface{})
 	conn.out = make(chan *Message, 10)
 	conn.signals = make(chan Signal, 10)
-	conn.handlers = make(map[ObjectPath]map[string]*Interface)
+	conn.handlers = make(map[ObjectPath]*expObject)
 	conn.busObj = conn.Object("org.freedesktop.DBus", "/org/freedesktop/DBus")
 	go conn.inWorker()
 	go conn.outWorker()

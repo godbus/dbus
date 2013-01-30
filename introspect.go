@@ -13,21 +13,13 @@ type Node struct {
 	Children   []Node      `xml:"node,omitempty"`
 }
 
-// Interface describes a DBus interface that is available on the message bus. It
-// is returned by Introspect (as a member of Node) or passed to Export which
-// uses it to generate the Introspection data.
+// Interface describes a DBus interface that is available on the message bus.
 type Interface struct {
-	Name string `xml:"name,attr"`
-
-	// This field is currently ignored by Export.
-	Methods []Method `xml:"method"`
-
+	Name        string       `xml:"name,attr"`
+	Methods     []Method     `xml:"method"`
 	Signals     []SignalInfo `xml:"signal"`
 	Properties  []Property   `xml:"property"`
 	Annotations []Annotation `xml:"annotation"`
-
-	// Value that methods are invoked on (for Export).
-	v interface{}
 }
 
 // Method describes a Method on an Interface as retured by an introspection.
