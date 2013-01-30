@@ -6,6 +6,16 @@ import (
 	"os"
 )
 
+const intro = `
+<node>
+	<interface name="com.github.guelfey.Demo">
+		<method name="Foo">
+			<arg direction="out" type="s"/>
+		</method>
+	</interface>
+</node>
+`
+
 type foo string
 
 func (f foo) Foo() (string, *dbus.Error) {
@@ -28,6 +38,7 @@ func main() {
 	}
 	f := foo("Bar!")
 	conn.Export(f, "/com/github/guelfey/Demo", "com.github.guelfey.Demo")
+	conn.SetIntrospect("/com/github/guelfey/Demo", intro)
 	fmt.Println("Listening on com.github.guelfey.Demo / /com/github/guelfey/Demo ...")
 	select {}
 }
