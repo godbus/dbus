@@ -176,12 +176,17 @@ func (conn *Connection) Export(v interface{}, path ObjectPath, iface string) {
 	conn.handlersLck.Unlock()
 }
 
-// Request name calls org.freedesktop.DBus.RequestName.
+// RequestName calls org.freedesktop.DBus.RequestName. You should only use this
+// method to request a name because package dbus needs to keep track of all
+// names that the connection has.
 func (conn *Connection) RequestName(name string, flags RequestNameFlags) (RequestNameReply, error) {
 	var r uint32
 	err := conn.busObj.Call("org.freedesktop.DBus.RequestName", 0, name, flags).StoreReply(&r)
 	if err != nil {
 		return 0, err
+	}
+	if r == uint32(NameReplyPrimaryOwner) {
+		conn.names = append(conn.names, name)
 	}
 	return RequestNameReply(r), nil
 }

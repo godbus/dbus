@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"log"
 	"net"
 	"os"
 	"reflect"
@@ -18,7 +19,7 @@ const defaultSystemBusAddress = "unix:path=/var/run/dbus/system_bus_socket"
 type Connection struct {
 	transport     net.Conn
 	uuid          string
-	uaddr         string
+	names         []string
 	lastSerial    uint32
 	lastSerialLck sync.Mutex
 	replies       map[uint32]chan interface{}
@@ -27,6 +28,7 @@ type Connection struct {
 	handlersLck   sync.RWMutex
 	out           chan *Message
 	signals       chan Signal
+	eavesdropped  chan Message
 	busObj        *Object
 }
 
@@ -87,6 +89,7 @@ func NewConnection(address string) (*Connection, error) {
 	conn.out = make(chan *Message, 10)
 	conn.signals = make(chan Signal, 10)
 	conn.handlers = make(map[ObjectPath]*expObject)
+	conn.eavesdropped = make(chan Message, 10)
 	conn.busObj = conn.Object("org.freedesktop.DBus", "/org/freedesktop/DBus")
 	go conn.inWorker()
 	go conn.outWorker()
@@ -109,6 +112,14 @@ func (conn *Connection) Close() error {
 	close(conn.out)
 	close(conn.signals)
 	return conn.transport.Close()
+}
+
+// Eavesdropped returns a channel to which all messages are sent whose
+// destination field is not one of the know names of this connection and which
+// are not signals. The channel is buffered; messages received when the channel
+// is full are discarded.
+func (conn *Connection) Eavesdropped() <-chan Message {
+	return conn.eavesdropped
 }
 
 func (conn *Connection) getSerial() uint32 {
@@ -134,7 +145,8 @@ func (conn *Connection) hello() error {
 	if err != nil {
 		return err
 	}
-	conn.uaddr = s
+	conn.names = make([]string, 1)
+	conn.names[0] = s
 	return nil
 }
 
@@ -142,6 +154,26 @@ func (conn *Connection) inWorker() {
 	for {
 		msg, err := conn.readMessage()
 		if err == nil {
+			dest, _ := msg.Headers[FieldDestination].value.(string)
+			found := false
+			if len(conn.names) == 0 {
+				found = true
+			}
+			for _, v := range conn.names {
+				if dest == v {
+					found = true
+					break
+				}
+			}
+			log.Println(msg)
+			if !found && msg.Type != TypeSignal {
+				select {
+				case conn.eavesdropped<-*msg:
+					log.Println("sent")
+				default:
+				}
+				continue
+			}
 			switch msg.Type {
 			case TypeMethodReply, TypeError:
 				serial := msg.Headers[FieldReplySerial].value.(uint32)
