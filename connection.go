@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"log"
 	"net"
 	"os"
 	"reflect"
@@ -87,9 +86,7 @@ func NewConnection(address string) (*Connection, error) {
 	}
 	conn.replies = make(map[uint32]chan interface{})
 	conn.out = make(chan *Message, 10)
-	conn.signals = make(chan Signal, 10)
 	conn.handlers = make(map[ObjectPath]*expObject)
-	conn.eavesdropped = make(chan Message, 10)
 	conn.busObj = conn.Object("org.freedesktop.DBus", "/org/freedesktop/DBus")
 	go conn.inWorker()
 	go conn.outWorker()
@@ -110,16 +107,27 @@ func (conn *Connection) BusObject() *Object {
 // related goroutines.
 func (conn *Connection) Close() error {
 	close(conn.out)
-	close(conn.signals)
+	if conn.signals != nil {
+		close(conn.signals)
+	}
+	if conn.eavesdropped != nil {
+		close(conn.eavesdropped)
+	}
 	return conn.transport.Close()
 }
 
-// Eavesdropped returns a channel to which all messages are sent whose
+// Eavesdrop changes the channel to which all messages are sent whose
 // destination field is not one of the know names of this connection and which
-// are not signals. The channel is buffered; messages received when the channel
-// is full are discarded.
-func (conn *Connection) Eavesdropped() <-chan Message {
-	return conn.eavesdropped
+// are not signals. The caller has to make sure that c is sufficiently buffered;
+// if a message arrives when a write to c is not possible, the message is
+// discarded.
+//
+// The channel can be reset by passing nil.
+//
+// If the connection is closed by the server or a call to Close, the channel is
+// also closed.
+func (conn *Connection) Eavesdrop(c chan Message) {
+	conn.eavesdropped = c
 }
 
 func (conn *Connection) getSerial() uint32 {
@@ -165,11 +173,9 @@ func (conn *Connection) inWorker() {
 					break
 				}
 			}
-			log.Println(msg)
-			if !found && msg.Type != TypeSignal {
+			if !found && (msg.Type != TypeSignal || conn.eavesdropped != nil) {
 				select {
 				case conn.eavesdropped<-*msg:
-					log.Println("sent")
 				default:
 				}
 				continue
@@ -316,14 +322,20 @@ func (conn *Connection) Object(dest string, path ObjectPath) *Object {
 	return &Object{conn, dest, path}
 }
 
-// Signals returns a channel to which all received signal messages are forwarded.
-// The channel is buffered, but package dbus will not block when it is full, but
-// discard the signal.
+// Signal sets the channel to which all received signal messages are forwarded.
+// The caller has to make sure that c is sufficiently buffered; if a message
+// arrives when a write ot c is not possible, it is discarded.
+//
+// The channel can be reset by passing nil.
+//
+// This channel is "overwritten" by Eavesdrop; i.e., if there currently is a
+// channel for eavesdropped messages, this channel receives all signals, and the
+// channel passed to Signal will not receive any signals.
 //
 // If the connection is closed by the server or a call to Close, the channel is
 // also closed.
-func (conn *Connection) Signals() <-chan Signal {
-	return conn.signals
+func (conn *Connection) Signal(c chan Signal) {
+	conn.signals = c
 }
 
 // Error represents a DBus message of type Error.

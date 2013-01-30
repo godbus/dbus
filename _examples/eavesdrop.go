@@ -21,13 +21,10 @@ func main() {
 			os.Exit(1)
 		}
 	}
+	c := make(chan dbus.Message, 10)
+	conn.Eavesdrop(c)
 	fmt.Println("Listening for everything")
-	for {
-		select {
-		case v := <-conn.Signals():
-			fmt.Println(v)
-		case v := <-conn.Eavesdropped():
-			fmt.Println(v)
-		}
+	for v := range c {
+		fmt.Println(v)
 	}
 }
