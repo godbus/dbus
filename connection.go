@@ -339,6 +339,31 @@ func (conn *Connection) Object(dest string, path ObjectPath) *Object {
 	return &Object{conn, dest, path}
 }
 
+// Send the given message to the message bus. You usually don't need to use
+// this; use the higher-level equivalents (Call, Emit and Export) instead.
+// The returned cookie is nil if msg isn't a message call or if NoReplyExpected
+// is set.
+//
+// The serial member is set to a unique serial before sending.
+func (conn *Connection) Send(msg *Message) Cookie {
+	if err := msg.IsValid(); err != nil {
+		c := make(chan *Reply, 1)
+		c<-&Reply{nil, err}
+		return Cookie(c)
+	}
+	msg.Serial = <-conn.serial
+	if msg.Type == TypeMethodCall && msg.Flags&NoReplyExpected == 0 {
+		conn.repliesLck.Lock()
+		c := make(chan *Reply, 1)
+		conn.replies[msg.Serial] = Cookie(c)
+		conn.repliesLck.Unlock()
+		conn.out <- msg
+		return Cookie(c)
+	}
+	conn.out <- msg
+	return nil
+}
+
 // Signal sets the channel to which all received signal messages are forwarded.
 // The caller has to make sure that c is sufficiently buffered; if a message
 // arrives when a write ot c is not possible, it is discarded.
