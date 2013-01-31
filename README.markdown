@@ -20,7 +20,10 @@ go get github.com/guelfey/go.dbus
 ```go
 package main
 
-import "github.com/guelfey/go.dbus"
+import (
+	"fmt"
+	"github.com/guelfey/go.dbus"
+)
 
 func main() {
 	conn, err := dbus.ConnectSessionBus()
@@ -28,7 +31,32 @@ func main() {
 		panic(err)
 	}
 
-	// do stuff with conn
+	// Synchronous method call:
+	var list []string
+	err = conn.BusObj.Call("org.freedesktop.DBus.ListNames", 0).Store(&list)
+	if err != nil {
+		panic(err)
+	}
+	for _, v := range list {
+		fmt.Println(v)
+	}
+
+	// Asynchronous method call:
+	c := conn.BusObj.Call("org.freedesktop.DBus.ListActivatableNames", 0)
+	select {
+	case reply := <-c:
+		if reply.Err != nil {
+			panic(err)
+		}
+		list = reply.Values[0].([]string)
+		for _, v := range list {
+			fmt.Println(v)
+		}
+	// other cases...
+	}
+
+	// Signal emission:
+	conn.Emit("/foo/bar", "foo.bar", "Baz", uint32(0xDEADBEEF))
 }
 ```
 
