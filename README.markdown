@@ -60,8 +60,9 @@ func main() {
 }
 ```
 
-See the [documentation](http://godoc.org/github.com/guelfey/go.dbus) and _examples for
-more information.
+See the [documentation](http://godoc.org/github.com/guelfey/go.dbus) and the 
+[examples](https://github.com/guelfey/go.dbus/tree/master/_examples) for more
+information.
 
 Please note that the API is considered unstable for now and may change without
 further notice.
