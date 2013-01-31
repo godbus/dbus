@@ -2,10 +2,10 @@
 Package dbus implements bindings to the DBus message bus system, as well as the
 corresponding encoding format.
 
-For the message bus API, you first need to connect to a bus (usually the Session
-or System bus). Then, call methods by first getting an Object and then using
-Call(). Signals can be received with the channel returned by Signals() and can
-be emitted via Emit().
+For the message bus API, you first need to connect to a bus (usually the session
+or system bus). Then, call methods by getting an Object and then using Call().
+Signals can be received by passing a channel to Signal() and can be emitted via
+Emit().
 
 Handling method calls is even easier; using Export(), you can arrange DBus
 message calls to be directly translated to method calls on a Go value.

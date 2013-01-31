@@ -21,7 +21,7 @@ type Connection struct {
 	names         []string
 	lastSerial    uint32
 	lastSerialLck sync.Mutex
-	replies       map[uint32]chan interface{}
+	replies       map[uint32]Cookie
 	repliesLck    sync.RWMutex
 	handlers      map[ObjectPath]*expObject
 	handlersLck   sync.RWMutex
@@ -55,7 +55,6 @@ func ConnectSystemBus() (*Connection, error) {
 // NewConnection establishes a new connection to the message bus specified by
 // address.
 func NewConnection(address string) (*Connection, error) {
-	// BUG(guelfey): Only the "unix" transport is supported right now.
 	var err error
 	conn := new(Connection)
 	if strings.HasPrefix(address, "unix") {
@@ -84,7 +83,7 @@ func NewConnection(address string) (*Connection, error) {
 		conn.transport.Close()
 		return nil, err
 	}
-	conn.replies = make(map[uint32]chan interface{})
+	conn.replies = make(map[uint32]Cookie)
 	conn.out = make(chan *Message, 10)
 	conn.handlers = make(map[ObjectPath]*expObject)
 	conn.busObj = conn.Object("org.freedesktop.DBus", "/org/freedesktop/DBus")
@@ -149,7 +148,7 @@ func (conn *Connection) getSerial() uint32 {
 
 func (conn *Connection) hello() error {
 	var s string
-	err := conn.busObj.Call("org.freedesktop.DBus.Hello", 0).StoreReply(&s)
+	err := conn.busObj.Call("org.freedesktop.DBus.Hello", 0).Store(&s)
 	if err != nil {
 		return err
 	}
@@ -182,12 +181,37 @@ func (conn *Connection) inWorker() {
 			}
 			switch msg.Type {
 			case TypeMethodReply, TypeError:
+				var rvs []interface{}
+				var reply *Reply
+
 				serial := msg.Headers[FieldReplySerial].value.(uint32)
-				conn.repliesLck.RLock()
-				if c, ok := conn.replies[serial]; ok {
-					c <- msg
+				sig, _ := msg.Headers[FieldSignature].value.(Signature)
+				if sig.str != "" {
+					rvs = sig.Values()
+					dec := NewDecoder(bytes.NewBuffer(msg.Body), msg.Order)
+					err = dec.DecodeMulti(rvs...)
+					if err != nil {
+						reply = &Reply{nil, err}
+					} else {
+						rvs = dereferenceAll(rvs)
+					}
+				} else {
+					rvs = []interface{}{}
 				}
-				conn.repliesLck.RUnlock()
+				if reply == nil {
+					if msg.Type == TypeError {
+						name, _ := msg.Headers[FieldErrorName].value.(string)
+						reply = &Reply{nil, Error{name, rvs}}
+					} else {
+						reply = &Reply{rvs, nil}
+					}
+				}
+				conn.repliesLck.Lock()
+				if c, ok := conn.replies[serial]; ok {
+					c <- reply
+				}
+				conn.replies[serial] = nil
+				conn.repliesLck.Unlock()
 			case TypeSignal:
 				var signal Signal
 				signal.Name = msg.Headers[FieldMember].value.(string)
@@ -216,7 +240,7 @@ func (conn *Connection) inWorker() {
 			conn.Close()
 			conn.repliesLck.RLock()
 			for _, v := range conn.replies {
-				v <- err
+				v <- &Reply{nil, err}
 			}
 			conn.repliesLck.RUnlock()
 			return
@@ -232,7 +256,7 @@ func (conn *Connection) outWorker() {
 		_, err := buf.WriteTo(conn.transport)
 		conn.repliesLck.RLock()
 		if err != nil && conn.replies[msg.Serial] != nil {
-			conn.replies[msg.Serial] <- err
+			conn.replies[msg.Serial] <- &Reply{nil, err}
 		}
 		conn.repliesLck.RUnlock()
 		buf.Reset()

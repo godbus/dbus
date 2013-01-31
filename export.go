@@ -146,10 +146,7 @@ func (conn *Connection) Emit(path ObjectPath, iface string, name string, values 
 	conn.out <- msg
 }
 
-// Export the given value as an object on the message bus. Package dbus will
-// translate method calls on path to actual method calls. The iface parameter
-// gives the name of the interface and the other introspection data that is
-// passed to any peer calling org.freedesktop.Introspectable.Introspect.
+// Export the given value as an object on the message bus.
 //
 // If a method call on the given path and interface is received, an exported
 // method with the same name is called if the parameters match and the last
@@ -181,7 +178,7 @@ func (conn *Connection) Export(v interface{}, path ObjectPath, iface string) {
 // names that the connection has.
 func (conn *Connection) RequestName(name string, flags RequestNameFlags) (RequestNameReply, error) {
 	var r uint32
-	err := conn.busObj.Call("org.freedesktop.DBus.RequestName", 0, name, flags).StoreReply(&r)
+	err := conn.busObj.Call("org.freedesktop.DBus.RequestName", 0, name, flags).Store(&r)
 	if err != nil {
 		return 0, err
 	}

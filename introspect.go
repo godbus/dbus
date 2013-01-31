@@ -71,7 +71,7 @@ func (o *Object) Introspect() (*Node, error) {
 	var xmldata string
 	var node Node
 
-	err := o.Call("org.freedesktop.DBus.Introspectable.Introspect", 0).StoreReply(&xmldata)
+	err := o.Call("org.freedesktop.DBus.Introspectable.Introspect", 0).Store(&xmldata)
 	if err != nil {
 		return nil, err
 	}

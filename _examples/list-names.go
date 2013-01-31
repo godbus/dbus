@@ -13,20 +13,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	reply, err := conn.BusObject().Call("org.freedesktop.DBus.ListNames", 0).Reply()
+	var s []string
+	err = conn.BusObject().Call("org.freedesktop.DBus.ListNames", 0).Store(&s)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Failed to get list of owned names:", err)
 		os.Exit(1)
 	}
 
-	list, ok := reply[0].([]string)
-	if !ok {
-		fmt.Fprintln(os.Stderr, "ListNames has invalid response type")
-		os.Exit(1)
-	}
-
 	fmt.Println("Currently owned names on the session bus:")
-	for _, v := range list {
+	for _, v := range s {
 		fmt.Println(v)
 	}
 }
