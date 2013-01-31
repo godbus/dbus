@@ -19,7 +19,7 @@ type Reply struct {
 // the channel.
 type Cookie chan *Reply
 
-// Store but decodes the values into provided pointers.
+// Store waits for the reply of c and stores the values into the provided pointers.
 // It panics if one of retvalues is not a pointer to a DBus-representable value
 // and returns an error if the signatures of the body and retvalues don't match,
 // or if the reply that was returned contained an error.
@@ -49,7 +49,8 @@ type Object struct {
 
 // Call calls a method with the given arguments. The method parameter must be
 // formatted as "interface.method" (e.g., "org.freedesktop.DBus.Hello"). The
-// returned cookie can be used to get the reply later.
+// returned cookie can be used to get the reply later, unless the flags include
+// FlagNoReplyExpected, in which case a nil channel is returned.
 func (o *Object) Call(method string, flags Flags, args ...interface{}) Cookie {
 	i := strings.LastIndex(method, ".")
 	if i == -1 {
@@ -60,7 +61,7 @@ func (o *Object) Call(method string, flags Flags, args ...interface{}) Cookie {
 	msg := new(Message)
 	msg.Order = binary.LittleEndian
 	msg.Type = TypeMethodCall
-	msg.Serial = o.conn.getSerial()
+	msg.Serial = <-o.conn.serial
 	msg.Flags = flags & (NoAutoStart | NoReplyExpected)
 	msg.Headers = make(map[HeaderField]Variant)
 	msg.Headers[FieldPath] = MakeVariant(o.path)

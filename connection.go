@@ -19,8 +19,7 @@ type Connection struct {
 	transport     net.Conn
 	uuid          string
 	names         []string
-	lastSerial    uint32
-	lastSerialLck sync.Mutex
+	serial        chan uint32
 	replies       map[uint32]Cookie
 	repliesLck    sync.RWMutex
 	handlers      map[ObjectPath]*expObject
@@ -86,9 +85,11 @@ func NewConnection(address string) (*Connection, error) {
 	conn.replies = make(map[uint32]Cookie)
 	conn.out = make(chan *Message, 10)
 	conn.handlers = make(map[ObjectPath]*expObject)
+	conn.serial = make(chan uint32)
 	conn.busObj = conn.Object("org.freedesktop.DBus", "/org/freedesktop/DBus")
 	go conn.inWorker()
 	go conn.outWorker()
+	go conn.genSerials()
 	if err = conn.hello(); err != nil {
 		conn.transport.Close()
 		return nil, err
@@ -127,23 +128,6 @@ func (conn *Connection) Close() error {
 // also closed.
 func (conn *Connection) Eavesdrop(c chan Message) {
 	conn.eavesdropped = c
-}
-
-func (conn *Connection) getSerial() uint32 {
-	conn.lastSerialLck.Lock()
-	conn.repliesLck.RLock()
-	defer conn.lastSerialLck.Unlock()
-	defer conn.repliesLck.RUnlock()
-	if conn.replies[conn.lastSerial+1] == nil {
-		conn.lastSerial++
-		return conn.lastSerial
-	}
-	var i uint32
-	for i = conn.lastSerial + 2; conn.replies[i] != nil; {
-		i++
-	}
-	conn.lastSerial = i
-	return i
 }
 
 func (conn *Connection) hello() error {
@@ -301,7 +285,7 @@ func (conn *Connection) sendError(e Error, dest string, serial uint32) {
 	msg := new(Message)
 	msg.Order = binary.LittleEndian
 	msg.Type = TypeError
-	msg.Serial = conn.getSerial()
+	msg.Serial = <-conn.serial
 	msg.Headers = make(map[HeaderField]Variant)
 	msg.Headers[FieldDestination] = MakeVariant(dest)
 	msg.Headers[FieldErrorName] = MakeVariant(e.Name)
@@ -322,7 +306,7 @@ func (conn *Connection) sendReply(dest string, serial uint32, values ...interfac
 	msg := new(Message)
 	msg.Order = binary.LittleEndian
 	msg.Type = TypeMethodReply
-	msg.Serial = conn.getSerial()
+	msg.Serial = <-conn.serial
 	msg.Headers = make(map[HeaderField]Variant)
 	msg.Headers[FieldDestination] = MakeVariant(dest)
 	msg.Headers[FieldReplySerial] = MakeVariant(serial)
@@ -336,6 +320,15 @@ func (conn *Connection) sendReply(dest string, serial uint32, values ...interfac
 		msg.Body = []byte{}
 	}
 	conn.out <- msg
+}
+
+func (conn *Connection) genSerials() {
+	s := uint32(1)
+	for {
+		conn.serial<-s
+		// let's hope that nobody sends 2^32-1 messages at once
+		s++
+	}
 }
 
 // Object returns the object identified by the given destination name and path.

@@ -110,7 +110,7 @@ func (conn *Connection) handleCall(msg *Message) {
 		reply := new(Message)
 		reply.Order = binary.LittleEndian
 		reply.Type = TypeMethodReply
-		reply.Serial = conn.getSerial()
+		reply.Serial = <-conn.serial
 		reply.Headers = make(map[HeaderField]Variant)
 		reply.Headers[FieldDestination] = msg.Headers[FieldSender]
 		reply.Headers[FieldReplySerial] = MakeVariant(msg.Serial)
@@ -129,7 +129,7 @@ func (conn *Connection) Emit(path ObjectPath, iface string, name string, values 
 	msg := new(Message)
 	msg.Order = binary.LittleEndian
 	msg.Type = TypeSignal
-	msg.Serial = conn.getSerial()
+	msg.Serial = <-conn.serial
 	msg.Headers = make(map[HeaderField]Variant)
 	msg.Headers[FieldInterface] = MakeVariant(iface)
 	msg.Headers[FieldMember] = MakeVariant(name)
