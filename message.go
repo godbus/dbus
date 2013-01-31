@@ -169,7 +169,7 @@ func (message *Message) EncodeTo(out io.Writer) error {
 	}
 	vs[6] = headers
 	buf := new(bytes.Buffer)
-	enc := NewEncoder(buf, binary.LittleEndian)
+	enc := NewEncoder(buf, message.Order)
 	enc.EncodeMulti(vs...)
 	enc.align(8)
 	if len(message.Body) != 0 {
