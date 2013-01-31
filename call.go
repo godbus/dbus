@@ -17,7 +17,7 @@ type Reply struct {
 
 // Cookie represents a pending message reply. To get the reply, simply read from
 // the channel.
-type Cookie chan *Reply
+type Cookie <-chan *Reply
 
 // Store waits for the reply of c and stores the values into the provided pointers.
 // It panics if one of retvalues is not a pointer to a DBus-representable value
@@ -82,7 +82,7 @@ func (o *Object) Call(method string, flags Flags, args ...interface{}) Cookie {
 	if msg.Flags&NoReplyExpected == 0 {
 		o.conn.repliesLck.Lock()
 		c := make(chan *Reply, 1)
-		o.conn.replies[msg.Serial] = Cookie(c)
+		o.conn.replies[msg.Serial] = c
 		o.conn.repliesLck.Unlock()
 		o.conn.out <- msg
 		return Cookie(c)

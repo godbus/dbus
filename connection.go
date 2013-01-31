@@ -20,7 +20,7 @@ type Connection struct {
 	uuid          string
 	names         []string
 	serial        chan uint32
-	replies       map[uint32]Cookie
+	replies       map[uint32]chan *Reply
 	repliesLck    sync.RWMutex
 	handlers      map[ObjectPath]*expObject
 	handlersLck   sync.RWMutex
@@ -82,7 +82,7 @@ func NewConnection(address string) (*Connection, error) {
 		conn.transport.Close()
 		return nil, err
 	}
-	conn.replies = make(map[uint32]Cookie)
+	conn.replies = make(map[uint32]chan *Reply)
 	conn.out = make(chan *Message, 10)
 	conn.handlers = make(map[ObjectPath]*expObject)
 	conn.serial = make(chan uint32)
@@ -355,7 +355,7 @@ func (conn *Connection) Send(msg *Message) Cookie {
 	if msg.Type == TypeMethodCall && msg.Flags&NoReplyExpected == 0 {
 		conn.repliesLck.Lock()
 		c := make(chan *Reply, 1)
-		conn.replies[msg.Serial] = Cookie(c)
+		conn.replies[msg.Serial] = c
 		conn.repliesLck.Unlock()
 		conn.out <- msg
 		return Cookie(c)
