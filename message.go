@@ -3,8 +3,10 @@ package dbus
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"reflect"
+	"strconv"
 )
 
 const protoVersion byte = 1
@@ -219,4 +221,56 @@ func (message *Message) IsValid() error {
 		}
 	}
 	return nil
+}
+
+// String returns a string representation of a message similar to the format of
+// dbus-monitor.
+func (msg *Message) String() string {
+	if err := msg.IsValid(); err != nil {
+		return "<invalid>"
+	}
+	s := map[Type]string{
+		TypeMethodCall: "method call",
+		TypeMethodReply: "reply",
+		TypeError: "error",
+		TypeSignal: "signal",
+	}[msg.Type]
+	if v, ok := msg.Headers[FieldSender]; ok {
+		s += " from " + v.value.(string)
+	}
+	if v, ok := msg.Headers[FieldDestination]; ok {
+		s += " to " + v.value.(string)
+	} else {
+		s += " to <null>"
+	}
+	s += " serial " + strconv.FormatUint(uint64(msg.Serial), 10)
+	if v, ok := msg.Headers[FieldPath]; ok {
+		s += " path " + string(v.value.(ObjectPath))
+	}
+	if v, ok := msg.Headers[FieldInterface]; ok {
+		s += " interface " + v.value.(string)
+	}
+	if v, ok := msg.Headers[FieldErrorName]; ok {
+		s += " name " + v.value.(string)
+	}
+	if v, ok := msg.Headers[FieldMember]; ok {
+		s += " member " + v.value.(string)
+	}
+	sig, _ := msg.Headers[FieldSignature].value.(Signature)
+	if sig.str != "" {
+		s += "\n"
+		rvs := sig.Values()
+		dec := NewDecoder(bytes.NewBuffer(msg.Body), msg.Order)
+		if err := dec.DecodeMulti(rvs...); err != nil {
+			return "<invalid>"
+		}
+		rvs = dereferenceAll(rvs)
+		for i, v := range rvs {
+			s += "  " + fmt.Sprint(v)
+			if i != len(rvs)-1 {
+				s += "\n"
+			}
+		}
+	}
+	return s
 }
