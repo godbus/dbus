@@ -28,11 +28,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	reply, err := conn.RequestName("com.github.guelfey.Demo", dbus.FlagDoNotQueue)
+	reply, err := conn.RequestName("com.github.guelfey.Demo",
+		dbus.NameFlagDoNotQueue)
 	if err != nil {
 		panic(err)
 	}
-	if reply != dbus.NameReplyPrimaryOwner {
+	if reply != dbus.RequestNameReplyPrimaryOwner {
 		fmt.Fprintln(os.Stderr, "name already taken")
 		os.Exit(1)
 	}

@@ -15,8 +15,8 @@ const protoVersion byte = 1
 type Flags byte
 
 const (
-	NoReplyExpected Flags = 1 << iota
-	NoAutoStart
+	FlagNoReplyExpected Flags = 1 << iota
+	FlagNoAutoStart
 )
 
 // Type represents the possible types of a DBus message.
@@ -191,7 +191,7 @@ func (message *Message) IsValid() error {
 	default:
 		return InvalidMessageError("invalid byte order")
 	}
-	if message.Flags & ^(NoAutoStart|NoReplyExpected) != 0 {
+	if message.Flags & ^(FlagNoAutoStart|FlagNoReplyExpected) != 0 {
 		return InvalidMessageError("invalid flags")
 	}
 	if message.Type == 0 || message.Type >= typeMax {

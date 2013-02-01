@@ -352,7 +352,7 @@ func (conn *Connection) Send(msg *Message) Cookie {
 		return Cookie(c)
 	}
 	msg.Serial = <-conn.serial
-	if msg.Type == TypeMethodCall && msg.Flags&NoReplyExpected == 0 {
+	if msg.Type == TypeMethodCall && msg.Flags&FlagNoReplyExpected == 0 {
 		conn.repliesLck.Lock()
 		c := make(chan *Reply, 1)
 		conn.replies[msg.Serial] = c

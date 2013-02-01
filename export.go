@@ -99,7 +99,7 @@ func (conn *Connection) handleCall(msg *Message) {
 		conn.sendError(*em, sender, serial)
 		return
 	}
-	if msg.Flags&NoReplyExpected == 0 {
+	if msg.Flags&FlagNoReplyExpected == 0 {
 		body := new(bytes.Buffer)
 		sig := ""
 		enc := NewEncoder(body, binary.LittleEndian)
@@ -173,7 +173,7 @@ func (conn *Connection) Export(v interface{}, path ObjectPath, iface string) {
 	conn.handlersLck.Unlock()
 }
 
-// RequestName calls org.freedesktop.DBus.RequestName. You should only use this
+// RequestName calls org.freedesktop.DBus.RequestName. You should use only this
 // method to request a name because package dbus needs to keep track of all
 // names that the connection has.
 func (conn *Connection) RequestName(name string, flags RequestNameFlags) (RequestNameReply, error) {
@@ -182,7 +182,7 @@ func (conn *Connection) RequestName(name string, flags RequestNameFlags) (Reques
 	if err != nil {
 		return 0, err
 	}
-	if r == uint32(NameReplyPrimaryOwner) {
+	if r == uint32(RequestNameReplyPrimaryOwner) {
 		conn.names = append(conn.names, name)
 	}
 	return RequestNameReply(r), nil
@@ -213,17 +213,17 @@ func (conn *Connection) SetIntrospect(path ObjectPath, intro string) error {
 type RequestNameFlags uint32
 
 const (
-	FlagAllowReplacement RequestNameFlags = 1 << iota
-	FlagReplaceExisting
-	FlagDoNotQueue
+	NameFlagAllowReplacement RequestNameFlags = 1 << iota
+	NameFlagReplaceExisting
+	NameFlagDoNotQueue
 )
 
 // RequestNameReply is the reply to a RequestName call.
 type RequestNameReply uint32
 
 const (
-	NameReplyPrimaryOwner RequestNameReply = 1 + iota
-	NameReplyInQueue
-	NameReplyExists
-	NameReplyAlreadyOwner
+	RequestNameReplyPrimaryOwner RequestNameReply = 1 + iota
+	RequestNameReplyInQueue
+	RequestNameReplyExists
+	RequestNameReplyAlreadyOwner
 )
