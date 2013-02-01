@@ -26,7 +26,7 @@ type Connection struct {
 	handlersLck   sync.RWMutex
 	out           chan *Message
 	signals       chan Signal
-	eavesdropped  chan Message
+	eavesdropped  chan *Message
 	busObj        *Object
 }
 
@@ -126,7 +126,7 @@ func (conn *Connection) Close() error {
 //
 // If the connection is closed by the server or a call to Close, the channel is
 // also closed.
-func (conn *Connection) Eavesdrop(c chan Message) {
+func (conn *Connection) Eavesdrop(c chan *Message) {
 	conn.eavesdropped = c
 }
 
@@ -158,7 +158,7 @@ func (conn *Connection) inWorker() {
 			}
 			if !found && (msg.Type != TypeSignal || conn.eavesdropped != nil) {
 				select {
-				case conn.eavesdropped<-*msg:
+				case conn.eavesdropped<-msg:
 				default:
 				}
 				continue

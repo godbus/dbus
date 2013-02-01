@@ -21,7 +21,7 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	c := make(chan dbus.Message, 10)
+	c := make(chan *dbus.Message, 10)
 	conn.Eavesdrop(c)
 	fmt.Println("Listening for everything")
 	for v := range c {
