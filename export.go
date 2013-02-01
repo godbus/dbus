@@ -26,7 +26,7 @@ type expObject struct {
 func (conn *Connection) handleCall(msg *Message) {
 	var vs []interface{}
 	if len(msg.Body) != 0 {
-		vs := msg.Headers[FieldSignature].value.(Signature).Values()
+		vs = msg.Headers[FieldSignature].value.(Signature).Values()
 		dec := NewDecoder(bytes.NewBuffer(msg.Body), msg.Order)
 		err := dec.DecodeMulti(vs...)
 		if err != nil {
