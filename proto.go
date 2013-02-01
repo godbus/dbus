@@ -284,7 +284,7 @@ func validSingle(s string) (err error, rem string) {
 				return SignatureError{Sig: s, Reason: "unmatched '{'"}, ""
 			}
 			rem = s[i+1:]
-			s = s[1:i]
+			s = s[2:i]
 			if err, _ = validSingle(s[0:1]); err != nil {
 				return SignatureError{Sig: s, Reason: "invalid map key type"}, ""
 			}
@@ -329,11 +329,16 @@ func value(s string) (t reflect.Type) {
 	}
 	switch s[0] {
 	case 'a':
-		t = reflect.SliceOf(sigToType[s[1]])
+		if s[1] == '{' {
+			i := strings.LastIndex(s, "}")
+			t = reflect.MapOf(sigToType[s[2]], value(s[3:i]))
+		} else if s[1] == '(' {
+			t = interfacesType
+		} else {
+			t = reflect.SliceOf(sigToType[s[1]])
+		}
 	case '(':
-		t = reflect.TypeOf([]interface{}{})
-	case '{':
-		t = reflect.MapOf(value(s[1:2]), value(s[2:]))
+		t = interfacesType
 	}
 	return
 }
