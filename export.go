@@ -173,6 +173,25 @@ func (conn *Connection) Export(v interface{}, path ObjectPath, iface string) {
 	conn.handlersLck.Unlock()
 }
 
+// ReleaseName calls org.freedesktop.DBus.ReleaseName. You should use only this
+// method to release a name (see below).
+func (conn *Connection) ReleaseName(name string) (ReleaseNameReply, error) {
+	var r uint32
+	err := conn.busObj.Call("org.freedesktop.DBus.ReleaseName", 0, name).Store(&r)
+	if err != nil {
+		return 0, err
+	}
+	if r == uint32(ReleaseNameReplyReleased) {
+		for i, v := range conn.names {
+			if v == name {
+				copy(conn.names[i:], conn.names[i+1:])
+				conn.names = conn.names[:len(conn.names)-1]
+			}
+		}
+	}
+	return ReleaseNameReply(r), nil
+}
+
 // RequestName calls org.freedesktop.DBus.RequestName. You should use only this
 // method to request a name because package dbus needs to keep track of all
 // names that the connection has.
@@ -208,6 +227,15 @@ func (conn *Connection) SetIntrospect(path ObjectPath, intro string) error {
 	conn.handlersLck.Unlock()
 	return nil
 }
+
+// ReleaseNameReply is the reply to a ReleaseName call.
+type ReleaseNameReply uint32
+
+const (
+	ReleaseNameReplyReleased ReleaseNameReply = 1 + iota
+	ReleaseNameReplyNonExistent
+	ReleaseNameReplyNotOwner
+)
 
 // RequestNameFlags represents the possible flags for the RequestName call.
 type RequestNameFlags uint32
