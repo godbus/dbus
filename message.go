@@ -230,10 +230,10 @@ func (msg *Message) String() string {
 		return "<invalid>"
 	}
 	s := map[Type]string{
-		TypeMethodCall: "method call",
+		TypeMethodCall:  "method call",
 		TypeMethodReply: "reply",
-		TypeError: "error",
-		TypeSignal: "signal",
+		TypeError:       "error",
+		TypeSignal:      "signal",
 	}[msg.Type]
 	if v, ok := msg.Headers[FieldSender]; ok {
 		s += " from " + v.value.(string)

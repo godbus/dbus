@@ -12,7 +12,7 @@ import (
 // an error of the underlying transport a error message.
 type Reply struct {
 	Values []interface{}
-	Err error
+	Err    error
 }
 
 // Cookie represents a pending message reply. To get the reply, simply read from

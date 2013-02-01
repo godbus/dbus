@@ -19,7 +19,7 @@ var (
 )
 
 type expObject struct {
-	intro string
+	intro      string
 	interfaces map[string]interface{}
 }
 

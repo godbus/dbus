@@ -16,18 +16,18 @@ const defaultSystemBusAddress = "unix:path=/var/run/dbus/system_bus_socket"
 // Connection represents a connection to a message bus (usually, the system or
 // session bus).
 type Connection struct {
-	transport     net.Conn
-	uuid          string
-	names         []string
-	serial        chan uint32
-	replies       map[uint32]chan *Reply
-	repliesLck    sync.RWMutex
-	handlers      map[ObjectPath]*expObject
-	handlersLck   sync.RWMutex
-	out           chan *Message
-	signals       chan Signal
-	eavesdropped  chan *Message
-	busObj        *Object
+	transport    net.Conn
+	uuid         string
+	names        []string
+	serial       chan uint32
+	replies      map[uint32]chan *Reply
+	repliesLck   sync.RWMutex
+	handlers     map[ObjectPath]*expObject
+	handlersLck  sync.RWMutex
+	out          chan *Message
+	signals      chan Signal
+	eavesdropped chan *Message
+	busObj       *Object
 }
 
 // ConnectSessionBus connects to the session message bus and returns the
@@ -158,7 +158,7 @@ func (conn *Connection) inWorker() {
 			}
 			if !found && (msg.Type != TypeSignal || conn.eavesdropped != nil) {
 				select {
-				case conn.eavesdropped<-msg:
+				case conn.eavesdropped <- msg:
 				default:
 				}
 				continue
@@ -325,7 +325,7 @@ func (conn *Connection) sendReply(dest string, serial uint32, values ...interfac
 func (conn *Connection) genSerials() {
 	s := uint32(1)
 	for {
-		conn.serial<-s
+		conn.serial <- s
 		// let's hope that nobody sends 2^32-1 messages at once
 		s++
 	}
@@ -348,7 +348,7 @@ func (conn *Connection) Object(dest string, path ObjectPath) *Object {
 func (conn *Connection) Send(msg *Message) Cookie {
 	if err := msg.IsValid(); err != nil {
 		c := make(chan *Reply, 1)
-		c<-&Reply{nil, err}
+		c <- &Reply{nil, err}
 		return Cookie(c)
 	}
 	msg.Serial = <-conn.serial
@@ -398,8 +398,8 @@ func (e Error) Error() string {
 
 // Signal represents a DBus message of type Signal.
 type Signal struct {
-	Name      string
-	Values    []interface{}
+	Name   string
+	Values []interface{}
 }
 
 func getKey(s, key string) string {
