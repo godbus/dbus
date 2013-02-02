@@ -19,6 +19,7 @@ type Connection struct {
 	transport    net.Conn
 	uuid         string
 	names        []string
+	namesLck     sync.RWMutex
 	serial       chan uint32
 	replies      map[uint32]chan *Reply
 	repliesLck   sync.RWMutex
@@ -136,8 +137,10 @@ func (conn *Connection) hello() error {
 	if err != nil {
 		return err
 	}
+	conn.namesLck.Lock()
 	conn.names = make([]string, 1)
 	conn.names[0] = s
+	conn.namesLck.Unlock()
 	return nil
 }
 
@@ -147,6 +150,7 @@ func (conn *Connection) inWorker() {
 		if err == nil {
 			dest, _ := msg.Headers[FieldDestination].value.(string)
 			found := false
+			conn.namesLck.RLock()
 			if len(conn.names) == 0 {
 				found = true
 			}
@@ -156,6 +160,7 @@ func (conn *Connection) inWorker() {
 					break
 				}
 			}
+			conn.namesLck.RUnlock()
 			if !found && (msg.Type != TypeSignal || conn.eavesdropped != nil) {
 				select {
 				case conn.eavesdropped <- msg:

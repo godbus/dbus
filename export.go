@@ -182,12 +182,14 @@ func (conn *Connection) ReleaseName(name string) (ReleaseNameReply, error) {
 		return 0, err
 	}
 	if r == uint32(ReleaseNameReplyReleased) {
+		conn.namesLck.Lock()
 		for i, v := range conn.names {
 			if v == name {
 				copy(conn.names[i:], conn.names[i+1:])
 				conn.names = conn.names[:len(conn.names)-1]
 			}
 		}
+		conn.namesLck.Unlock()
 	}
 	return ReleaseNameReply(r), nil
 }
@@ -202,7 +204,9 @@ func (conn *Connection) RequestName(name string, flags RequestNameFlags) (Reques
 		return 0, err
 	}
 	if r == uint32(RequestNameReplyPrimaryOwner) {
+		conn.namesLck.Lock()
 		conn.names = append(conn.names, name)
+		conn.namesLck.Unlock()
 	}
 	return RequestNameReply(r), nil
 }
