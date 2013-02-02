@@ -122,7 +122,7 @@ func StringToSig(s string) (sig Signature, err error) {
 	}
 	sig.str = s
 	for err == nil && len(s) != 0 {
-		err, s = validSingle(s)
+		err, s = validSingle(s, 0)
 	}
 	if err != nil {
 		sig = Signature{""}
@@ -148,7 +148,7 @@ func (s Signature) Empty() bool {
 
 // Single returns whether the signature represents a single, complete type.
 func (s Signature) Single() bool {
-	_, r := validSingle(s.str)
+	_, r := validSingle(s.str, 0)
 	return r == ""
 }
 
@@ -163,7 +163,7 @@ func (s Signature) Values() []interface{} {
 	str := s.str
 	for str != "" {
 		slice = append(slice, reflect.New(value(str)).Interface())
-		_, str = validSingle(str)
+		_, str = validSingle(str, 0)
 	}
 	return slice
 }
@@ -270,12 +270,16 @@ func isKeyType(t reflect.Type) bool {
 	return false
 }
 
-// Try to read a single type from this string. If it was successfull, valid is
-// true and r is the remaining unparsed part. Otherwise, valid is false and r is
-// "".
-func validSingle(s string) (err error, rem string) {
+// Try to read a single type from this string. If it was successfull, err is nil
+// and rem is the remaining unparsed part. Otherwise, err is a non-nil
+// SignatureError and rem is "". depth is the current recursion depth which may
+// not be greater than 64 and should be given as 0 on the first call.
+func validSingle(s string, depth int) (err error, rem string) {
 	if s == "" {
 		return SignatureError{Sig: s, Reason: "empty signature"}, ""
+	}
+	if depth > 64 {
+		return SignatureError{Sig: s, Reason: "container nesting too deep"}, ""
 	}
 	switch s[0] {
 	case 'y', 'b', 'n', 'q', 'i', 'u', 'x', 't', 'd', 's', 'g', 'o', 'v':
@@ -288,10 +292,10 @@ func validSingle(s string) (err error, rem string) {
 			}
 			rem = s[i+1:]
 			s = s[2:i]
-			if err, _ = validSingle(s[0:1]); err != nil {
-				return SignatureError{Sig: s, Reason: "invalid map key type"}, ""
+			if err, _ = validSingle(s[:1], depth+1); err != nil {
+				return err, ""
 			}
-			err, nr := validSingle(s[1:])
+			err, nr := validSingle(s[1:], depth+1)
 			if err != nil {
 				return err, ""
 			}
@@ -300,7 +304,7 @@ func validSingle(s string) (err error, rem string) {
 			}
 			return nil, rem
 		}
-		return validSingle(s[1:])
+		return validSingle(s[1:], depth+1)
 	case '(':
 		i := strings.LastIndex(s, ")")
 		if i == -1 {
@@ -309,7 +313,7 @@ func validSingle(s string) (err error, rem string) {
 		rem = s[i+1:]
 		s = s[1:i]
 		for err == nil && s != "" {
-			err, s = validSingle(s)
+			err, s = validSingle(s, depth+1)
 		}
 		if err != nil {
 			rem = ""
@@ -322,7 +326,7 @@ func validSingle(s string) (err error, rem string) {
 // value returns the type of the given signature. It ignores any left over
 // characters and panics if s doesn't start with a valid type signature.
 func value(s string) (t reflect.Type) {
-	err, _ := validSingle(s)
+	err, _ := validSingle(s, 0)
 	if err != nil {
 		panic(err)
 	}

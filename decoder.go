@@ -165,9 +165,9 @@ func (dec *Decoder) decode(v reflect.Value) {
 			dec.decode(reflect.ValueOf(&sig))
 			variant.sig = sig
 			if len(sig.str) == 0 {
-				panic(SignatureError{sig.str, "signature is empty"})
+				panic(SignatureError{sig.str, "variant signature is empty"})
 			}
-			err, rem := validSingle(sig.str)
+			err, rem := validSingle(sig.str, 0)
 			if err != nil {
 				panic(err)
 			}
@@ -180,7 +180,7 @@ func (dec *Decoder) decode(v reflect.Value) {
 				s := sig.str[1 : len(sig.str)-1]
 				slice := reflect.MakeSlice(t, 0, 0)
 				for len(s) != 0 {
-					err, rem := validSingle(s)
+					err, rem := validSingle(s, 0)
 					if err != nil {
 						panic(err)
 					}
