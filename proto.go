@@ -117,6 +117,9 @@ func StringToSig(s string) (sig Signature, err error) {
 	if len(s) == 0 {
 		return
 	}
+	if len(s) > 255 {
+		return Signature{""}, SignatureError{s, "too long"}
+	}
 	sig.str = s
 	for err == nil && len(s) != 0 {
 		err, s = validSingle(s)
