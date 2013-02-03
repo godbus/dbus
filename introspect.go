@@ -38,24 +38,16 @@ type SignalInfo struct {
 
 // Property describes a property of an Interface.
 type Property struct {
-	Name string `xml:"name,attr"`
-
-	// Must be a valid signature.
-	Type string `xml:"type,attr"`
-
+	Name        string       `xml:"name,attr"`
+	Type        string       `xml:"type,attr"`
 	Access      string       `xml:"access,attr"`
 	Annotations []Annotation `xml:"annotation"`
 }
 
 // Arg represents an argument of a method or a signal.
 type Arg struct {
-	// May be empty.
-	Name string `xml:"name,attr"`
-
-	// Must be a valid signature.
-	Type string `xml:"type,attr"`
-
-	// Must be "in" or "out" for methods and "out" or "" for signals.
+	Name      string `xml:"name,attr"`
+	Type      string `xml:"type,attr"`
 	Direction string `xml:"direction,attr"`
 }
 

@@ -7,15 +7,15 @@ import (
 	"strings"
 )
 
-// Reply represents a reply to an error call. If Error is non-nil, it is either
-// an error of the underlying transport a error message.
+// Reply represents a reply to a method call. If Error is non-nil, it is either
+// an error from the underlying transport or an error message from the peer.
 type Reply struct {
 	Values []interface{}
 	Err    error
 }
 
-// Cookie represents a pending message reply. To get the reply, simply read from
-// the channel.
+// Cookie represents a pending message reply. To get the reply, simply receive
+// from the channel.
 type Cookie <-chan *Reply
 
 // Store waits for the reply of c and stores the values into the provided pointers.

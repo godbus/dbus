@@ -15,8 +15,7 @@ type Encoder struct {
 	pos   int
 }
 
-// NewEncoder returns a new encoder that writes to out in the given
-// byte order.
+// NewEncoder returns a new encoder that writes to out in the given byte order.
 func NewEncoder(out io.Writer, order binary.ByteOrder) *Encoder {
 	enc := new(Encoder)
 	enc.out = out

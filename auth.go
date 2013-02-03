@@ -18,8 +18,8 @@ const (
 	// Additional data is needed; next command from the server should be a DATA.
 	AuthContinue
 
-	// Error; the server sent invalid data and the current authentication
-	// process should be aborted.
+	// Error; the server sent invalid data or some other unexpected thing
+	// happend and the current authentication process should be aborted.
 	AuthError
 )
 
@@ -39,13 +39,14 @@ var AuthMechanisms = map[string]AuthMechanism{
 	"EXTERNAL":         AuthExternal{},
 }
 
-// AuthMechanism defines the behaviour of a authentication mechanism.
+// AuthMechanism defines the behaviour of an authentication mechanism.
 type AuthMechanism interface {
 	// Return the argument to the first AUTH command and the next status.
 	FirstData() ([]byte, AuthStatus)
+
 	// Process the given DATA command, and return the argument to the DATA
 	// command and the next status. If len(resp) == 0, no DATA command is sent.
-	HandleData([]byte) (resp []byte, status AuthStatus)
+	HandleData([]byte) ([]byte, AuthStatus)
 }
 
 func (conn *Connection) auth() error {
@@ -189,7 +190,7 @@ func authReadLine(in *bufio.Reader) ([][]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	data = bytes.TrimRight(data, "\r\n")
+	data = bytes.TrimSuffix(data, []byte("\r\n"))
 	return bytes.Split(data, []byte{' '}), nil
 }
 

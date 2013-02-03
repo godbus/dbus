@@ -28,8 +28,8 @@ are marshalled as a DBus struct). The exceptions are the structs defined in this
 package that have a custom wire format. These are ObjectPath, Signature and
 Variant. Also, fields whose tag contains dbus:"-" will be skipped.
 
-4. Trying to encode any other type (including int and uint!) will result
-in a panic. This applies to all functions that call (*Encoder).Encode somewhere.
+4. Trying to encode any other type (including int and uint) will result in a
+panic. This applies to all functions that call (*Encoder).Encode somewhere.
 
 The rules for decoding are mostly just the reverse of the encoding rules,
 except for the handling of variants. If a struct is wrapped in a variant,

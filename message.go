@@ -93,8 +93,8 @@ type header struct {
 
 // DecodeMessage tries to decode a single message from the given reader.
 // The byte order is figured out from the first byte. The possibly returned
-// error may either be an error of the underlying reader or an
-// InvalidMessageError.
+// error can be an error of the underlying reader, an InvalidMessageError or an
+// FormatError.
 func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 	var order binary.ByteOrder
 	var length uint32

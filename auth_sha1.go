@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"crypto/sha1"
 	"encoding/hex"
-	"io"
 	"os"
 	"os/user"
 )
@@ -17,7 +16,7 @@ type AuthCookieSha1 struct{}
 func (a AuthCookieSha1) FirstData() ([]byte, AuthStatus) {
 	u, err := user.Current()
 	if err != nil {
-		panic(err)
+		return nil, AuthError
 	}
 	b := make([]byte, 2*len(u.Username))
 	hex.Encode(b, []byte(u.Username))
@@ -42,6 +41,9 @@ func (a AuthCookieSha1) HandleData(data []byte) ([]byte, AuthStatus) {
 		return nil, AuthError
 	}
 	clchallenge := a.generateChallenge()
+	if clchallenge == nil {
+		return nil, AuthError
+	}
 	hash := sha1.New()
 	hash.Write(bytes.Join([][]byte{svchallenge, clchallenge, cookie}, []byte{':'}))
 	hexhash := make([]byte, 2*hash.Size())
@@ -85,10 +87,10 @@ func (a AuthCookieSha1) generateChallenge() []byte {
 	b := make([]byte, 16)
 	n, err := rand.Read(b)
 	if err != nil {
-		panic(err)
+		return nil
 	}
 	if n != 16 {
-		panic(io.ErrUnexpectedEOF)
+		return nil
 	}
 	enc := make([]byte, 32)
 	hex.Encode(enc, b)

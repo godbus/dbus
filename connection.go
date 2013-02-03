@@ -34,7 +34,6 @@ type Connection struct {
 // ConnectSessionBus connects to the session message bus and returns the
 // connection or any error that occured.
 func ConnectSessionBus() (*Connection, error) {
-	// TODO: autolaunch
 	address := os.Getenv("DBUS_SESSION_BUS_ADDRESS")
 	if address != "" {
 		return NewConnection(address)
@@ -62,7 +61,7 @@ func NewConnection(address string) (*Connection, error) {
 		path := getKey(address, "path")
 		switch {
 		case abstract == "" && path == "":
-			return nil, errors.New("neither path nor abstract set")
+			return nil, errors.New("bad address: neither path nor abstract set")
 		case abstract != "" && path == "":
 			conn.transport, err = net.Dial("unix", "@"+abstract)
 			if err != nil {
@@ -74,10 +73,10 @@ func NewConnection(address string) (*Connection, error) {
 				return nil, err
 			}
 		case abstract != "" && path != "":
-			return nil, errors.New("both path and abstract set")
+			return nil, errors.New("bad address: both path and abstract set")
 		}
 	} else {
-		return nil, errors.New("invalid or unsupported transport")
+		return nil, errors.New("bad address: invalid or unsupported transport")
 	}
 	if err = conn.auth(); err != nil {
 		conn.transport.Close()
@@ -118,7 +117,7 @@ func (conn *Connection) Close() error {
 }
 
 // Eavesdrop changes the channel to which all messages are sent whose
-// destination field is not one of the know names of this connection and which
+// destination field is not one of the known names of this connection and which
 // are not signals. The caller has to make sure that c is sufficiently buffered;
 // if a message arrives when a write to c is not possible, the message is
 // discarded.
@@ -212,7 +211,6 @@ func (conn *Connection) inWorker() {
 }
 
 func (conn *Connection) outWorker() {
-	buf := new(bytes.Buffer)
 	for msg := range conn.out {
 		err := msg.EncodeTo(conn.transport)
 		conn.repliesLck.RLock()
@@ -220,7 +218,6 @@ func (conn *Connection) outWorker() {
 			conn.replies[msg.Serial] <- &Reply{nil, err}
 		}
 		conn.repliesLck.RUnlock()
-		buf.Reset()
 	}
 }
 
@@ -295,6 +292,9 @@ func (conn *Connection) genSerials() {
 		conn.serial <- s
 		// let's hope that nobody sends 2^32-1 messages at once
 		s++
+		if s == 0 {
+			s++
+		}
 	}
 }
 
@@ -333,7 +333,7 @@ func (conn *Connection) Send(msg *Message) Cookie {
 
 // Signal sets the channel to which all received signal messages are forwarded.
 // The caller has to make sure that c is sufficiently buffered; if a message
-// arrives when a write ot c is not possible, it is discarded.
+// arrives when a write to c is not possible, it is discarded.
 //
 // The channel can be reset by passing nil.
 //

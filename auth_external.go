@@ -11,7 +11,7 @@ type AuthExternal struct{}
 func (a AuthExternal) FirstData() ([]byte, AuthStatus) {
 	u, err := user.Current()
 	if err != nil {
-		panic(err)
+		return nil, AuthError
 	}
 	b := make([]byte, 2*len(u.Username))
 	hex.Encode(b, []byte(u.Username))

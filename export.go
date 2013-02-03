@@ -133,12 +133,14 @@ func (conn *Connection) Emit(path ObjectPath, iface string, name string, values 
 // sent back to the caller as an error. Otherwise, a method reply is sent
 // with the other parameters as its body.
 //
-// The method is executed in a new goroutine.
+// Every method call is executed in a new goroutine, so the method may be called
+// in multiple goroutines at once.
 //
-// If you need to implement multiple interfaces on one "object", wrap it with
-// (Go) interfaces.
+// Multiple DBus interfaces can be implemented on one object by calling Export
+// multiple times and converting the value to different (Go) interfaces each
+// time.
 //
-// If path is not a valid object path, Export panics.
+// Export panics if path is not a valid object path.
 func (conn *Connection) Export(v interface{}, path ObjectPath, iface string) {
 	if !path.IsValid() {
 		panic("(*dbus.Connection).Export: invalid path name")
