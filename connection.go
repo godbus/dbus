@@ -15,6 +15,8 @@ const defaultSystemBusAddress = "unix:path=/var/run/dbus/system_bus_socket"
 
 // Connection represents a connection to a message bus (usually, the system or
 // session bus).
+//
+// Multiple goroutines may invoke methods on a connection simultaneously.
 type Connection struct {
 	transport       net.Conn
 	uuid            string
