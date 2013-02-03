@@ -66,7 +66,7 @@ further notice.
 		if reply.Err != nil {
 			panic(err)
 		}
-		list = reply.Values[0].([]string)
+		list = reply.Body[0].([]string)
 		for _, v := range list {
 			fmt.Println(v)
 		}

@@ -201,7 +201,7 @@ func (conn *Connection) inWorker() {
 			case TypeSignal:
 				var signal Signal
 				signal.Name = msg.Headers[FieldMember].value.(string)
-				signal.Values = msg.Body
+				signal.Body = msg.Body
 				// don't block trying to send a signal
 				conn.signalsLck.Lock()
 				select {
@@ -279,9 +279,9 @@ func (conn *Connection) sendError(e Error, dest string, serial uint32) {
 	msg.Headers[FieldDestination] = MakeVariant(dest)
 	msg.Headers[FieldErrorName] = MakeVariant(e.Name)
 	msg.Headers[FieldReplySerial] = MakeVariant(serial)
-	msg.Body = e.Values
-	if len(e.Values) > 0 {
-		msg.Headers[FieldSignature] = MakeVariant(GetSignature(e.Values...))
+	msg.Body = e.Body
+	if len(e.Body) > 0 {
+		msg.Headers[FieldSignature] = MakeVariant(GetSignature(e.Body...))
 	}
 	conn.out <- msg
 }
@@ -366,13 +366,13 @@ func (conn *Connection) Signal(c chan Signal) {
 
 // Error represents a DBus message of type Error.
 type Error struct {
-	Name   string
-	Values []interface{}
+	Name string
+	Body []interface{}
 }
 
 func (e Error) Error() string {
-	if len(e.Values) > 1 {
-		s, ok := e.Values[0].(string)
+	if len(e.Body) > 1 {
+		s, ok := e.Body[0].(string)
 		if ok {
 			return s
 		}
@@ -382,8 +382,8 @@ func (e Error) Error() string {
 
 // Signal represents a DBus message of type Signal.
 type Signal struct {
-	Name   string
-	Values []interface{}
+	Name string
+	Body []interface{}
 }
 
 func getKey(s, key string) string {

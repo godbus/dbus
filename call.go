@@ -10,8 +10,8 @@ import (
 // Reply represents a reply to a method call. If Error is non-nil, it is either
 // an error from the underlying transport or an error message from the peer.
 type Reply struct {
-	Values []interface{}
-	Err    error
+	Body []interface{}
+	Err  error
 }
 
 // Cookie represents a pending message reply. To get the reply, simply receive
@@ -29,11 +29,11 @@ func (c Cookie) Store(retvalues ...interface{}) error {
 	}
 
 	esig := GetSignature(retvalues...)
-	rsig := GetSignature(reply.Values...)
+	rsig := GetSignature(reply.Body...)
 	if esig != rsig {
 		return errors.New("mismatched signature")
 	}
-	for i, v := range reply.Values {
+	for i, v := range reply.Body {
 		reflect.ValueOf(retvalues[i]).Elem().Set(reflect.ValueOf(v))
 	}
 	return nil
