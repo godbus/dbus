@@ -16,19 +16,21 @@ const defaultSystemBusAddress = "unix:path=/var/run/dbus/system_bus_socket"
 // Connection represents a connection to a message bus (usually, the system or
 // session bus).
 type Connection struct {
-	transport    net.Conn
-	uuid         string
-	names        []string
-	namesLck     sync.RWMutex
-	serial       chan uint32
-	replies      map[uint32]chan *Reply
-	repliesLck   sync.RWMutex
-	handlers     map[ObjectPath]*expObject
-	handlersLck  sync.RWMutex
-	out          chan *Message
-	signals      chan Signal
-	eavesdropped chan *Message
-	busObj       *Object
+	transport       net.Conn
+	uuid            string
+	names           []string
+	namesLck        sync.RWMutex
+	serial          chan uint32
+	replies         map[uint32]chan *Reply
+	repliesLck      sync.RWMutex
+	handlers        map[ObjectPath]*expObject
+	handlersLck     sync.RWMutex
+	out             chan *Message
+	signals         chan Signal
+	signalsLck      sync.Mutex
+	eavesdropped    chan *Message
+	eavesdroppedLck sync.Mutex
+	busObj          *Object
 }
 
 // ConnectSessionBus connects to the session message bus and returns the
@@ -107,12 +109,16 @@ func (conn *Connection) BusObject() *Object {
 // related goroutines.
 func (conn *Connection) Close() error {
 	close(conn.out)
+	conn.signalsLck.Lock()
 	if conn.signals != nil {
 		close(conn.signals)
 	}
+	conn.signalsLck.Unlock()
+	conn.eavesdroppedLck.Lock()
 	if conn.eavesdropped != nil {
 		close(conn.eavesdropped)
 	}
+	conn.eavesdroppedLck.Unlock()
 	return conn.transport.Close()
 }
 
@@ -127,7 +133,9 @@ func (conn *Connection) Close() error {
 // If the connection is closed by the server or a call to Close, the channel is
 // also closed.
 func (conn *Connection) Eavesdrop(c chan *Message) {
+	conn.eavesdroppedLck.Lock()
 	conn.eavesdropped = c
+	conn.eavesdroppedLck.Unlock()
 }
 
 func (conn *Connection) hello() error {
@@ -160,13 +168,16 @@ func (conn *Connection) inWorker() {
 				}
 			}
 			conn.namesLck.RUnlock()
+			conn.eavesdroppedLck.Lock()
 			if !found && (msg.Type != TypeSignal || conn.eavesdropped != nil) {
 				select {
 				case conn.eavesdropped <- msg:
 				default:
 				}
+				conn.eavesdroppedLck.Unlock()
 				continue
 			}
+			conn.eavesdroppedLck.Unlock()
 			switch msg.Type {
 			case TypeMethodReply, TypeError:
 				var reply *Reply
@@ -190,10 +201,12 @@ func (conn *Connection) inWorker() {
 				signal.Name = msg.Headers[FieldMember].value.(string)
 				signal.Values = msg.Body
 				// don't block trying to send a signal
+				conn.signalsLck.Lock()
 				select {
 				case conn.signals <- signal:
 				default:
 				}
+				conn.signalsLck.Unlock()
 			case TypeMethodCall:
 				go conn.handleCall(msg)
 			}
@@ -344,7 +357,9 @@ func (conn *Connection) Send(msg *Message) Cookie {
 // If the connection is closed by the server or a call to Close, the channel is
 // also closed.
 func (conn *Connection) Signal(c chan Signal) {
+	conn.signalsLck.Lock()
 	conn.signals = c
+	conn.signalsLck.Unlock()
 }
 
 // Error represents a DBus message of type Error.
