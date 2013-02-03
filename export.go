@@ -1,7 +1,6 @@
 package dbus
 
 import (
-	"bytes"
 	"encoding/binary"
 	"encoding/xml"
 	"reflect"
@@ -24,16 +23,7 @@ type expObject struct {
 }
 
 func (conn *Connection) handleCall(msg *Message) {
-	var vs []interface{}
-	if len(msg.Body) != 0 {
-		vs = msg.Headers[FieldSignature].value.(Signature).Values()
-		dec := NewDecoder(bytes.NewBuffer(msg.Body), msg.Order)
-		err := dec.DecodeMulti(vs...)
-		if err != nil {
-			return
-		}
-		vs = dereferenceAll(vs)
-	}
+	vs := msg.Body
 	name := msg.Headers[FieldMember].value.(string)
 	path := msg.Headers[FieldPath].value.(ObjectPath)
 	ifacename := msg.Headers[FieldInterface].value.(string)
@@ -100,13 +90,6 @@ func (conn *Connection) handleCall(msg *Message) {
 		return
 	}
 	if msg.Flags&FlagNoReplyExpected == 0 {
-		body := new(bytes.Buffer)
-		sig := ""
-		enc := NewEncoder(body, binary.LittleEndian)
-		for i := 0; i < len(ret)-1; i++ {
-			enc.encode(ret[i])
-			sig += getSignature(ret[i].Type())
-		}
 		reply := new(Message)
 		reply.Order = binary.LittleEndian
 		reply.Type = TypeMethodReply
@@ -114,11 +97,12 @@ func (conn *Connection) handleCall(msg *Message) {
 		reply.Headers = make(map[HeaderField]Variant)
 		reply.Headers[FieldDestination] = msg.Headers[FieldSender]
 		reply.Headers[FieldReplySerial] = MakeVariant(msg.Serial)
+		reply.Body = make([]interface{}, len(ret)-1)
+		for i := 0; i < len(ret)-1; i++ {
+			msg.Body[i] = ret[i].Interface()
+		}
 		if len(ret) != 1 {
-			reply.Headers[FieldSignature] = MakeVariant(Signature{sig})
-			reply.Body = body.Bytes()
-		} else {
-			reply.Body = []byte{}
+			reply.Headers[FieldSignature] = MakeVariant(GetSignature(msg.Body))
 		}
 		conn.out <- reply
 	}
@@ -134,14 +118,9 @@ func (conn *Connection) Emit(path ObjectPath, iface string, name string, values 
 	msg.Headers[FieldInterface] = MakeVariant(iface)
 	msg.Headers[FieldMember] = MakeVariant(name)
 	msg.Headers[FieldPath] = MakeVariant(path)
+	msg.Body = values
 	if len(values) > 0 {
 		msg.Headers[FieldSignature] = MakeVariant(GetSignature(values...))
-		buf := new(bytes.Buffer)
-		enc := NewEncoder(buf, binary.LittleEndian)
-		enc.EncodeMulti(values...)
-		msg.Body = buf.Bytes()
-	} else {
-		msg.Body = []byte{}
 	}
 	conn.out <- msg
 }

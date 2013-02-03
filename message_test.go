@@ -16,7 +16,7 @@ func TestMessage(t *testing.T) {
 		FieldPath:   MakeVariant(ObjectPath("/org/foo/bar")),
 		FieldMember: MakeVariant("baz"),
 	}
-	message.Body = make([]byte, 0)
+	message.Body = make([]interface{}, 0)
 	err := message.EncodeTo(buf)
 	if err != nil {
 		t.Error(err)

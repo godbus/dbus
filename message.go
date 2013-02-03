@@ -83,7 +83,7 @@ type Message struct {
 	Flags
 	Serial  uint32
 	Headers map[HeaderField]Variant
-	Body    []byte
+	Body    []interface{}
 }
 
 type header struct {
@@ -95,7 +95,7 @@ type header struct {
 // The byte order is figured out from the first byte. The possibly returned
 // error may either be an error of the underlying reader or an
 // InvalidMessageError.
-func DecodeMessage(rd io.Reader) (message *Message, err error) {
+func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 	var order binary.ByteOrder
 	var length uint32
 	var proto byte
@@ -118,30 +118,40 @@ func DecodeMessage(rd io.Reader) (message *Message, err error) {
 	dec := NewDecoder(rd, order)
 	dec.pos = 1
 
-	message = new(Message)
-	message.Order = order
-	err = dec.DecodeMulti(&message.Type, &message.Flags, &proto, &length,
-		&message.Serial, &headers)
+	msg = new(Message)
+	msg.Order = order
+	err = dec.DecodeMulti(&msg.Type, &msg.Flags, &proto, &length, &msg.Serial,
+		&headers)
 	if err != nil {
 		return nil, err
 	}
 
-	message.Headers = make(map[HeaderField]Variant)
+	msg.Headers = make(map[HeaderField]Variant)
 	for _, v := range headers {
-		message.Headers[v.HeaderField] = v.Variant
+		msg.Headers[v.HeaderField] = v.Variant
 	}
 
 	dec.align(8)
-	message.Body = make([]byte, int(length))
+	body := make([]byte, int(length))
 	if length != 0 {
-		_, err := rd.Read(message.Body)
+		_, err := rd.Read(body)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	if err = message.IsValid(); err != nil {
+	if err = msg.IsValid(); err != nil {
 		return nil, err
+	}
+	sig, _ := msg.Headers[FieldSignature].value.(Signature)
+	if sig.str != "" {
+		vs := sig.Values()
+		buf := bytes.NewBuffer(body)
+		dec = NewDecoder(buf, order)
+		if err = dec.DecodeMulti(vs...); err != nil {
+			return nil, err
+		}
+		msg.Body = dereferenceAll(vs)
 	}
 
 	return
@@ -149,34 +159,37 @@ func DecodeMessage(rd io.Reader) (message *Message, err error) {
 
 // EncodeTo encodes and sends a message to the given writer. If the message is
 // not valid or an error occurs when writing, an error is returned.
-func (message *Message) EncodeTo(out io.Writer) error {
-	if err := message.IsValid(); err != nil {
+func (msg *Message) EncodeTo(out io.Writer) error {
+	if err := msg.IsValid(); err != nil {
 		return err
 	}
 	vs := make([]interface{}, 7)
-	switch message.Order {
+	switch msg.Order {
 	case binary.LittleEndian:
 		vs[0] = byte('l')
 	case binary.BigEndian:
 		vs[0] = byte('B')
 	}
-	vs[1] = message.Type
-	vs[2] = message.Flags
+	body := new(bytes.Buffer)
+	enc := NewEncoder(body, msg.Order)
+	if len(msg.Body) != 0 {
+		enc.EncodeMulti(msg.Body...)
+	}
+	vs[1] = msg.Type
+	vs[2] = msg.Flags
 	vs[3] = protoVersion
-	vs[4] = uint32(len(message.Body))
-	vs[5] = message.Serial
+	vs[4] = uint32(len(body.Bytes()))
+	vs[5] = msg.Serial
 	headers := make([]header, 0)
-	for k, v := range message.Headers {
+	for k, v := range msg.Headers {
 		headers = append(headers, header{k, v})
 	}
 	vs[6] = headers
 	buf := new(bytes.Buffer)
-	enc := NewEncoder(buf, message.Order)
+	enc = NewEncoder(buf, msg.Order)
 	enc.EncodeMulti(vs...)
 	enc.align(8)
-	if len(message.Body) != 0 {
-		buf.Write(message.Body)
-	}
+	body.WriteTo(buf)
 	if _, err := buf.WriteTo(out); err != nil {
 		return err
 	}
@@ -256,20 +269,13 @@ func (msg *Message) String() string {
 	if v, ok := msg.Headers[FieldMember]; ok {
 		s += " member " + v.value.(string)
 	}
-	sig, _ := msg.Headers[FieldSignature].value.(Signature)
-	if sig.str != "" {
+	if len(msg.Body) != 0 {
 		s += "\n"
-		rvs := sig.Values()
-		dec := NewDecoder(bytes.NewBuffer(msg.Body), msg.Order)
-		if err := dec.DecodeMulti(rvs...); err != nil {
-			return "<invalid>"
-		}
-		rvs = dereferenceAll(rvs)
-		for i, v := range rvs {
-			s += "  " + fmt.Sprint(v)
-			if i != len(rvs)-1 {
-				s += "\n"
-			}
+	}
+	for i, v := range msg.Body {
+		s += "  " + fmt.Sprint(v)
+		if i != len(msg.Body)-1 {
+			s += "\n"
 		}
 	}
 	return s

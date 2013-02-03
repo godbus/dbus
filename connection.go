@@ -170,53 +170,26 @@ func (conn *Connection) inWorker() {
 			}
 			switch msg.Type {
 			case TypeMethodReply, TypeError:
-				var rvs []interface{}
 				var reply *Reply
-
 				serial := msg.Headers[FieldReplySerial].value.(uint32)
-				sig, _ := msg.Headers[FieldSignature].value.(Signature)
-				if sig.str != "" {
-					rvs = sig.Values()
-					dec := NewDecoder(bytes.NewBuffer(msg.Body), msg.Order)
-					err = dec.DecodeMulti(rvs...)
-					if err != nil {
-						reply = &Reply{nil, err}
-					} else {
-						rvs = dereferenceAll(rvs)
-					}
-				} else {
-					rvs = []interface{}{}
-				}
 				if reply == nil {
 					if msg.Type == TypeError {
 						name, _ := msg.Headers[FieldErrorName].value.(string)
-						reply = &Reply{nil, Error{name, rvs}}
+						reply = &Reply{nil, Error{name, msg.Body}}
 					} else {
-						reply = &Reply{rvs, nil}
+						reply = &Reply{msg.Body, nil}
 					}
 				}
 				conn.repliesLck.Lock()
 				if c, ok := conn.replies[serial]; ok {
 					c <- reply
+					delete(conn.replies, serial)
 				}
-				conn.replies[serial] = nil
 				conn.repliesLck.Unlock()
 			case TypeSignal:
 				var signal Signal
 				signal.Name = msg.Headers[FieldMember].value.(string)
-				// if the signature is present, it is guaranteed to be valid
-				sig, _ := msg.Headers[FieldSignature].value.(Signature)
-				if sig.str != "" {
-					rvs := sig.Values()
-					dec := NewDecoder(bytes.NewBuffer(msg.Body), msg.Order)
-					err := dec.DecodeMulti(rvs...)
-					if err != nil {
-						continue
-					}
-					signal.Values = dereferenceAll(rvs)
-				} else {
-					signal.Values = make([]interface{}, 0)
-				}
+				signal.Values = msg.Body
 				// don't block trying to send a signal
 				select {
 				case conn.signals <- signal:
@@ -241,8 +214,7 @@ func (conn *Connection) inWorker() {
 func (conn *Connection) outWorker() {
 	buf := new(bytes.Buffer)
 	for msg := range conn.out {
-		msg.EncodeTo(buf)
-		_, err := buf.WriteTo(conn.transport)
+		err := msg.EncodeTo(conn.transport)
 		conn.repliesLck.RLock()
 		if err != nil && conn.replies[msg.Serial] != nil {
 			conn.replies[msg.Serial] <- &Reply{nil, err}
@@ -295,14 +267,9 @@ func (conn *Connection) sendError(e Error, dest string, serial uint32) {
 	msg.Headers[FieldDestination] = MakeVariant(dest)
 	msg.Headers[FieldErrorName] = MakeVariant(e.Name)
 	msg.Headers[FieldReplySerial] = MakeVariant(serial)
+	msg.Body = e.Values
 	if len(e.Values) > 0 {
 		msg.Headers[FieldSignature] = MakeVariant(GetSignature(e.Values...))
-		buf := new(bytes.Buffer)
-		enc := NewEncoder(buf, binary.LittleEndian)
-		enc.EncodeMulti(e.Values...)
-		msg.Body = buf.Bytes()
-	} else {
-		msg.Body = []byte{}
 	}
 	conn.out <- msg
 }
@@ -315,14 +282,9 @@ func (conn *Connection) sendReply(dest string, serial uint32, values ...interfac
 	msg.Headers = make(map[HeaderField]Variant)
 	msg.Headers[FieldDestination] = MakeVariant(dest)
 	msg.Headers[FieldReplySerial] = MakeVariant(serial)
+	msg.Body = values
 	if len(values) > 0 {
 		msg.Headers[FieldSignature] = MakeVariant(GetSignature(values...))
-		buf := new(bytes.Buffer)
-		enc := NewEncoder(buf, binary.LittleEndian)
-		enc.EncodeMulti(values...)
-		msg.Body = buf.Bytes()
-	} else {
-		msg.Body = []byte{}
 	}
 	conn.out <- msg
 }

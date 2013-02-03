@@ -56,9 +56,12 @@ func (dec *Decoder) Decode(v interface{}) (err error) {
 			if _, ok := err.(invalidTypeError); ok {
 				panic(err)
 			}
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
+				err = FormatError("input too short (unexpected EOF)")
+			}
 		}
 	}()
-	dec.decode(reflect.ValueOf(v))
+	dec.decode(reflect.ValueOf(v), 0)
 	return nil
 }
 
@@ -72,7 +75,7 @@ func (dec *Decoder) DecodeMulti(vs ...interface{}) error {
 	return nil
 }
 
-func (dec *Decoder) decode(v reflect.Value) {
+func (dec *Decoder) decode(v reflect.Value, depth int) {
 	if v.Kind() != reflect.Ptr {
 		panic(invalidTypeError{v.Type()})
 	}
@@ -89,7 +92,7 @@ func (dec *Decoder) decode(v reflect.Value) {
 		v.SetUint(uint64(b[0]))
 	case reflect.Bool:
 		var i uint32
-		dec.decode(reflect.ValueOf(&i))
+		dec.decode(reflect.ValueOf(&i), depth)
 		switch {
 		case i == 0:
 			v.SetBool(false)
@@ -135,7 +138,7 @@ func (dec *Decoder) decode(v reflect.Value) {
 		v.SetFloat(f)
 	case reflect.String:
 		var length uint32
-		dec.decode(reflect.ValueOf(&length))
+		dec.decode(reflect.ValueOf(&length), depth)
 		b := make([]byte, int(length)+1)
 		if _, err := dec.in.Read(b); err != nil {
 			panic(err)
@@ -144,35 +147,41 @@ func (dec *Decoder) decode(v reflect.Value) {
 		v.SetString(string(b[:len(b)-1]))
 	case reflect.Ptr:
 		nv := reflect.New(v.Type().Elem())
-		dec.decode(nv)
+		dec.decode(nv, depth)
 		v.Set(nv)
 	case reflect.Slice:
 		var length uint32
-		dec.decode(reflect.ValueOf(&length))
+		if depth >= 64 {
+			panic(FormatError("input exceeds container depth limit"))
+		}
+		dec.decode(reflect.ValueOf(&length), depth)
 		slice := reflect.MakeSlice(v.Type(), 0, 0)
 		spos := dec.pos
 		for dec.pos < spos+int(length) {
 			nv := reflect.New(v.Type().Elem())
-			dec.decode(nv)
+			dec.decode(nv, depth)
 			slice = reflect.Append(slice, nv.Elem())
 		}
 		v.Set(slice)
 	case reflect.Struct:
+		if depth >= 64 {
+			panic(FormatError("input exceeds container depth limit"))
+		}
 		switch t := v.Type(); t {
 		case variantType:
 			var variant Variant
 			var sig Signature
-			dec.decode(reflect.ValueOf(&sig))
+			dec.decode(reflect.ValueOf(&sig), depth)
 			variant.sig = sig
 			if len(sig.str) == 0 {
-				panic(SignatureError{sig.str, "variant signature is empty"})
+				panic(FormatError("variant signature is empty"))
 			}
 			err, rem := validSingle(sig.str, 0)
 			if err != nil {
-				panic(err)
+				panic(FormatError(err.Error()))
 			}
 			if rem != "" {
-				panic(SignatureError{sig.str, "got multiple types, but expected one"})
+				panic(FormatError("variant signature has multiple types"))
 			}
 			t = value(sig.str)
 			if t == interfacesType {
@@ -182,24 +191,24 @@ func (dec *Decoder) decode(v reflect.Value) {
 				for len(s) != 0 {
 					err, rem := validSingle(s, 0)
 					if err != nil {
-						panic(err)
+						panic(FormatError(err.Error()))
 					}
 					t = value(s[:len(s)-len(rem)])
 					nv := reflect.New(t)
-					dec.decode(nv)
+					dec.decode(nv, depth+1)
 					slice = reflect.Append(slice, nv.Elem())
 					s = rem
 				}
 				variant.value = slice.Interface()
 			} else {
 				nv := reflect.New(t)
-				dec.decode(nv)
+				dec.decode(nv, depth+1)
 				variant.value = nv.Elem().Interface()
 			}
 			v.Set(reflect.ValueOf(variant))
 		case signatureType:
 			var length uint8
-			dec.decode(reflect.ValueOf(&length))
+			dec.decode(reflect.ValueOf(&length), depth)
 			b := make([]byte, int(length)+1)
 			if _, err := dec.in.Read(b); err != nil {
 				panic(err)
@@ -216,13 +225,13 @@ func (dec *Decoder) decode(v reflect.Value) {
 				if unicode.IsUpper([]rune(field.Name)[0]) &&
 					field.Tag.Get("dbus") != "-" {
 
-					dec.decode(v.Field(i).Addr())
+					dec.decode(v.Field(i).Addr(), depth+1)
 				}
 			}
 		}
 	case reflect.Map:
 		var length uint32
-		dec.decode(reflect.ValueOf(&length))
+		dec.decode(reflect.ValueOf(&length), depth)
 		m := reflect.MakeMap(v.Type())
 		spos := dec.pos
 		for dec.pos < spos+int(length) {
@@ -232,12 +241,20 @@ func (dec *Decoder) decode(v reflect.Value) {
 			}
 			kv := reflect.New(v.Type().Key())
 			vv := reflect.New(v.Type().Elem())
-			dec.decode(kv)
-			dec.decode(vv)
+			dec.decode(kv, depth+1)
+			dec.decode(vv, depth+1)
 			m.SetMapIndex(kv.Elem(), vv.Elem())
 		}
 		v.Set(m)
 	default:
 		panic(invalidTypeError{v.Type()})
 	}
+}
+
+// A FormatError represents an error in the wire format (e.g. an invalid value
+// for a boolean).
+type FormatError string
+
+func (e FormatError) Error() string {
+	return "dbus format error: " + string(e)
 }

@@ -1,7 +1,6 @@
 package dbus
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"reflect"
@@ -70,14 +69,9 @@ func (o *Object) Call(method string, flags Flags, args ...interface{}) Cookie {
 	if iface != "" {
 		msg.Headers[FieldInterface] = MakeVariant(iface)
 	}
+	msg.Body = args
 	if len(args) > 0 {
 		msg.Headers[FieldSignature] = MakeVariant(GetSignature(args...))
-		buf := new(bytes.Buffer)
-		enc := NewEncoder(buf, binary.LittleEndian)
-		enc.EncodeMulti(args...)
-		msg.Body = buf.Bytes()
-	} else {
-		msg.Body = []byte{}
 	}
 	if msg.Flags&FlagNoReplyExpected == 0 {
 		o.conn.repliesLck.Lock()
