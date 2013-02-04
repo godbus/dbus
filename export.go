@@ -99,10 +99,10 @@ func (conn *Connection) handleCall(msg *Message) {
 		reply.Headers[FieldReplySerial] = MakeVariant(msg.Serial)
 		reply.Body = make([]interface{}, len(ret)-1)
 		for i := 0; i < len(ret)-1; i++ {
-			msg.Body[i] = ret[i].Interface()
+			reply.Body[i] = ret[i].Interface()
 		}
 		if len(ret) != 1 {
-			reply.Headers[FieldSignature] = MakeVariant(GetSignature(msg.Body))
+			reply.Headers[FieldSignature] = MakeVariant(GetSignature(reply.Body...))
 		}
 		conn.out <- reply
 	}
