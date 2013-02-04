@@ -33,35 +33,6 @@ gives a short overview over the basic usage.
 Please note that the API is considered unstable for now and may change without
 further notice.
 
-#### Signal emission
-
-```go
-	conn.Emit("/foo/bar", "foo.bar", "Baz", uint32(0xDEADBEEF))
-```
-
-#### Handling remote method calls
-```go
-
-import "github.com/guelfey/go.dbus"
-
-type Arith struct{}
-
-func (a Arith) Add(n, m uint32) (uint32, *dbus.Error) {
-	return n+m, nil
-}
-
-func main() {
-	conn, err := dbus.ConnectSessionBus()
-	if err != nil {
-		panic(err)
-	}
-	var a Arith
-	conn.Export(a, "/foo/bar", "foo.bar")
-
-	// ...
-}
-```
-
 ### License
 
 go.dbus is available under the Simplified BSD License; see LICENSE for the full
