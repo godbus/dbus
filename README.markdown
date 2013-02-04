@@ -25,54 +25,13 @@ go get github.com/guelfey/go.dbus
 
 ### Usage
 
-The snippets below and the
-[examples](https://github.com/guelfey/go.dbus/tree/master/_examples) give a
-short overview over the basic usage. The complete package documentation is
-available at [godoc.org](http://godoc.org/github.com/guelfey/go.dbus).
+The complete package documentation and some simple examples are available at
+[godoc.org](http://godoc.org/github.com/guelfey/go.dbus). Also, the
+[_examples](https://github.com/guelfey/go.dbus/tree/master/_examples) directory
+gives a short overview over the basic usage. 
 
 Please note that the API is considered unstable for now and may change without
 further notice.
-
-### Some usage snippets
-
-#### Connecting
-
-```go
-	conn, err := dbus.ConnectSessionBus()
-	if err != nil {
-		panic(err)
-	}
-```
-
-#### Synchronous method calls
-
-```go
-	var list []string
-	err = conn.BusObj.Call("org.freedesktop.DBus.ListNames", 0).Store(&list)
-	if err != nil {
-		panic(err)
-	}
-	for _, v := range list {
-		fmt.Println(v)
-	}
-```
-
-#### Asynchronous method calls
-
-```go
-	c := conn.BusObj.Call("org.freedesktop.DBus.ListActivatableNames", 0)
-	select {
-	case reply := <-c:
-		if reply.Err != nil {
-			panic(err)
-		}
-		list = reply.Body[0].([]string)
-		for _, v := range list {
-			fmt.Println(v)
-		}
-	// other cases...
-	}
-```
 
 #### Signal emission
 
