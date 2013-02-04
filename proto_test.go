@@ -3,65 +3,56 @@ package dbus
 import (
 	"bytes"
 	"encoding/binary"
+	"io/ioutil"
 	"reflect"
 	"testing"
 )
 
-type test struct {
+var tests = []struct {
 	vs         []interface{}
 	marshalled []byte
 	signature  Signature
-}
-
-type Foo struct {
-	A int32
-	B int16
-}
-
-type Bar struct {
-	A int32
-	B chan interface{} `dbus:"-"`
-	C int32
-}
-
-var tests = []test{
-	test{
+}{
+	{
 		[]interface{}{int32(0)},
 		[]byte{0, 0, 0, 0},
 		Signature{"i"},
 	},
-	test{
+	{
 		[]interface{}{int16(32)},
 		[]byte{0, 32},
 		Signature{"n"},
 	},
-	test{
+	{
 		[]interface{}{"foo"},
 		[]byte{0, 0, 0, 3, 'f', 'o', 'o', 0},
 		Signature{"s"},
 	},
-	test{
+	{
 		[]interface{}{Signature{"ai"}},
 		[]byte{2, 'a', 'i', 0},
 		Signature{"g"},
 	},
-	test{
+	{
 		[]interface{}{[]int16{42, 256}},
 		[]byte{0, 0, 0, 4, 0, 42, 1, 0},
 		Signature{"an"},
 	},
-	test{
+	{
 		[]interface{}{int16(42), int32(42)},
 		[]byte{0, 42, 0, 0, 0, 0, 0, 42},
 		Signature{"ni"},
 	},
-	test{
+	{
 		[]interface{}{MakeVariant("foo")},
 		[]byte{1, 's', 0, 0, 0, 0, 0, 3, 'f', 'o', 'o', 0},
 		Signature{"v"},
 	},
-	test{
-		[]interface{}{Foo{10752, 256}},
+	{
+		[]interface{}{struct {
+			A int32
+			B int16
+		}{10752, 256}},
 		[]byte{0, 0, 42, 0, 1, 0},
 		Signature{"(in)"},
 	},
@@ -135,7 +126,10 @@ func TestProtoMap(t *testing.T) {
 
 func TestProtoVariantStruct(t *testing.T) {
 	var variant Variant
-	v := MakeVariant(Foo{1, 2})
+	v := MakeVariant(struct {
+		A int32
+		B int16
+	}{1, 2})
 	buf := new(bytes.Buffer)
 	enc := NewEncoder(buf, binary.LittleEndian)
 	enc.Encode(v)
@@ -152,6 +146,11 @@ func TestProtoVariantStruct(t *testing.T) {
 }
 
 func TestStructTag(t *testing.T) {
+	type Bar struct {
+		A int32
+		B chan interface{} `dbus:"-"`
+		C int32
+	}
 	var bar1, bar2 Bar
 	bar1.A = 234
 	bar2.C = 345
@@ -162,5 +161,67 @@ func TestStructTag(t *testing.T) {
 	dec.Decode(&bar2)
 	if bar1 != bar2 {
 		t.Error("struct tag test: got", bar2)
+	}
+}
+
+var someMessage = &Message{
+	Order:  binary.LittleEndian,
+	Type:   TypeMethodCall,
+	Flags:  0,
+	Serial: 42,
+	Headers: map[HeaderField]Variant{
+		FieldPath:        MakeVariant(ObjectPath("/foo/bar")),
+		FieldInterface:   MakeVariant("foo.bar"),
+		FieldMember:      MakeVariant("Baz"),
+		FieldDestination: MakeVariant("foo.bar"),
+		FieldSignature:   MakeVariant(Signature{"ai(uu)"}),
+	},
+	Body: []interface{}{
+		[]int32{12643, 17888, 20569},
+		struct{ n, m uint32 }{0, 1},
+	},
+}
+
+func BenchmarkDecodeMessage(b *testing.B) {
+	var err error
+	var rd *bytes.Reader
+
+	b.StopTimer()
+	buf := new(bytes.Buffer)
+	err = someMessage.EncodeTo(buf)
+	if err != nil {
+		b.Fatal(err)
+	}
+	decoded := buf.Bytes()
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		rd = bytes.NewReader(decoded)
+		_, err = DecodeMessage(rd)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkEncodeMessage(b *testing.B) {
+	var err error
+	for i := 0; i < b.N; i++ {
+		err = someMessage.EncodeTo(ioutil.Discard)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkGetSignature(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		GetSignature(someMessage.Body...)
+	}
+}
+
+func BenchmarkSignatureValues(b *testing.B) {
+	s := Signature{"a(bits)a{sv}"}
+	for i := 0; i < b.N; i++ {
+		s.Values()
 	}
 }
