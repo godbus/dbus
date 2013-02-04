@@ -23,6 +23,7 @@ type Connection struct {
 	names           []string
 	namesLck        sync.RWMutex
 	serial          chan uint32
+	serialUsed      chan uint32
 	replies         map[uint32]chan *Reply
 	repliesLck      sync.RWMutex
 	handlers        map[ObjectPath]*expObject
@@ -90,10 +91,11 @@ func NewConnection(address string) (*Connection, error) {
 	conn.out = make(chan *Message, 10)
 	conn.handlers = make(map[ObjectPath]*expObject)
 	conn.serial = make(chan uint32)
+	conn.serialUsed = make(chan uint32)
 	conn.busObj = conn.Object("org.freedesktop.DBus", "/org/freedesktop/DBus")
 	go conn.inWorker()
 	go conn.outWorker()
-	go conn.genSerials()
+	go conn.serials()
 	if err = conn.hello(); err != nil {
 		conn.transport.Close()
 		return nil, err
@@ -195,6 +197,7 @@ func (conn *Connection) inWorker() {
 				conn.repliesLck.Lock()
 				if c, ok := conn.replies[serial]; ok {
 					c <- reply
+					conn.serialUsed <- serial
 					delete(conn.replies, serial)
 				}
 				conn.repliesLck.Unlock()
@@ -229,8 +232,13 @@ func (conn *Connection) outWorker() {
 	for msg := range conn.out {
 		err := msg.EncodeTo(conn.transport)
 		conn.repliesLck.RLock()
-		if err != nil && conn.replies[msg.Serial] != nil {
-			conn.replies[msg.Serial] <- &Reply{nil, err}
+		if err != nil {
+			if conn.replies[msg.Serial] != nil {
+				conn.replies[msg.Serial] <- &Reply{nil, err}
+			}
+			conn.serialUsed <- msg.Serial
+		} else if msg.Type != TypeMethodCall {
+			conn.serialUsed <- msg.Serial
 		}
 		conn.repliesLck.RUnlock()
 	}
@@ -301,14 +309,20 @@ func (conn *Connection) sendReply(dest string, serial uint32, values ...interfac
 	conn.out <- msg
 }
 
-func (conn *Connection) genSerials() {
+func (conn *Connection) serials() {
 	s := uint32(1)
+	used := make(map[uint32]bool)
+	used[0] = true // ensure that 0 is never used
 	for {
-		conn.serial <- s
-		// let's hope that nobody sends 2^32-1 messages at once
-		s++
-		if s == 0 {
+		select {
+		case conn.serial <- s:
+			used[s] = true
 			s++
+			for used[s] {
+				s++
+			}
+		case n := <-conn.serialUsed:
+			delete(used, n)
 		}
 	}
 }
