@@ -64,6 +64,7 @@ func GetSignature(vs ...interface{}) Signature {
 	return Signature{s}
 }
 
+// getSignature returns the signature of the given type and panics on unknown types.
 func getSignature(v reflect.Type) string {
 	// handle simple types first
 	switch v.Kind() {
@@ -235,6 +236,7 @@ func (v Variant) Value() interface{} {
 	return v.value
 }
 
+// alignment returns the alignment of values of type t.
 func alignment(t reflect.Type) int {
 	n, ok := map[reflect.Type]int{
 		variantType:    1,
@@ -259,6 +261,7 @@ func alignment(t reflect.Type) int {
 	return 1
 }
 
+// isKeyType returns whether t is a valid type for a DBus dict.
 func isKeyType(t reflect.Type) bool {
 	switch t.Kind() {
 	case reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,

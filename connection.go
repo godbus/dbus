@@ -142,6 +142,7 @@ func (conn *Connection) Eavesdrop(c chan *Message) {
 	conn.eavesdroppedLck.Unlock()
 }
 
+// hello sends the initial org.freedesktop.DBus.Hello call.
 func (conn *Connection) hello() error {
 	var s string
 	err := conn.busObj.Call("org.freedesktop.DBus.Hello", 0).Store(&s)
@@ -155,6 +156,8 @@ func (conn *Connection) hello() error {
 	return nil
 }
 
+// inWorker runs in an own goroutine, reading incoming messages from the
+// transport and dispatching them appropiately.
 func (conn *Connection) inWorker() {
 	for {
 		msg, err := conn.readMessage()
@@ -216,6 +219,9 @@ func (conn *Connection) inWorker() {
 				go conn.handleCall(msg)
 			}
 		} else if _, ok := err.(InvalidMessageError); !ok {
+			// Some read error occured (usually EOF); we can't really do
+			// anything but to shut down all stuff and returns errors to all
+			// pending replies.
 			conn.Close()
 			conn.repliesLck.RLock()
 			for _, v := range conn.replies {
@@ -228,6 +234,8 @@ func (conn *Connection) inWorker() {
 	}
 }
 
+// outWorker runs in an own goroutine, encoding and sending messages that are
+// sent to conn.out.
 func (conn *Connection) outWorker() {
 	for msg := range conn.out {
 		err := msg.EncodeTo(conn.transport)
@@ -244,6 +252,7 @@ func (conn *Connection) outWorker() {
 	}
 }
 
+// readMessage reads and decodes a single message from the transport.
 func (conn *Connection) readMessage() (*Message, error) {
 	// read the first 16 bytes, from which we can figure out the length of the
 	// rest of the message
@@ -278,6 +287,8 @@ func (conn *Connection) readMessage() (*Message, error) {
 	return DecodeMessage(bytes.NewBuffer(all))
 }
 
+// sendError creates an error message corresponding to the parameters and sends
+// it to conn.out.
 func (conn *Connection) sendError(e Error, dest string, serial uint32) {
 	msg := new(Message)
 	msg.Order = binary.LittleEndian
@@ -294,6 +305,8 @@ func (conn *Connection) sendError(e Error, dest string, serial uint32) {
 	conn.out <- msg
 }
 
+// sendReply creates a method reply message corresponding to the parameters and
+// sends it to conn.out.
 func (conn *Connection) sendReply(dest string, serial uint32, values ...interface{}) {
 	msg := new(Message)
 	msg.Order = binary.LittleEndian
@@ -309,6 +322,8 @@ func (conn *Connection) sendReply(dest string, serial uint32, values ...interfac
 	conn.out <- msg
 }
 
+// serials runs in an own goroutine, constantly sending serials on conn.serial
+// and reading serials that are ready for "recycling" from conn.serialUsed.
 func (conn *Connection) serials() {
 	s := uint32(1)
 	used := make(map[uint32]bool)
@@ -400,6 +415,7 @@ type Signal struct {
 	Body []interface{}
 }
 
+// getKey gets a key from a server address. Returns "" on error / not found...
 func getKey(s, key string) string {
 	i := strings.IndexRune(s, ':')
 	if i == -1 {
@@ -420,6 +436,9 @@ func getKey(s, key string) string {
 	return s[i+len(key)+1 : j]
 }
 
+// dereferenceAll returns a slice that, assuming that vs is a slice of pointers
+// of arbitrary types, containes the values that are obtained from dereferencing
+// all elements in vs.
 func dereferenceAll(vs []interface{}) []interface{} {
 	for i := range vs {
 		v := reflect.ValueOf(vs[i])

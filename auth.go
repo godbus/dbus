@@ -49,6 +49,7 @@ type AuthMechanism interface {
 	HandleData([]byte) ([]byte, AuthStatus)
 }
 
+// auth does the whole authentication stuff.
 func (conn *Connection) auth() error {
 	in := bufio.NewReader(conn.transport)
 	_, err := conn.transport.Write([]byte{0})
@@ -93,6 +94,10 @@ func (conn *Connection) auth() error {
 	return errors.New("authentication failed")
 }
 
+// tryAuth tries to authenticate with m as the mechanism, using state as the
+// initial authState and in for reading input. It returns (nil, true) on
+// success, (nil, false) on a REJECTED and (someErr, false) if some other
+// error occured.
 func (conn *Connection) tryAuth(m AuthMechanism, state authState, in *bufio.Reader) (error, bool) {
 	for {
 		s, err := authReadLine(in)
@@ -185,6 +190,7 @@ func (conn *Connection) tryAuth(m AuthMechanism, state authState, in *bufio.Read
 	panic("not reached")
 }
 
+// authReadLine reads a line and separates it into its fields.
 func authReadLine(in *bufio.Reader) ([][]byte, error) {
 	data, err := in.ReadBytes('\n')
 	if err != nil {
@@ -194,6 +200,8 @@ func authReadLine(in *bufio.Reader) ([][]byte, error) {
 	return bytes.Split(data, []byte{' '}), nil
 }
 
+// authWriteLine writes the given line in the authentication protocol format
+// (elements of data separated by a " " and terminated by "\r\n").
 func authWriteLine(out io.Writer, data ...[]byte) error {
 	buf := make([]byte, 0)
 	for i, v := range data {

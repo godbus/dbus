@@ -55,6 +55,7 @@ func (e InvalidMessageError) Error() string {
 	return "invalid message: " + string(e)
 }
 
+// fieldType are the types of the various header fields.
 var fieldTypes = map[HeaderField]reflect.Type{
 	FieldPath:        objectPathType,
 	FieldInterface:   stringType,
@@ -67,6 +68,8 @@ var fieldTypes = map[HeaderField]reflect.Type{
 	FieldUnixFds:     uint32Type,
 }
 
+// requiredFields lists the header fields that are required by the different
+// message types.
 var requiredFields = map[Type][]HeaderField{
 	TypeMethodCall:  []HeaderField{FieldPath, FieldMember},
 	TypeMethodReply: []HeaderField{FieldReplySerial},

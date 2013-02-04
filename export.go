@@ -22,6 +22,8 @@ type expObject struct {
 	interfaces map[string]interface{}
 }
 
+// handleCall handles the given method call (i.e. looks if it's one of the
+// pre-implemented ones and searches for a corresponding handler if not).
 func (conn *Connection) handleCall(msg *Message) {
 	vs := msg.Body
 	name := msg.Headers[FieldMember].value.(string)

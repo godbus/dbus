@@ -24,7 +24,8 @@ func NewDecoder(in io.Reader, order binary.ByteOrder) *Decoder {
 	return dec
 }
 
-func (dec *Decoder) align(n int) error {
+// align aligns the input to the given boundary and panics on error.
+func (dec *Decoder) align(n int) {
 	newpos := dec.pos
 	if newpos%n != 0 {
 		newpos += (n - (newpos % n))
@@ -35,7 +36,6 @@ func (dec *Decoder) align(n int) error {
 		}
 		dec.pos = newpos
 	}
-	return nil
 }
 
 // Calls binary.Read(dec.in, dec.order, v) and panics on read errors.
@@ -75,6 +75,8 @@ func (dec *Decoder) DecodeMulti(vs ...interface{}) error {
 	return nil
 }
 
+// decode decodes a single value and stores it in *v. depth holds the depth of
+// the container nesting.
 func (dec *Decoder) decode(v reflect.Value, depth int) {
 	if v.Kind() != reflect.Ptr {
 		panic(invalidTypeError{v.Type()})

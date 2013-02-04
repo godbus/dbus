@@ -55,6 +55,10 @@ func (a AuthCookieSha1) HandleData(data []byte) ([]byte, AuthStatus) {
 	return resp, AuthOk
 }
 
+// getCookie searches for the cookie identified by id in context and returns
+// the cookie content or nil. (Since HandleData can't return a specific error,
+// but only whether an error occured, this function also doesn't bother to
+// return an error.)
 func (a AuthCookieSha1) getCookie(context, id []byte) []byte {
 	home := os.Getenv("HOME")
 	if home == "" {
@@ -83,6 +87,8 @@ func (a AuthCookieSha1) getCookie(context, id []byte) []byte {
 	panic("not reached")
 }
 
+// generateChallenge returns a random, hex-encoded challenge, or nil on error
+// (see above).
 func (a AuthCookieSha1) generateChallenge() []byte {
 	b := make([]byte, 16)
 	n, err := rand.Read(b)

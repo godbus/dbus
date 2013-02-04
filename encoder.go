@@ -70,7 +70,7 @@ func (enc *Encoder) EncodeMulti(vs ...interface{}) error {
 	return nil
 }
 
-// Encode the given value to the internal buffer. Panics on error.
+// encode encodes the given value to the writer and panics on error.
 func (enc *Encoder) encode(v reflect.Value) {
 	enc.align(alignment(v.Type()))
 	switch v.Kind() {
