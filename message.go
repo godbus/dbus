@@ -100,7 +100,7 @@ type header struct {
 // FormatError.
 func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 	var order binary.ByteOrder
-	var length uint32
+	var hlength, length uint32
 	var proto byte
 	var headers []header
 
@@ -123,8 +123,24 @@ func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 
 	msg = new(Message)
 	msg.Order = order
-	err = dec.DecodeMulti(&msg.Type, &msg.Flags, &proto, &length, &msg.Serial,
-		&headers)
+	err = dec.DecodeMulti(&msg.Type, &msg.Flags, &proto, &length, &msg.Serial)
+	if err != nil {
+		return nil, err
+	}
+
+	// get the header length separately because we need it later
+	b = make([]byte, 4)
+	_, err = io.ReadFull(rd, b)
+	if err != nil {
+		return nil, err
+	}
+	binary.Read(bytes.NewBuffer(b), order, &hlength)
+	if hlength+length+16 > 1<<27 {
+		return nil, InvalidMessageError("message is too long")
+	}
+	dec = NewDecoder(io.MultiReader(bytes.NewBuffer(b), rd), order)
+	dec.pos = 12
+	err = dec.Decode(&headers)
 	if err != nil {
 		return nil, err
 	}
@@ -193,6 +209,9 @@ func (msg *Message) EncodeTo(out io.Writer) error {
 	enc.EncodeMulti(vs...)
 	enc.align(8)
 	body.WriteTo(buf)
+	if buf.Len() > 1<<27 {
+		return InvalidMessageError("message is too long")
+	}
 	if _, err := buf.WriteTo(out); err != nil {
 		return err
 	}
