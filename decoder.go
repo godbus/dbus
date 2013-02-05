@@ -166,7 +166,7 @@ func (dec *Decoder) decode(v reflect.Value, depth int) {
 		}
 		v.Set(slice)
 	case reflect.Struct:
-		if depth >= 64 {
+		if depth >= 64 && v.Type() != signatureType {
 			panic(FormatError("input exceeds container depth limit"))
 		}
 		switch t := v.Type(); t {
@@ -232,6 +232,11 @@ func (dec *Decoder) decode(v reflect.Value, depth int) {
 			}
 		}
 	case reflect.Map:
+		// Maps are arrays of structures, so they actually increase the depth by
+		// 2.
+		if depth >= 63 {
+			panic(FormatError("input exceeds container depth limit"))
+		}
 		var length uint32
 		dec.decode(reflect.ValueOf(&length), depth)
 		m := reflect.MakeMap(v.Type())
@@ -243,8 +248,8 @@ func (dec *Decoder) decode(v reflect.Value, depth int) {
 			}
 			kv := reflect.New(v.Type().Key())
 			vv := reflect.New(v.Type().Elem())
-			dec.decode(kv, depth+1)
-			dec.decode(vv, depth+1)
+			dec.decode(kv, depth+2)
+			dec.decode(vv, depth+2)
 			m.SetMapIndex(kv.Elem(), vv.Elem())
 		}
 		v.Set(m)
