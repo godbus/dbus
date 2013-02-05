@@ -7,13 +7,6 @@ import (
 	"strings"
 )
 
-// Reply represents a reply to a method call. If Error is non-nil, it is either
-// an error from the underlying transport or an error message from the peer.
-type Reply struct {
-	Body []interface{}
-	Err  error
-}
-
 // Cookie represents a pending message reply. To get the reply, simply receive
 // from the channel.
 type Cookie <-chan *Reply
@@ -83,4 +76,21 @@ func (o *Object) Call(method string, flags Flags, args ...interface{}) Cookie {
 	}
 	o.conn.out <- msg
 	return nil
+}
+
+// Destination returns the destination that calls on o are sent to.
+func (o *Object) Destination() string {
+	return o.dest
+}
+
+// Path returns the path that calls on o are sent to.
+func (o *Object) Path() ObjectPath {
+	return o.path
+}
+
+// Reply represents a reply to a method call. If Error is non-nil, it is either
+// an error from the underlying transport or an error message from the peer.
+type Reply struct {
+	Body []interface{}
+	Err  error
 }

@@ -2,7 +2,6 @@ package dbus
 
 import (
 	"encoding/binary"
-	"encoding/xml"
 	"reflect"
 )
 
@@ -16,11 +15,6 @@ var (
 		[]interface{}{"Unkown / invalid method"},
 	}
 )
-
-type expObject struct {
-	intro      string
-	interfaces map[string]interface{}
-}
 
 // handleCall handles the given method call (i.e. looks if it's one of the
 // pre-implemented ones and searches for a corresponding handler if not).
@@ -38,7 +32,7 @@ func (conn *Connection) handleCall(msg *Message) {
 		conn.handlersLck.RUnlock()
 		return
 	}
-	iface := obj.interfaces[ifacename]
+	iface := obj[ifacename]
 	conn.handlersLck.RUnlock()
 	if ifacename == "org.freedesktop.DBus.Peer" {
 		switch name {
@@ -46,12 +40,7 @@ func (conn *Connection) handleCall(msg *Message) {
 			conn.sendReply(sender, serial)
 		case "GetMachineId":
 			conn.sendReply(sender, serial, conn.uuid)
-		}
-		return
-	} else if ifacename == "org.freedesktop.DBus.Introspectable" && name == "Introspect" {
-		if intro := obj.intro; intro != "" {
-			conn.sendReply(sender, serial, intro)
-		} else {
+		default:
 			conn.sendError(errmsgUnknownMethod, sender, serial)
 		}
 		return
@@ -149,10 +138,9 @@ func (conn *Connection) Export(v interface{}, path ObjectPath, iface string) {
 	}
 	conn.handlersLck.Lock()
 	if _, ok := conn.handlers[path]; !ok {
-		conn.handlers[path] = new(expObject)
-		conn.handlers[path].interfaces = make(map[string]interface{})
+		conn.handlers[path] = make(map[string]interface{})
 	}
-	conn.handlers[path].interfaces[iface] = v
+	conn.handlers[path][iface] = v
 	conn.handlersLck.Unlock()
 }
 
@@ -192,27 +180,6 @@ func (conn *Connection) RequestName(name string, flags RequestNameFlags) (Reques
 		conn.namesLck.Unlock()
 	}
 	return RequestNameReply(r), nil
-}
-
-// SetIntrospect sets the introspection data that is returned if a peer calls
-// org.freedesktop.Introspectable.Introspect on the given object path. If the
-// string is "", an error is returned to peers that try to call Introspect.
-//
-// An error is returned if the given string is not valid introspection data.
-func (conn *Connection) SetIntrospect(path ObjectPath, intro string) error {
-	var n Node
-	if err := xml.Unmarshal([]byte(intro), &n); err != nil {
-		return err
-	}
-	// TODO: check that n is valid
-	conn.handlersLck.Lock()
-	if _, ok := conn.handlers[path]; !ok {
-		conn.handlers[path] = new(expObject)
-		conn.handlers[path].interfaces = make(map[string]interface{})
-	}
-	conn.handlers[path].intro = intro
-	conn.handlersLck.Unlock()
-	return nil
 }
 
 // ReleaseNameReply is the reply to a ReleaseName call.

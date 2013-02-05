@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"github.com/guelfey/go.dbus"
+	"github.com/guelfey/go.dbus/introspect"
 	"os"
 )
 
@@ -11,7 +12,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	node, err := conn.Object("org.freedesktop.DBus", "/org/freedesktop/DBus").Introspect()
+	node, err := introspect.Call(conn.Object("org.freedesktop.DBus", "/org/freedesktop/DBus"))
 	if err != nil {
 		panic(err)
 	}

@@ -1,9 +1,8 @@
-package dbus
+// Package introspect provides some utilities for dealing with the DBus
+// introspection format.
+package introspect
 
-import (
-	"encoding/xml"
-	"strings"
-)
+import "encoding/xml"
 
 // Node is the root element of an introspection.
 type Node struct {
@@ -17,7 +16,7 @@ type Node struct {
 type Interface struct {
 	Name        string       `xml:"name,attr"`
 	Methods     []Method     `xml:"method"`
-	Signals     []SignalInfo `xml:"signal"`
+	Signals     []Signal     `xml:"signal"`
 	Properties  []Property   `xml:"property"`
 	Annotations []Annotation `xml:"annotation"`
 }
@@ -29,8 +28,8 @@ type Method struct {
 	Annotations []Annotation `xml:"annotation"`
 }
 
-// SignalInfo describes a Signal emitted on an Interface.
-type SignalInfo struct {
+// Signal describes a Signal emitted on an Interface.
+type Signal struct {
 	Name        string       `xml:"name,attr"`
 	Args        []Arg        `xml:"arg"`
 	Annotations []Annotation `xml:"annotation"`
@@ -55,24 +54,4 @@ type Arg struct {
 type Annotation struct {
 	Name  string `xml:"name,attr"`
 	Value string `xml:"value,attr"`
-}
-
-// Introspect calls org.freedesktop.Introspectable.Introspect on the given
-// object and returns the introspection data.
-func (o *Object) Introspect() (*Node, error) {
-	var xmldata string
-	var node Node
-
-	err := o.Call("org.freedesktop.DBus.Introspectable.Introspect", 0).Store(&xmldata)
-	if err != nil {
-		return nil, err
-	}
-	err = xml.NewDecoder(strings.NewReader(xmldata)).Decode(&node)
-	if err != nil {
-		return nil, err
-	}
-	if node.Name == "" {
-		node.Name = string(o.path)
-	}
-	return &node, nil
 }
