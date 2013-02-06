@@ -50,7 +50,7 @@ type Arg struct {
 	Direction string `xml:"direction,attr"`
 }
 
-// Annotation is a annotation in the introspection format.
+// Annotation is an annotation in the introspection format.
 type Annotation struct {
 	Name  string `xml:"name,attr"`
 	Value string `xml:"value,attr"`

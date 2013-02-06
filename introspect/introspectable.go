@@ -6,7 +6,7 @@ import (
 )
 
 // Introspectable implements org.freedesktop.Introspectable.
-// 
+//
 // You can create it by converting the XML-formatted introspection data from a
 // string to an Introspectable or call NewIntrospectable with a Node. Then,
 // export it as org.freedesktop.Introspectable on you object.
