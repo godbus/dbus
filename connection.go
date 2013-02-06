@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net"
 	"os"
+	"os/exec"
 	"reflect"
 	"strings"
 	"sync"
@@ -40,10 +41,20 @@ type Connection struct {
 // connection or any error that occured.
 func ConnectSessionBus() (*Connection, error) {
 	address := os.Getenv("DBUS_SESSION_BUS_ADDRESS")
-	if address != "" {
+	if address != "" && address != "autolaunch:" {
 		return NewConnection(address)
 	}
-	return nil, errors.New("couldn't determine address of the session bus")
+	cmd := exec.Command("dbus-launch")
+	b, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, err
+	}
+	i := bytes.IndexByte(b, '=')
+	j := bytes.IndexByte(b, '\n')
+	if i == -1 || j == -1 {
+		return nil, errors.New("couldn't determine address of the session bus")
+	}
+	return NewConnection(string(b[i+1 : j]))
 }
 
 // ConnectSystemBus connects to the system message bus and returns the
