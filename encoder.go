@@ -25,15 +25,14 @@ func NewEncoder(out io.Writer, order binary.ByteOrder) *Encoder {
 
 // Aligns the next output to be on a multiple of n. Panics on write errors.
 func (enc *Encoder) align(n int) {
-	newpos := enc.pos
-	if newpos%n != 0 {
-		newpos += (n - (newpos % n))
+	if enc.pos%n != 0 {
+		newpos := (enc.pos + n - 1) & ^(n - 1)
+		empty := make([]byte, newpos-enc.pos)
+		if _, err := enc.out.Write(empty); err != nil {
+			panic(err)
+		}
+		enc.pos = newpos
 	}
-	empty := make([]byte, newpos-enc.pos)
-	if _, err := enc.out.Write(empty); err != nil {
-		panic(err)
-	}
-	enc.pos = newpos
 }
 
 // Calls binary.Write(enc.out, enc.order, v) and panics on write errors.

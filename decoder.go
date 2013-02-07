@@ -26,9 +26,8 @@ func NewDecoder(in io.Reader, order binary.ByteOrder) *Decoder {
 
 // align aligns the input to the given boundary and panics on error.
 func (dec *Decoder) align(n int) {
-	newpos := dec.pos
-	if newpos%n != 0 {
-		newpos += (n - (newpos % n))
+	if dec.pos%n != 0 {
+		newpos := (dec.pos + n - 1) & ^(n - 1)
 		empty := make([]byte, newpos-dec.pos)
 		if _, err := io.ReadFull(dec.in, empty); err != nil {
 			panic(err)
