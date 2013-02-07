@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/guelfey/go.dbus"
+	"github.com/guelfey/go.dbus/introspect"
 	"os"
 )
 
@@ -10,6 +11,11 @@ const intro = `
 <node>
 	<interface name="com.github.guelfey.Demo">
 		<method name="Foo">
+			<arg direction="out" type="s"/>
+		</method>
+	</interface>
+	<interface name="org.freedesktop.DBus.Introspectable">
+		<method name="Introspect">
 			<arg direction="out" type="s"/>
 		</method>
 	</interface>
@@ -39,7 +45,8 @@ func main() {
 	}
 	f := foo("Bar!")
 	conn.Export(f, "/com/github/guelfey/Demo", "com.github.guelfey.Demo")
-	conn.SetIntrospect("/com/github/guelfey/Demo", intro)
+	conn.Export(introspect.Introspectable(intro), "/com/github/guelfey/Demo",
+		"org.freedesktop.DBus.Introspectable")
 	fmt.Println("Listening on com.github.guelfey.Demo / /com/github/guelfey/Demo ...")
 	select {}
 }
