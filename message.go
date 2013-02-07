@@ -153,7 +153,7 @@ func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 	dec.align(8)
 	body := make([]byte, int(length))
 	if length != 0 {
-		_, err := rd.Read(body)
+		_, err := io.ReadFull(rd, body)
 		if err != nil {
 			return nil, err
 		}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -268,7 +269,7 @@ func (conn *Connection) readMessage() (*Message, error) {
 	// read the first 16 bytes, from which we can figure out the length of the
 	// rest of the message
 	var header [16]byte
-	if _, err := conn.transport.Read(header[:]); err != nil {
+	if _, err := io.ReadFull(conn.transport, header[:]); err != nil {
 		return nil, err
 	}
 	var order binary.ByteOrder
@@ -289,7 +290,7 @@ func (conn *Connection) readMessage() (*Message, error) {
 		hlen += 8 - (hlen % 8)
 	}
 	rest := make([]byte, int(blen+hlen))
-	if _, err := conn.transport.Read(rest); err != nil {
+	if _, err := io.ReadFull(conn.transport, rest); err != nil {
 		return nil, err
 	}
 	all := make([]byte, 16+len(rest))

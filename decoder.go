@@ -30,8 +30,7 @@ func (dec *Decoder) align(n int) {
 	if newpos%n != 0 {
 		newpos += (n - (newpos % n))
 		empty := make([]byte, newpos-dec.pos)
-		_, err := dec.in.Read(empty)
-		if err != nil {
+		if _, err := io.ReadFull(dec.in, empty); err != nil {
 			panic(err)
 		}
 		dec.pos = newpos
@@ -142,7 +141,7 @@ func (dec *Decoder) decode(v reflect.Value, depth int) {
 		var length uint32
 		dec.decode(reflect.ValueOf(&length), depth)
 		b := make([]byte, int(length)+1)
-		if _, err := dec.in.Read(b); err != nil {
+		if _, err := io.ReadFull(dec.in, b); err != nil {
 			panic(err)
 		}
 		dec.pos += int(length) + 1
@@ -212,7 +211,7 @@ func (dec *Decoder) decode(v reflect.Value, depth int) {
 			var length uint8
 			dec.decode(reflect.ValueOf(&length), depth)
 			b := make([]byte, int(length)+1)
-			if _, err := dec.in.Read(b); err != nil {
+			if _, err := io.ReadFull(dec.in, b); err != nil {
 				panic(err)
 			}
 			dec.pos += int(length) + 1
