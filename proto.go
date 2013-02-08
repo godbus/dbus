@@ -64,6 +64,12 @@ func GetSignature(vs ...interface{}) Signature {
 	return Signature{s}
 }
 
+// GetSignatureType returns the signature of the given type. It panics if the
+// type is not representable in DBus.
+func GetSignatureType(t reflect.Type) Signature {
+	return Signature{getSignature(t)}
+}
+
 // getSignature returns the signature of the given type and panics on unknown types.
 func getSignature(v reflect.Type) string {
 	// handle simple types first

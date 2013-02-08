@@ -13,14 +13,7 @@ const intro = `
 		<method name="Foo">
 			<arg direction="out" type="s"/>
 		</method>
-	</interface>
-	<interface name="org.freedesktop.DBus.Introspectable">
-		<method name="Introspect">
-			<arg direction="out" type="s"/>
-		</method>
-	</interface>
-</node>
-`
+	</interface>` + introspect.InterfaceDataString + `</node> `
 
 type foo string
 
