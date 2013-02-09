@@ -34,7 +34,8 @@ type Prop struct {
 }
 
 // Properties is a set of values that can be made available to the message bus
-// using the org.freedesktop.DBus.Properties interface.
+// using the org.freedesktop.DBus.Properties interface. It is safe for
+// concurrent use by multiple goroutines.
 type Properties struct {
 	m   map[string]map[string]Prop
 	mut sync.RWMutex
@@ -47,6 +48,7 @@ func New(props map[string]map[string]Prop) *Properties {
 	return &Properties{m: props}
 }
 
+// Get implements org.freedesktop.DBus.Properties.Get.
 func (p *Properties) Get(iface, property string) (dbus.Variant, *dbus.Error) {
 	p.mut.RLock()
 	defer p.mut.RUnlock()
@@ -61,6 +63,7 @@ func (p *Properties) Get(iface, property string) (dbus.Variant, *dbus.Error) {
 	return dbus.MakeVariant(prop.Value), nil
 }
 
+// GetAll implements org.freedesktop.DBus.Properties.GetAll.
 func (p *Properties) GetAll(iface string) (map[string]dbus.Variant, *dbus.Error) {
 	p.mut.RLock()
 	defer p.mut.RUnlock()
@@ -75,12 +78,15 @@ func (p *Properties) GetAll(iface string) (map[string]dbus.Variant, *dbus.Error)
 	return rm, nil
 }
 
+// GetMust returns the value of the given property and panics if either the
+// interface or the property name are invalid.
 func (p *Properties) GetMust(iface, property string) interface{} {
 	p.mut.RLock()
 	defer p.mut.RUnlock()
 	return p.m[iface][property].Value
 }
 
+// Set implements org.freedesktop.Properties.Set.
 func (p *Properties) Set(iface, property string, newv dbus.Variant) *dbus.Error {
 	p.mut.Lock()
 	defer p.mut.Unlock()
@@ -104,6 +110,9 @@ func (p *Properties) Set(iface, property string, newv dbus.Variant) *dbus.Error 
 	return nil
 }
 
+// SetMust sets the value of the given property and panics if the interface or
+// the property name are invalid or if the types of v and the property to be
+// changed don't match.
 func (p *Properties) SetMust(iface, property string, v interface{}) {
 	p.mut.Lock()
 	defer p.mut.Unlock()
