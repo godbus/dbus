@@ -31,6 +31,10 @@ type Prop struct {
 
 	// If true, the value can be modified by calls to Set.
 	Writable bool
+
+	// If not nil, anytime this property is changed by Set, the new value is
+	// sent to this channel.
+	Chan chan interface{}
 }
 
 // Properties is a set of values that can be made available to the message bus
@@ -100,7 +104,10 @@ func (p *Properties) Set(iface, property string, newv dbus.Variant) *dbus.Error 
 	}
 	if prop.Writable {
 		if dbus.GetSignature(prop.Value) == newv.Signature() {
-			m[property] = Prop{newv.Value(), prop.Writable}
+			m[property] = Prop{newv.Value(), prop.Writable, prop.Chan}
+			if prop.Chan != nil {
+				prop.Chan <- newv.Value()
+			}
 		} else {
 			return ErrInvalidType
 		}
@@ -121,5 +128,5 @@ func (p *Properties) SetMust(iface, property string, v interface{}) {
 	if dbus.GetSignature(prop) != dbus.GetSignature(v) {
 		panic(ErrInvalidType)
 	}
-	m[property] = Prop{v, prop.Writable}
+	m[property] = Prop{v, prop.Writable, prop.Chan}
 }
