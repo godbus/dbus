@@ -3,6 +3,7 @@ package dbus
 import (
 	"encoding/binary"
 	"reflect"
+	"unicode"
 )
 
 var (
@@ -25,6 +26,9 @@ func (conn *Connection) handleCall(msg *Message) {
 	ifacename := msg.Headers[FieldInterface].value.(string)
 	sender := msg.Headers[FieldSender].value.(string)
 	serial := msg.Serial
+	if len(name) == 0 || unicode.IsLower([]rune(name)[0]) {
+		conn.sendError(errmsgUnknownMethod, sender, serial)
+	}
 	conn.handlersLck.RLock()
 	obj, ok := conn.handlers[path]
 	if !ok {
