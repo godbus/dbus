@@ -47,6 +47,7 @@ func main() {
 				Methods:    introspect.Methods(f),
 				Properties: props.Introspection("com.github.guelfey.Demo"),
 			},
+			prop.IntrospectData,
 		},
 	}
 	conn.Export(introspect.NewIntrospectable(n), "/com/github/guelfey/Demo",

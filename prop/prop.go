@@ -3,8 +3,10 @@
 package prop
 
 import (
+	"encoding/xml"
 	"github.com/guelfey/go.dbus"
 	"github.com/guelfey/go.dbus/introspect"
+	"strings"
 	"sync"
 )
 
@@ -35,6 +37,44 @@ var ErrReadOnly = &dbus.Error{"org.freedesktop.DBus.Properties.Error.ReadOnly", 
 // ErrInvalidType is returned to peers that set a property to a value of invalid
 // type.
 var ErrInvalidType = &dbus.Error{"org.freedesktop.DBus.Properties.Error.InvalidType", nil}
+
+// The introspection data for the org.freedesktop.DBus.Properties interface.
+// Generated from IntrospectDataString in init().
+var IntrospectData introspect.Interface
+
+// The introspection data for the org.freedesktop.DBus.Properties interface, as
+// a string.
+const IntrospectDataString = `
+	<interface name="org.freedesktop.DBus.Introspectable">
+		<method name="Get">
+			<arg name="out" direction="in" type="s"/>
+			<arg name="property" direction="in" type="s"/>
+			<arg name="value" direction="out" type="v"/>
+		</method>
+		<method name="GetAll">
+			<arg name="interface" direction="in" type="s"/>
+			<arg name="props" direction="out" type="a{sv}"/>
+		</method>
+		<method name="Set">
+			<arg name="interface" direction="in" type="s"/>
+			<arg name="property" direction="in" type="s"/>
+			<arg name="value" direction="in" type="v"/>
+		</method>
+		<signal name="PropertiesChanged">
+			<arg name="interface" type="s"/>
+			<arg name="changed_properties" type="a{sv}"/>
+			<arg name="invalidates_properties" type="as"/>
+		</signal>
+	</interface>
+`
+
+func init() {
+	dec := xml.NewDecoder(strings.NewReader(IntrospectDataString))
+	err := dec.Decode(&IntrospectData)
+	if err != nil {
+		panic(err)
+	}
+}
 
 // Prop represents a single property. It is used for creating a Properties
 // value.
