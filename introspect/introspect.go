@@ -5,28 +5,24 @@ package introspect
 import "encoding/xml"
 
 // The introspection data for the org.freedesktop.DBus.Introspectable interface.
-var InterfaceData = Interface{
-	"org.freedesktop.DBus.Introspectable",
-	[]Method{
+var IntrospectData = Interface{
+	Name: "org.freedesktop.DBus.Introspectable",
+	Methods: []Method{
 		Method{
-			"Introspect",
-			[]Arg{
-				Arg{"", "s", "out"},
+			Name: "Introspect",
+			Args: []Arg{
+				Arg{"out", "s", "out"},
 			},
-			[]Annotation{},
 		},
 	},
-	[]Signal{},
-	[]Property{},
-	[]Annotation{},
 }
 
 // The introspection data for the org.freedesktop.DBus.Introspectable interface,
 // as a string.
-const InterfaceDataString = `
+const IntrospectDataString = `
 	<interface name="org.freedesktop.DBus.Introspectable">
 		<method name="Introspect">
-			<arg direction="out" type="s"/>
+			<arg name="out" direction="out" type="s"/>
 		</method>
 	</interface>
 `
@@ -74,7 +70,7 @@ type Property struct {
 type Arg struct {
 	Name      string `xml:"name,attr,omitempty"`
 	Type      string `xml:"type,attr"`
-	Direction string `xml:"direction,attr"`
+	Direction string `xml:"direction,attr,omitempty"`
 }
 
 // Annotation is an annotation in the introspection format.

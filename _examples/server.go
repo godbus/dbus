@@ -13,7 +13,7 @@ const intro = `
 		<method name="Foo">
 			<arg direction="out" type="s"/>
 		</method>
-	</interface>` + introspect.InterfaceDataString + `</node> `
+	</interface>` + introspect.IntrospectDataString + `</node> `
 
 type foo string
 

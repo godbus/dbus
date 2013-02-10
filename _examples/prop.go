@@ -41,7 +41,7 @@ func main() {
 	n := &introspect.Node{
 		Name: "/com/github/guelfey/Demo",
 		Interfaces: []introspect.Interface{
-			introspect.InterfaceData,
+			introspect.IntrospectData,
 			introspect.Interface{
 				Name:       "com.github.guelfey.Demo",
 				Methods:    introspect.Methods(f),

@@ -25,7 +25,7 @@ func NewIntrospectable(n *Node) Introspectable {
 		}
 	}
 	if !found {
-		n.Interfaces = append(n.Interfaces, InterfaceData)
+		n.Interfaces = append(n.Interfaces, IntrospectData)
 	}
 	b, err := xml.Marshal(n)
 	if err != nil {
