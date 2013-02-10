@@ -8,6 +8,18 @@ import (
 	"sync"
 )
 
+// EmitType controls how org.freedesktop.DBus.Properties.PropertiesChanged is
+// emitted for a property. If it is EmitTrue, the signal is emitted. If it is
+// EmitInvalidtes, the signal is also emitted, but the new value of the property
+// is not disclosed.
+type EmitType byte
+
+const (
+	EmitFalse EmitType = iota
+	EmitTrue
+	EmitInvalidates
+)
+
 // ErrIfaceNotFound is the error returned to peers who try to access properties
 // on interfaces that aren't found.
 var ErrIfaceNotFound = &dbus.Error{"org.freedesktop.DBus.Properties.Error.InterfaceNotFound", nil}
@@ -36,21 +48,30 @@ type Prop struct {
 	// If not nil, anytime this property is changed by Set, the new value is
 	// sent to this channel.
 	Chan chan interface{}
+
+	// Controls how org.freedesktop.DBus.Properties.PropertiesChanged is
+	// emitted if this property changes.
+	Emit EmitType
 }
 
 // Properties is a set of values that can be made available to the message bus
 // using the org.freedesktop.DBus.Properties interface. It is safe for
 // concurrent use by multiple goroutines.
 type Properties struct {
-	m   map[string]map[string]Prop
-	mut sync.RWMutex
+	m    map[string]map[string]Prop
+	mut  sync.RWMutex
+	conn *dbus.Connection
+	path dbus.ObjectPath
 }
 
 // New returns a new Properties structure that manages the given properties.
 // The key for the first-level map of props is the name of the interface; the
-// second-level key is the name of the property.
-func New(props map[string]map[string]Prop) *Properties {
-	return &Properties{m: props}
+// second-level key is the name of the property. The returned structure will be
+// exported as org.freedesktop.DBus.Properties on path.
+func New(conn *dbus.Connection, path dbus.ObjectPath, props map[string]map[string]Prop) *Properties {
+	p := &Properties{m: props, conn: conn, path: path}
+	conn.Export(p, path, "org.freedesktop.DBus.Properties")
+	return p
 }
 
 // Get implements org.freedesktop.DBus.Properties.Get.
@@ -110,6 +131,27 @@ func (p *Properties) Introspection(iface string) []introspect.Property {
 	return s
 }
 
+// set sets the given property and emits PropertyChanged if appropiate. p.mut
+// must already be locked.
+func (p *Properties) set(iface, property string, v interface{}) {
+	old := p.m[iface][property]
+	p.m[iface][property] = Prop{v, old.Writable, old.Chan, old.Emit}
+	switch old.Emit {
+	case EmitFalse:
+		// do nothing
+	case EmitInvalidates:
+		p.conn.Emit(p.path, "org.freedesktop.DBus.Properties",
+			"PropertiesChanged", iface, map[string]dbus.Variant{},
+			[]string{property})
+	case EmitTrue:
+		p.conn.Emit(p.path, "org.freedesktop.DBus.Properties",
+			"PropertiesChanged", iface,
+			map[string]dbus.Variant{property: dbus.MakeVariant(v)}, []string{})
+	default:
+		panic("invalid value for EmitType")
+	}
+}
+
 // Set implements org.freedesktop.Properties.Set.
 func (p *Properties) Set(iface, property string, newv dbus.Variant) *dbus.Error {
 	p.mut.Lock()
@@ -124,7 +166,7 @@ func (p *Properties) Set(iface, property string, newv dbus.Variant) *dbus.Error 
 	}
 	if prop.Writable {
 		if dbus.GetSignature(prop.Value) == newv.Signature() {
-			m[property] = Prop{newv.Value(), prop.Writable, prop.Chan}
+			p.set(iface, property, newv.Value())
 			if prop.Chan != nil {
 				prop.Chan <- newv.Value()
 			}
@@ -143,10 +185,8 @@ func (p *Properties) Set(iface, property string, newv dbus.Variant) *dbus.Error 
 func (p *Properties) SetMust(iface, property string, v interface{}) {
 	p.mut.Lock()
 	defer p.mut.Unlock()
-	m := p.m[iface]
-	prop := m[property]
-	if dbus.GetSignature(prop) != dbus.GetSignature(v) {
+	if dbus.GetSignature(p.m[iface][property]) != dbus.GetSignature(v) {
 		panic(ErrInvalidType)
 	}
-	m[property] = Prop{v, prop.Writable, prop.Chan}
+	p.set(iface, property, v)
 }

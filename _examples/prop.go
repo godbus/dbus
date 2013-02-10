@@ -32,11 +32,12 @@ func main() {
 	c := make(chan interface{})
 	propsSpec := map[string]map[string]prop.Prop{
 		"com.github.guelfey.Demo": map[string]prop.Prop{
-			"SomeInt": prop.Prop{int32(0), true, c},
+			"SomeInt": prop.Prop{int32(0), true, c, prop.EmitTrue},
 		},
 	}
-	props := prop.New(propsSpec)
 	f := foo("Bar")
+	conn.Export(f, "/com/github/guelfey/Demo", "com.github.guelfey.Demo")
+	props := prop.New(conn, "/com/github/guelfey/Demo", propsSpec)
 	n := &introspect.Node{
 		Name: "/com/github/guelfey/Demo",
 		Interfaces: []introspect.Interface{
@@ -48,9 +49,6 @@ func main() {
 			},
 		},
 	}
-	conn.Export(f, "/com/github/guelfey/Demo", "com.github.guelfey.Demo")
-	conn.Export(props, "/com/github/guelfey/Demo",
-		"org.freedesktop.DBus.Properties")
 	conn.Export(introspect.NewIntrospectable(n), "/com/github/guelfey/Demo",
 		"org.freedesktop.DBus.Introspectable")
 	fmt.Println("Listening on com.github.guelfey.Demo / /com/github/guelfey/Demo ...")
