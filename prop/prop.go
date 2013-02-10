@@ -4,6 +4,7 @@ package prop
 
 import (
 	"github.com/guelfey/go.dbus"
+	"github.com/guelfey/go.dbus/introspect"
 	"sync"
 )
 
@@ -88,6 +89,25 @@ func (p *Properties) GetMust(iface, property string) interface{} {
 	p.mut.RLock()
 	defer p.mut.RUnlock()
 	return p.m[iface][property].Value
+}
+
+// Introspection returns the introspection data that represents the properties
+// of iface.
+func (p *Properties) Introspection(iface string) []introspect.Property {
+	p.mut.RLock()
+	defer p.mut.RUnlock()
+	m := p.m[iface]
+	s := make([]introspect.Property, 0, len(m))
+	for k, v := range m {
+		p := introspect.Property{Name: k, Type: dbus.GetSignature(v.Value).String()}
+		if v.Writable {
+			p.Access = "readwrite"
+		} else {
+			p.Access = "read"
+		}
+		s = append(s, p)
+	}
+	return s
 }
 
 // Set implements org.freedesktop.Properties.Set.
