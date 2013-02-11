@@ -3,6 +3,7 @@ package dbus
 import (
 	"reflect"
 	"strings"
+	"unicode"
 )
 
 var (
@@ -71,9 +72,9 @@ func GetSignatureType(t reflect.Type) Signature {
 }
 
 // getSignature returns the signature of the given type and panics on unknown types.
-func getSignature(v reflect.Type) string {
+func getSignature(t reflect.Type) string {
 	// handle simple types first
-	switch v.Kind() {
+	switch t.Kind() {
 	case reflect.Uint8:
 		return "y"
 	case reflect.Bool:
@@ -82,9 +83,9 @@ func getSignature(v reflect.Type) string {
 		return "n"
 	case reflect.Uint16:
 		return "q"
-	case reflect.Int32, reflect.Int:
+	case reflect.Int32:
 		return "i"
-	case reflect.Uint32, reflect.Uint:
+	case reflect.Uint32:
 		return "u"
 	case reflect.Int64:
 		return "x"
@@ -93,29 +94,37 @@ func getSignature(v reflect.Type) string {
 	case reflect.Float64:
 		return "d"
 	case reflect.Ptr:
-		return getSignature(v.Elem())
+		return getSignature(t.Elem())
 	case reflect.String:
-		if v == objectPathType {
+		if t == objectPathType {
 			return "o"
 		}
 		return "s"
 	case reflect.Struct:
-		if v == variantType {
+		if t == variantType {
 			return "v"
-		} else if v == signatureType {
+		} else if t == signatureType {
 			return "g"
 		}
 		var s string
-		for i := 0; i < v.NumField(); i++ {
-			s += getSignature(v.Field(i).Type)
+		for i := 0; i < t.NumField(); i++ {
+			field := t.Field(i)
+			if unicode.IsUpper([]rune(field.Name)[0]) &&
+				field.Tag.Get("dbus") != "-" {
+
+				s += getSignature(t.Field(i).Type)
+			}
 		}
 		return "(" + s + ")"
 	case reflect.Array, reflect.Slice:
-		return "a" + getSignature(v.Elem())
+		return "a" + getSignature(t.Elem())
 	case reflect.Map:
-		return "a{" + getSignature(v.Key()) + getSignature(v.Elem()) + "}"
+		if !isKeyType(t.Key()) {
+			panic(invalidTypeError{t})
+		}
+		return "a{" + getSignature(t.Key()) + getSignature(t.Elem()) + "}"
 	}
-	panic("unknown type " + v.String())
+	panic(invalidTypeError{t})
 }
 
 // StringToSig returns the signature represented by this string, or a
