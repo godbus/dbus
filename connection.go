@@ -218,7 +218,10 @@ func (conn *Connection) inWorker() {
 				conn.repliesLck.Unlock()
 			case TypeSignal:
 				var signal Signal
-				signal.Name = msg.Headers[FieldMember].value.(string)
+				member := msg.Headers[FieldMember].value.(string)
+				iface := msg.Headers[FieldInterface].value.(string)
+				signal.Path = msg.Headers[FieldPath].value.(ObjectPath)
+				signal.Name = member + "." + iface
 				signal.Body = msg.Body
 				// don't block trying to send a signal
 				conn.signalsLck.Lock()
@@ -433,8 +436,10 @@ func (e Error) Error() string {
 	return e.Name
 }
 
-// Signal represents a DBus message of type Signal.
+// Signal represents a DBus message of type Signal. The name member is given in
+// "interface.member" notation, e.g. org.freedesktop.DBus.NameLost.
 type Signal struct {
+	Path ObjectPath
 	Name string
 	Body []interface{}
 }
