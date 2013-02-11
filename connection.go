@@ -246,6 +246,18 @@ func (conn *Connection) inWorker() {
 	}
 }
 
+// Names returns the list of all names that are currently owned by this
+// connection. The slice is always at least one element long, the first element
+// being the unique name of the connection.
+func (conn *Connection) Names() []string {
+	conn.namesLck.RLock()
+	// copy the slice so it can't be modified
+	s := make([]string, len(conn.names))
+	copy(s, conn.names)
+	conn.namesLck.RUnlock()
+	return s
+}
+
 // outWorker runs in an own goroutine, encoding and sending messages that are
 // sent to conn.out.
 func (conn *Connection) outWorker() {
