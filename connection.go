@@ -218,8 +218,21 @@ func (conn *Connection) inWorker() {
 				conn.repliesLck.Unlock()
 			case TypeSignal:
 				var signal Signal
-				member := msg.Headers[FieldMember].value.(string)
 				iface := msg.Headers[FieldInterface].value.(string)
+				member := msg.Headers[FieldMember].value.(string)
+				if iface == "org.freedesktop.DBus" && member == "NameLost" &&
+					msg.Headers[FieldSender].value.(string) == "org.freedesktop.DBus" {
+
+					name, _ := msg.Body[0].(string)
+					conn.namesLck.Lock()
+					for i, v := range conn.names {
+						if v == name {
+							copy(conn.names[i:], conn.names[i+1:])
+							conn.names = conn.names[:len(conn.names)-1]
+						}
+					}
+					conn.namesLck.Unlock()
+				}
 				signal.Path = msg.Headers[FieldPath].value.(ObjectPath)
 				signal.Name = member + "." + iface
 				signal.Body = msg.Body
