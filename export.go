@@ -3,6 +3,7 @@ package dbus
 import (
 	"encoding/binary"
 	"reflect"
+	"strings"
 	"unicode"
 )
 
@@ -103,15 +104,22 @@ func (conn *Connection) handleCall(msg *Message) {
 	}
 }
 
-// Emit emits the given signal on the message bus.
-func (conn *Connection) Emit(path ObjectPath, iface string, name string, values ...interface{}) {
+// Emit emits the given signal on the message bus. The name parameter must be
+// formatted as "interface.member", e.g., "org.freedesktop.DBus.NameLost".
+func (conn *Connection) Emit(path ObjectPath, name string, values ...interface{}) {
+	i := strings.LastIndex(name, ".")
+	if i == -1 {
+		panic("invalid name parameter")
+	}
+	iface := name[:i]
+	member := name[i+1:]
 	msg := new(Message)
 	msg.Order = binary.LittleEndian
 	msg.Type = TypeSignal
 	msg.Serial = <-conn.serial
 	msg.Headers = make(map[HeaderField]Variant)
 	msg.Headers[FieldInterface] = MakeVariant(iface)
-	msg.Headers[FieldMember] = MakeVariant(name)
+	msg.Headers[FieldMember] = MakeVariant(member)
 	msg.Headers[FieldPath] = MakeVariant(path)
 	msg.Body = values
 	if len(values) > 0 {

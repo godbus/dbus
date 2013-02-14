@@ -180,13 +180,12 @@ func (p *Properties) set(iface, property string, v interface{}) {
 	case EmitFalse:
 		// do nothing
 	case EmitInvalidates:
-		p.conn.Emit(p.path, "org.freedesktop.DBus.Properties",
-			"PropertiesChanged", iface, map[string]dbus.Variant{},
-			[]string{property})
+		p.conn.Emit(p.path, "org.freedesktop.DBus.Properties.PropertiesChanged",
+			iface, map[string]dbus.Variant{}, []string{property})
 	case EmitTrue:
-		p.conn.Emit(p.path, "org.freedesktop.DBus.Properties",
-			"PropertiesChanged", iface,
-			map[string]dbus.Variant{property: dbus.MakeVariant(v)}, []string{})
+		p.conn.Emit(p.path, "org.freedesktop.DBus.Properties.PropertiesChanged",
+			iface, map[string]dbus.Variant{property: dbus.MakeVariant(v)},
+			[]string{})
 	default:
 		panic("invalid value for EmitType")
 	}

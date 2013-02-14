@@ -8,7 +8,7 @@ func ExampleConnection_Emit() {
 		panic(err)
 	}
 
-	conn.Emit("/foo/bar", "foo.bar", "Baz", uint32(0xDAEDBEEF))
+	conn.Emit("/foo/bar", "foo.bar.Baz", uint32(0xDAEDBEEF))
 }
 
 func ExampleCookie() {
