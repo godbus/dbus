@@ -233,6 +233,7 @@ func (conn *Connection) inWorker() {
 					}
 					conn.namesLck.Unlock()
 				}
+				signal.Sender = msg.Headers[FieldSender].value.(string)
 				signal.Path = msg.Headers[FieldPath].value.(ObjectPath)
 				signal.Name = member + "." + iface
 				signal.Body = msg.Body
@@ -452,9 +453,10 @@ func (e Error) Error() string {
 // Signal represents a DBus message of type Signal. The name member is given in
 // "interface.member" notation, e.g. org.freedesktop.DBus.NameLost.
 type Signal struct {
-	Path ObjectPath
-	Name string
-	Body []interface{}
+	Sender string
+	Path   ObjectPath
+	Name   string
+	Body   []interface{}
 }
 
 // getKey gets a key from a server address. Returns "" on error / not found...
