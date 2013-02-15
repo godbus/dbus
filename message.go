@@ -43,7 +43,7 @@ const (
 	FieldDestination
 	FieldSender
 	FieldSignature
-	FieldUnixFds
+	FieldUnixFDs
 	fieldMax
 )
 
@@ -65,7 +65,7 @@ var fieldTypes = map[HeaderField]reflect.Type{
 	FieldDestination: stringType,
 	FieldSender:      stringType,
 	FieldSignature:   signatureType,
-	FieldUnixFds:     uint32Type,
+	FieldUnixFDs:     uint32Type,
 }
 
 // requiredFields lists the header fields that are required by the different
@@ -279,7 +279,7 @@ func (msg *Message) String() string {
 		s += " to <null>"
 	}
 	s += " serial " + strconv.FormatUint(uint64(msg.Serial), 10)
-	if v, ok := msg.Headers[FieldUnixFds]; ok {
+	if v, ok := msg.Headers[FieldUnixFDs]; ok {
 		s += " unixfds " + strconv.FormatUint(uint64(v.value.(uint32)), 10)
 	}
 	if v, ok := msg.Headers[FieldPath]; ok {

@@ -109,7 +109,7 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 		return nil, err
 	}
 	for _, v := range headers {
-		if v.HeaderField == FieldUnixFds {
+		if v.HeaderField == FieldUnixFDs {
 			unixfds, _ = v.Variant.value.(uint32)
 		}
 	}
@@ -166,7 +166,7 @@ func (t *unixTransport) SendMessage(msg *Message) error {
 		if !t.hasUnixFDs {
 			return errors.New("unix fd passing not enabled")
 		}
-		msg.Headers[FieldUnixFds] = MakeVariant(uint32(len(fds)))
+		msg.Headers[FieldUnixFDs] = MakeVariant(uint32(len(fds)))
 		oob := syscall.UnixRights(fds...)
 		buf := new(bytes.Buffer)
 		msg.EncodeTo(buf)
