@@ -31,9 +31,6 @@ func TestUnixFDs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if os.Getenv("GO_WANT_HELPER_PROCESS") == "1" {
-		select {}
-	}
 	file, err := ioutil.TempFile("", "go.dbus-test-")
 	if err != nil {
 		t.Fatal(err)
