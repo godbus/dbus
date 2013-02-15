@@ -10,6 +10,13 @@ Emit().
 Handling method calls is even easier; using Export(), you can arrange DBus
 message calls to be directly translated to method calls on a Go value.
 
+Unix FD passing deserves special mention. To use it, you should first check that
+it is supported on a connection by calling SupportsUnixFDs. If it returns true,
+all method of Connection will translate messages containing UnixFD's to messages
+that are accompanied by the given file descriptors with the UnixFD values being
+substituted by the correct indices. Similarily, the indices of incoming messages
+are automatically resolved. It shouldn't be necessary to use UnixFDIndex.
+
 Decoder and Encoder provide direct access to the DBus wire format. You usually
 don't need to use them. While you may use them directly on the socket
 as they accept the standard io interfaces, it is not advised to do so as this
@@ -28,7 +35,9 @@ are marshalled as a DBus struct). The exceptions are the structs defined in this
 package that have a custom wire format. These are ObjectPath, Signature and
 Variant. Also, fields whose tag contains dbus:"-" will be skipped.
 
-4. Trying to encode any other type (including int and uint) will result in a
+4. UnixFDIndex's are treated like uint32, except that their signature is 'h'.
+
+5. Trying to encode any other type (including int and uint) will result in a
 panic. This applies to all functions that call (*Encoder).Encode somewhere.
 
 The rules for decoding are mostly just the reverse of the encoding rules,

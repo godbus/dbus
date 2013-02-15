@@ -87,7 +87,7 @@ func (conn *Connection) auth() error {
 				return err
 			}
 			if ok {
-				if conn.SupportsUnixFDs() {
+				if conn.transport.SupportsUnixFDs() {
 					err = authWriteLine(conn, []byte("NEGOTIATE_UNIX_FD"))
 					if err != nil {
 						return err
@@ -99,6 +99,7 @@ func (conn *Connection) auth() error {
 					switch {
 					case bytes.Equal(line[0], []byte("AGREE_UNIX_FD")):
 						conn.EnableUnixFDs()
+						conn.unixFD = true
 					case bytes.Equal(line[0], []byte("ERROR")):
 					default:
 						return errors.New("authentication protocol error")

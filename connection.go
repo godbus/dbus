@@ -35,6 +35,7 @@ type Connection struct {
 	eavesdropped    chan *Message
 	eavesdroppedLck sync.Mutex
 	busObj          *Object
+	unixFD          bool
 }
 
 // ConnectSessionBus connects to the session message bus and returns the
@@ -331,10 +332,11 @@ func (conn *Connection) serials() {
 
 // SupportsUnixFDs returns whether the underlying transport supports passing of
 // unix file descriptors. If this is false, method calls containing unix file
-// descriptors will return an error, emitted signals containing them will not be
-// sent and methods of exported objects that take them as a parameter will
-// behvae as if they weren't present.
-// TODO
+// descriptors will return an error and emitted signals containing them will
+// not be sent.
+func (conn *Connection) SupportsUnixFDs() bool {
+	return conn.unixFD
+}
 
 // Object returns the object identified by the given destination name and path.
 func (conn *Connection) Object(dest string, path ObjectPath) *Object {
