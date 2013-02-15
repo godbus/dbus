@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
-	"net"
 	"os"
 	"os/exec"
 	"reflect"
@@ -20,7 +19,7 @@ const defaultSystemBusAddress = "unix:path=/var/run/dbus/system_bus_socket"
 //
 // Multiple goroutines may invoke methods on a connection simultaneously.
 type Connection struct {
-	transport       net.Conn
+	transport
 	uuid            string
 	names           []string
 	namesLck        sync.RWMutex
@@ -73,27 +72,9 @@ func ConnectSystemBus() (*Connection, error) {
 func NewConnection(address string) (*Connection, error) {
 	var err error
 	conn := new(Connection)
-	if strings.HasPrefix(address, "unix") {
-		abstract := getKey(address, "abstract")
-		path := getKey(address, "path")
-		switch {
-		case abstract == "" && path == "":
-			return nil, errors.New("bad address: neither path nor abstract set")
-		case abstract != "" && path == "":
-			conn.transport, err = net.Dial("unix", "@"+abstract)
-			if err != nil {
-				return nil, err
-			}
-		case abstract == "" && path != "":
-			conn.transport, err = net.Dial("unix", path)
-			if err != nil {
-				return nil, err
-			}
-		case abstract != "" && path != "":
-			return nil, errors.New("bad address: both path and abstract set")
-		}
-	} else {
-		return nil, errors.New("bad address: invalid or unsupported transport")
+	conn.transport, err = getTransport(address)
+	if err != nil {
+		return nil, err
 	}
 	if err = conn.auth(); err != nil {
 		conn.transport.Close()
@@ -172,7 +153,7 @@ func (conn *Connection) hello() error {
 // transport and dispatching them appropiately.
 func (conn *Connection) inWorker() {
 	for {
-		msg, err := conn.readMessage()
+		msg, err := conn.ReadMessage()
 		if err == nil {
 			dest, _ := msg.Headers[FieldDestination].value.(string)
 			found := false
@@ -279,7 +260,7 @@ func (conn *Connection) Names() []string {
 // sent to conn.out.
 func (conn *Connection) outWorker() {
 	for msg := range conn.out {
-		err := msg.EncodeTo(conn.transport)
+		err := conn.SendMessage(msg)
 		conn.repliesLck.RLock()
 		if err != nil {
 			if conn.replies[msg.Serial] != nil {
@@ -291,41 +272,6 @@ func (conn *Connection) outWorker() {
 		}
 		conn.repliesLck.RUnlock()
 	}
-}
-
-// readMessage reads and decodes a single message from the transport.
-func (conn *Connection) readMessage() (*Message, error) {
-	// read the first 16 bytes, from which we can figure out the length of the
-	// rest of the message
-	var header [16]byte
-	if _, err := io.ReadFull(conn.transport, header[:]); err != nil {
-		return nil, err
-	}
-	var order binary.ByteOrder
-	switch header[0] {
-	case 'l':
-		order = binary.LittleEndian
-	case 'B':
-		order = binary.BigEndian
-	default:
-		return nil, InvalidMessageError("invalid byte order")
-	}
-	// header[4:8] -> length of message body, header[12:16] -> length of header
-	// fields (without alignment)
-	var blen, hlen uint32
-	binary.Read(bytes.NewBuffer(header[4:8]), order, &blen)
-	binary.Read(bytes.NewBuffer(header[12:16]), order, &hlen)
-	if hlen%8 != 0 {
-		hlen += 8 - (hlen % 8)
-	}
-	rest := make([]byte, int(blen+hlen))
-	if _, err := io.ReadFull(conn.transport, rest); err != nil {
-		return nil, err
-	}
-	all := make([]byte, 16+len(rest))
-	copy(all, header[:])
-	copy(all[16:], rest)
-	return DecodeMessage(bytes.NewBuffer(all))
 }
 
 // sendError creates an error message corresponding to the parameters and sends
@@ -382,6 +328,13 @@ func (conn *Connection) serials() {
 		}
 	}
 }
+
+// SupportsUnixFDs returns whether the underlying transport supports passing of
+// unix file descriptors. If this is false, method calls containing unix file
+// descriptors will return an error, emitted signals containing them will not be
+// sent and methods of exported objects that take them as a parameter will
+// behvae as if they weren't present.
+// TODO
 
 // Object returns the object identified by the given destination name and path.
 func (conn *Connection) Object(dest string, path ObjectPath) *Object {
@@ -459,14 +412,54 @@ type Signal struct {
 	Body   []interface{}
 }
 
-// getKey gets a key from a server address. Returns "" on error / not found...
-func getKey(s, key string) string {
-	i := strings.IndexRune(s, ':')
-	if i == -1 {
-		return ""
+// transport is a DBus transport.
+type transport interface {
+	// Read and Write raw data (for example, for the authentication protocol).
+	io.ReadWriteCloser
+
+	// Send the initial null byte used for the EXTERNAL mechanism.
+	SendNullByte() error
+
+	// Returns whether this transport supports passing Unix FDs.
+	SupportsUnixFDs() bool
+
+	// Signal the transport that Unix FD passing is enabled for this connection.
+	EnableUnixFDs()
+
+	// Read / send a message, handling things like Unix FDs.
+	ReadMessage() (*Message, error)
+	SendMessage(*Message) error
+}
+
+func getTransport(address string) (transport, error) {
+	var err error
+	var t transport
+
+	m := map[string]func(string) (transport, error){
+		"unix": newUnixTransport,
 	}
-	s = s[i+1:]
-	i = strings.Index(s, key)
+	addresses := strings.Split(address, ";")
+	for _, v := range addresses {
+		i := strings.IndexRune(v, ':')
+		if i == -1 {
+			err = errors.New("bad address: no transport")
+			continue
+		}
+		f := m[v[:i]]
+		if f == nil {
+			err = errors.New("bad address: invalid or unsupported transport")
+		}
+		t, err = f(v[i+1:])
+		if err == nil {
+			return t, nil
+		}
+	}
+	return nil, err
+}
+
+// getKey gets a key from a the list of keys. Returns "" on error / not found...
+func getKey(s, key string) string {
+	i := strings.Index(s, key)
 	if i == -1 {
 		return ""
 	}

@@ -7,21 +7,23 @@ import (
 )
 
 var (
-	byteType       = reflect.TypeOf(byte(0))
-	boolType       = reflect.TypeOf(false)
-	uint8Type      = reflect.TypeOf(uint8(0))
-	int16Type      = reflect.TypeOf(int16(0))
-	uint16Type     = reflect.TypeOf(uint16(0))
-	int32Type      = reflect.TypeOf(int32(0))
-	uint32Type     = reflect.TypeOf(uint32(0))
-	int64Type      = reflect.TypeOf(int64(0))
-	uint64Type     = reflect.TypeOf(uint64(0))
-	float64Type    = reflect.TypeOf(float64(0))
-	stringType     = reflect.TypeOf("")
-	signatureType  = reflect.TypeOf(Signature{""})
-	objectPathType = reflect.TypeOf(ObjectPath(""))
-	variantType    = reflect.TypeOf(Variant{Signature{""}, nil})
-	interfacesType = reflect.TypeOf([]interface{}{})
+	byteType        = reflect.TypeOf(byte(0))
+	boolType        = reflect.TypeOf(false)
+	uint8Type       = reflect.TypeOf(uint8(0))
+	int16Type       = reflect.TypeOf(int16(0))
+	uint16Type      = reflect.TypeOf(uint16(0))
+	int32Type       = reflect.TypeOf(int32(0))
+	uint32Type      = reflect.TypeOf(uint32(0))
+	int64Type       = reflect.TypeOf(int64(0))
+	uint64Type      = reflect.TypeOf(uint64(0))
+	float64Type     = reflect.TypeOf(float64(0))
+	stringType      = reflect.TypeOf("")
+	signatureType   = reflect.TypeOf(Signature{""})
+	objectPathType  = reflect.TypeOf(ObjectPath(""))
+	variantType     = reflect.TypeOf(Variant{Signature{""}, nil})
+	interfacesType  = reflect.TypeOf([]interface{}{})
+	unixFDType      = reflect.TypeOf(UnixFD(0))
+	unixFDIndexType = reflect.TypeOf(UnixFDIndex(0))
 )
 
 type invalidTypeError struct {
@@ -46,6 +48,7 @@ var sigToType = map[byte]reflect.Type{
 	'g': signatureType,
 	'o': objectPathType,
 	'v': variantType,
+	'h': unixFDIndexType,
 }
 
 // Signature represents a correct type signature as specified
@@ -84,8 +87,14 @@ func getSignature(t reflect.Type) string {
 	case reflect.Uint16:
 		return "q"
 	case reflect.Int32:
+		if t == unixFDType {
+			return "h"
+		}
 		return "i"
 	case reflect.Uint32:
+		if t == unixFDIndexType {
+			return "h"
+		}
 		return "u"
 	case reflect.Int64:
 		return "x"
@@ -230,6 +239,13 @@ func (o ObjectPath) IsValid() bool {
 	return true
 }
 
+// A UnixFD is a Unix file descriptor sent over the wire. See the package-level
+// documentation for more information about Unix file descriptor passsing.
+type UnixFD int32
+
+// A UnixFDIndex is the representation of a Unix file descriptor in a message.
+type UnixFDIndex uint32
+
 // Variant represents a DBus variant type.
 type Variant struct {
 	sig   Signature
@@ -300,7 +316,7 @@ func validSingle(s string, depth int) (err error, rem string) {
 		return SignatureError{Sig: s, Reason: "container nesting too deep"}, ""
 	}
 	switch s[0] {
-	case 'y', 'b', 'n', 'q', 'i', 'u', 'x', 't', 'd', 's', 'g', 'o', 'v':
+	case 'y', 'b', 'n', 'q', 'i', 'u', 'x', 't', 'd', 's', 'g', 'o', 'v', 'h':
 		return nil, s[1:]
 	case 'a':
 		if len(s) > 1 && s[1] == '{' {
