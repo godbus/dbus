@@ -3,10 +3,8 @@
 package prop
 
 import (
-	"encoding/xml"
 	"github.com/guelfey/go.dbus"
 	"github.com/guelfey/go.dbus/introspect"
-	"strings"
 	"sync"
 )
 
@@ -39,15 +37,51 @@ var ErrReadOnly = &dbus.Error{"org.freedesktop.DBus.Properties.Error.ReadOnly", 
 var ErrInvalidType = &dbus.Error{"org.freedesktop.DBus.Properties.Error.InvalidType", nil}
 
 // The introspection data for the org.freedesktop.DBus.Properties interface.
-// Generated from IntrospectDataString in init().
-var IntrospectData introspect.Interface
+var IntrospectData = introspect.Interface{
+	Name: "org.freedesktop.DBus.Properties",
+	Methods: []introspect.Method{
+		{
+			Name: "Get",
+			Args: []introspect.Arg{
+				{"interface", "in", "s"},
+				{"property", "in", "s"},
+				{"value", "out", "v"},
+			},
+		},
+		{
+			Name: "GetAll",
+			Args: []introspect.Arg{
+				{"interface", "in", "s"},
+				{"props", "out", "a{sv}"},
+			},
+		},
+		{
+			Name: "Set",
+			Args: []introspect.Arg{
+				{"interface", "in", "s"},
+				{"property", "in", "s"},
+				{"value", "in", "v"},
+			},
+		},
+	},
+	Signals: []introspect.Signal{
+		{
+			Name: "PropertiesChanged",
+			Args: []introspect.Arg{
+				{"interface", "out", "s"},
+				{"changed_properties", "out", "a{sv}"},
+				{"invalidates_properties", "out", "as"},
+			},
+		},
+	},
+}
 
 // The introspection data for the org.freedesktop.DBus.Properties interface, as
 // a string.
 const IntrospectDataString = `
 	<interface name="org.freedesktop.DBus.Introspectable">
 		<method name="Get">
-			<arg name="out" direction="in" type="s"/>
+			<arg name="interface" direction="in" type="s"/>
 			<arg name="property" direction="in" type="s"/>
 			<arg name="value" direction="out" type="v"/>
 		</method>
@@ -67,14 +101,6 @@ const IntrospectDataString = `
 		</signal>
 	</interface>
 `
-
-func init() {
-	dec := xml.NewDecoder(strings.NewReader(IntrospectDataString))
-	err := dec.Decode(&IntrospectData)
-	if err != nil {
-		panic(err)
-	}
-}
 
 // Prop represents a single property. It is used for creating a Properties
 // value.

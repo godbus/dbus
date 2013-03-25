@@ -43,13 +43,13 @@ func newUnixTransport(keys string) (transport, error) {
 	case abstract == "" && path == "":
 		return nil, errors.New("bad address: neither path nor abstract set")
 	case abstract != "" && path == "":
-		t.UnixConn, err = net.DialUnix("unix", nil, &net.UnixAddr{"@" + abstract, "unix"})
+		t.UnixConn, err = net.DialUnix("unix", nil, &net.UnixAddr{Name: "@" + abstract, Net: "unix"})
 		if err != nil {
 			return nil, err
 		}
 		return t, nil
 	case abstract == "" && path != "":
-		t.UnixConn, err = net.DialUnix("unix", nil, &net.UnixAddr{path, "unix"})
+		t.UnixConn, err = net.DialUnix("unix", nil, &net.UnixAddr{Name: path, Net: "unix"})
 		if err != nil {
 			return nil, err
 		}
@@ -186,8 +186,7 @@ func (t *unixTransport) SendMessage(msg *Message) error {
 }
 
 func (t *unixTransport) SendNullByte() error {
-	ucred := &syscall.Ucred{int32(os.Getpid()), uint32(os.Getuid()),
-		uint32(os.Getgid())}
+	ucred := &syscall.Ucred{Pid: int32(os.Getpid()), Uid: uint32(os.Getuid()), Gid: uint32(os.Getgid())}
 	b := syscall.UnixCredentials(ucred)
 	_, oobn, err := t.UnixConn.WriteMsgUnix([]byte{0}, b, nil)
 	if err != nil {

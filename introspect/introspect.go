@@ -8,10 +8,10 @@ import "encoding/xml"
 var IntrospectData = Interface{
 	Name: "org.freedesktop.DBus.Introspectable",
 	Methods: []Method{
-		Method{
+		{
 			Name: "Introspect",
 			Args: []Arg{
-				Arg{"out", "s", "out"},
+				{"out", "s", "out"},
 			},
 		},
 	},

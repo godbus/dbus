@@ -71,10 +71,10 @@ var fieldTypes = map[HeaderField]reflect.Type{
 // requiredFields lists the header fields that are required by the different
 // message types.
 var requiredFields = map[Type][]HeaderField{
-	TypeMethodCall:  []HeaderField{FieldPath, FieldMember},
-	TypeMethodReply: []HeaderField{FieldReplySerial},
-	TypeError:       []HeaderField{FieldErrorName, FieldReplySerial},
-	TypeSignal:      []HeaderField{FieldPath, FieldInterface, FieldMember},
+	TypeMethodCall:  {FieldPath, FieldMember},
+	TypeMethodReply: {FieldReplySerial},
+	TypeError:       {FieldErrorName, FieldReplySerial},
+	TypeSignal:      {FieldPath, FieldInterface, FieldMember},
 }
 
 // Message represents a single DBus message.
