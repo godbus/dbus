@@ -53,7 +53,7 @@ func (o *Object) Call(method string, flags Flags, args ...interface{}) Cookie {
 	msg := new(Message)
 	msg.Order = binary.LittleEndian
 	msg.Type = TypeMethodCall
-	msg.Serial = <-o.conn.serial
+	msg.serial = <-o.conn.serial
 	msg.Flags = flags & (FlagNoAutoStart | FlagNoReplyExpected)
 	msg.Headers = make(map[HeaderField]Variant)
 	msg.Headers[FieldPath] = MakeVariant(o.path)
@@ -69,7 +69,7 @@ func (o *Object) Call(method string, flags Flags, args ...interface{}) Cookie {
 	if msg.Flags&FlagNoReplyExpected == 0 {
 		o.conn.repliesLck.Lock()
 		c := make(chan *Reply, 1)
-		o.conn.replies[msg.Serial] = c
+		o.conn.replies[msg.serial] = c
 		o.conn.repliesLck.Unlock()
 		o.conn.out <- msg
 		return Cookie(c)

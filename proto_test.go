@@ -168,7 +168,7 @@ var someMessage = &Message{
 	Order:  binary.LittleEndian,
 	Type:   TypeMethodCall,
 	Flags:  0,
-	Serial: 42,
+	serial: 42,
 	Headers: map[HeaderField]Variant{
 		FieldPath:        MakeVariant(ObjectPath("/foo/bar")),
 		FieldInterface:   MakeVariant("foo.bar"),

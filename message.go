@@ -84,9 +84,10 @@ type Message struct {
 
 	Type
 	Flags
-	Serial  uint32
 	Headers map[HeaderField]Variant
 	Body    []interface{}
+
+	serial uint32
 }
 
 type header struct {
@@ -123,7 +124,7 @@ func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 
 	msg = new(Message)
 	msg.Order = order
-	err = dec.DecodeMulti(&msg.Type, &msg.Flags, &proto, &length, &msg.Serial)
+	err = dec.DecodeMulti(&msg.Type, &msg.Flags, &proto, &length, &msg.serial)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +199,7 @@ func (msg *Message) EncodeTo(out io.Writer) error {
 	vs[2] = msg.Flags
 	vs[3] = protoVersion
 	vs[4] = uint32(len(body.Bytes()))
-	vs[5] = msg.Serial
+	vs[5] = msg.serial
 	headers := make([]header, 0)
 	for k, v := range msg.Headers {
 		headers = append(headers, header{k, v})
@@ -278,7 +279,7 @@ func (msg *Message) String() string {
 	} else {
 		s += " to <null>"
 	}
-	s += " serial " + strconv.FormatUint(uint64(msg.Serial), 10)
+	s += " serial " + strconv.FormatUint(uint64(msg.serial), 10)
 	if v, ok := msg.Headers[FieldUnixFDs]; ok {
 		s += " unixfds " + strconv.FormatUint(uint64(v.value.(uint32)), 10)
 	}

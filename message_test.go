@@ -11,7 +11,7 @@ func TestMessage(t *testing.T) {
 	message := new(Message)
 	message.Order = binary.LittleEndian
 	message.Type = TypeMethodCall
-	message.Serial = 32
+	message.serial = 32
 	message.Headers = map[HeaderField]Variant{
 		FieldPath:   MakeVariant(ObjectPath("/org/foo/bar")),
 		FieldMember: MakeVariant("baz"),

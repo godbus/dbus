@@ -26,7 +26,7 @@ func (conn *Connection) handleCall(msg *Message) {
 	path := msg.Headers[FieldPath].value.(ObjectPath)
 	ifacename := msg.Headers[FieldInterface].value.(string)
 	sender := msg.Headers[FieldSender].value.(string)
-	serial := msg.Serial
+	serial := msg.serial
 	if len(name) == 0 || unicode.IsLower([]rune(name)[0]) {
 		conn.sendError(errmsgUnknownMethod, sender, serial)
 	}
@@ -89,10 +89,10 @@ func (conn *Connection) handleCall(msg *Message) {
 		reply := new(Message)
 		reply.Order = binary.LittleEndian
 		reply.Type = TypeMethodReply
-		reply.Serial = <-conn.serial
+		reply.serial = <-conn.serial
 		reply.Headers = make(map[HeaderField]Variant)
 		reply.Headers[FieldDestination] = msg.Headers[FieldSender]
-		reply.Headers[FieldReplySerial] = MakeVariant(msg.Serial)
+		reply.Headers[FieldReplySerial] = MakeVariant(msg.serial)
 		reply.Body = make([]interface{}, len(ret)-1)
 		for i := 0; i < len(ret)-1; i++ {
 			reply.Body[i] = ret[i].Interface()
@@ -120,7 +120,7 @@ func (conn *Connection) Emit(path ObjectPath, name string, values ...interface{}
 	msg := new(Message)
 	msg.Order = binary.LittleEndian
 	msg.Type = TypeSignal
-	msg.Serial = <-conn.serial
+	msg.serial = <-conn.serial
 	msg.Headers = make(map[HeaderField]Variant)
 	msg.Headers[FieldInterface] = MakeVariant(iface)
 	msg.Headers[FieldMember] = MakeVariant(member)

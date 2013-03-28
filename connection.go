@@ -267,12 +267,12 @@ func (conn *Connection) outWorker() {
 		err := conn.SendMessage(msg)
 		conn.repliesLck.RLock()
 		if err != nil {
-			if conn.replies[msg.Serial] != nil {
-				conn.replies[msg.Serial] <- &Reply{nil, err}
+			if conn.replies[msg.serial] != nil {
+				conn.replies[msg.serial] <- &Reply{nil, err}
 			}
-			conn.serialUsed <- msg.Serial
+			conn.serialUsed <- msg.serial
 		} else if msg.Type != TypeMethodCall {
-			conn.serialUsed <- msg.Serial
+			conn.serialUsed <- msg.serial
 		}
 		conn.repliesLck.RUnlock()
 	}
@@ -282,19 +282,17 @@ func (conn *Connection) outWorker() {
 // this; use the higher-level equivalents (Call, Emit and Export) instead.
 // The returned cookie is nil if msg isn't a message call or if NoReplyExpected
 // is set.
-//
-// The serial member is set to a unique serial before sending.
 func (conn *Connection) Send(msg *Message) Cookie {
 	if err := msg.IsValid(); err != nil {
 		c := make(chan *Reply, 1)
 		c <- &Reply{nil, err}
 		return Cookie(c)
 	}
-	msg.Serial = <-conn.serial
+	msg.serial = <-conn.serial
 	if msg.Type == TypeMethodCall && msg.Flags&FlagNoReplyExpected == 0 {
 		conn.repliesLck.Lock()
 		c := make(chan *Reply, 1)
-		conn.replies[msg.Serial] = c
+		conn.replies[msg.serial] = c
 		conn.repliesLck.Unlock()
 		conn.out <- msg
 		return Cookie(c)
@@ -309,7 +307,7 @@ func (conn *Connection) sendError(e Error, dest string, serial uint32) {
 	msg := new(Message)
 	msg.Order = binary.LittleEndian
 	msg.Type = TypeError
-	msg.Serial = <-conn.serial
+	msg.serial = <-conn.serial
 	msg.Headers = make(map[HeaderField]Variant)
 	msg.Headers[FieldDestination] = MakeVariant(dest)
 	msg.Headers[FieldErrorName] = MakeVariant(e.Name)
@@ -327,7 +325,7 @@ func (conn *Connection) sendReply(dest string, serial uint32, values ...interfac
 	msg := new(Message)
 	msg.Order = binary.LittleEndian
 	msg.Type = TypeMethodReply
-	msg.Serial = <-conn.serial
+	msg.serial = <-conn.serial
 	msg.Headers = make(map[HeaderField]Variant)
 	msg.Headers[FieldDestination] = MakeVariant(dest)
 	msg.Headers[FieldReplySerial] = MakeVariant(serial)
