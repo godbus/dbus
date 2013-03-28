@@ -105,11 +105,15 @@ func (conn *Connection) handleCall(msg *Message) {
 }
 
 // Emit emits the given signal on the message bus. The name parameter must be
-// formatted as "interface.member", e.g., "org.freedesktop.DBus.NameLost".
+// formatted as "interface.member", e.g., "org.freedesktop.DBus.NameLost". It
+// panics if the path or the method name are invalid.
 func (conn *Connection) Emit(path ObjectPath, name string, values ...interface{}) {
+	if !path.IsValid() {
+		panic("(*dbus.Connection).Emit: invalid path name")
+	}
 	i := strings.LastIndex(name, ".")
 	if i == -1 {
-		panic("invalid name parameter")
+		panic("(*dbus.Connection).Emit: invalid signal name")
 	}
 	iface := name[:i]
 	member := name[i+1:]

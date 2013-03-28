@@ -20,30 +20,8 @@ are automatically resolved. It shouldn't be necessary to use UnixFDIndex.
 Decoder and Encoder provide direct access to the DBus wire format. You usually
 don't need to use them. While you may use them directly on the socket
 as they accept the standard io interfaces, it is not advised to do so as this
-would generate many small reads / writes that could limit performance.
-
-Rules for encoding are as follows:
-
-1. Any primitive Go type that has a direct equivalent in the wire format
-is directly converted. This includes all fixed size integers
-except for int8, as well as float64, bool and string.
-
-2. Slices and maps are converted to arrays and dicts, respectively.
-
-3. Most structs are converted to the expected DBus struct (all exported members
-are marshalled as a DBus struct). The exceptions are the structs defined in this
-package that have a custom wire format. These are ObjectPath, Signature and
-Variant. Also, fields whose tag contains dbus:"-" will be skipped.
-
-4. UnixFDIndex's are treated like uint32, except that their signature is 'h'.
-
-5. Trying to encode any other type (including int and uint) will result in a
-panic. This applies to all functions that call (*Encoder).Encode somewhere.
-
-The rules for decoding are mostly just the reverse of the encoding rules,
-except for the handling of variants. If a struct is wrapped in a variant,
-its decoded value will be a slice of interfaces which contain the struct
-fields in the correct order.
+would generate many small reads / writes that could limit performance. See their
+respective documentation for the conversion rules.
 
 Because encoding and decoding of messages need special handling, they are also
 implemented here.

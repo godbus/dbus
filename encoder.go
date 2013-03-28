@@ -8,7 +8,37 @@ import (
 	"unicode"
 )
 
-// An Encoder encodes values to the DBus wire format.
+// An Encoder encodes values to the D-Bus wire format.
+//
+// The following types are directly encoded as their respective D-Bus
+// equivalents:
+//     Go type      D-Bus type
+//     byte         BYTE
+//     bool         BOOLEAN
+//     int16        INT16
+//     uint16       UINT16
+//     int32        INT32
+//     uint32       UINT32
+//     int64        INT64
+//     uint64       UINT64
+//     float64      DOUBLE
+//     string       STRING
+//     ObjectPath   OBJECT_PATH
+//     Signature    SIGNATURE
+//     Variant      VARIANT
+//     UnixFDIndex  UNIX_FD
+//
+// Slices encode as ARRAYs of their element type.
+//
+// Maps encode as DICTs, provided that their key type is a basic type.
+//
+// Structs other than Variant encode as a STRUCT. Fields whose tag
+// contains `dbus:"-"` will be skipped.
+//
+// Pointers encode as the value they're pointed to.
+//
+// Trying to encode any other type (including int and uint) or a slice, map or
+// struct containing an unsupported type will result in a panic.
 type Encoder struct {
 	out   io.Writer
 	order binary.ByteOrder

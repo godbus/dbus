@@ -7,8 +7,7 @@ import (
 	"io"
 )
 
-// AuthStatus represents the Status returned by an authentication mechanism
-// as suggested by the DBus spec.
+// AuthStatus represents the Status of an authentication mechanism.
 type AuthStatus byte
 
 const (
@@ -42,11 +41,11 @@ var AuthMechanisms = map[string]AuthMechanism{
 // AuthMechanism defines the behaviour of an authentication mechanism.
 type AuthMechanism interface {
 	// Return the argument to the first AUTH command and the next status.
-	FirstData() ([]byte, AuthStatus)
+	FirstData() (resp []byte, status AuthStatus)
 
 	// Process the given DATA command, and return the argument to the DATA
 	// command and the next status. If len(resp) == 0, no DATA command is sent.
-	HandleData([]byte) ([]byte, AuthStatus)
+	HandleData(data []byte) (resp []byte, status AuthStatus)
 }
 
 // auth does the whole authentication stuff.

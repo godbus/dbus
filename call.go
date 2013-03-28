@@ -46,7 +46,7 @@ type Object struct {
 func (o *Object) Call(method string, flags Flags, args ...interface{}) Cookie {
 	i := strings.LastIndex(method, ".")
 	if i == -1 {
-		panic("invalid method parameter")
+		panic("(*dbus.Object).Call: invalid method name")
 	}
 	iface := method[:i]
 	method = method[i+1:]

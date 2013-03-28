@@ -2,13 +2,17 @@ package dbus
 
 import (
 	"encoding/binary"
-	"errors"
 	"io"
 	"reflect"
 	"unicode"
 )
 
 // A Decoder reads values that are encoded in the DBus wire format.
+//
+// For decoding, the inverse of the encoding that an Encoder applies are used,
+// with the exception of variants. If a VARIANT contains a STRUCT, its decoded
+// value will be of type []interface{} and contain the struct fileds in the
+// correct order.
 type Decoder struct {
 	in    io.Reader
 	order binary.ByteOrder
@@ -45,7 +49,7 @@ func (dec *Decoder) binread(v interface{}) {
 
 // Decode decodes a single value from the decoder and stores it
 // in v. If v isn't a pointer, Decode panics. For the details of decoding,
-// see the package-level documentation.
+// see the documentation of Decoder.
 //
 // The input is expected to be aligned as required by the DBus spec.
 func (dec *Decoder) Decode(v interface{}) (err error) {
@@ -99,7 +103,7 @@ func (dec *Decoder) decode(v reflect.Value, depth int) {
 		case i == 1:
 			v.SetBool(true)
 		default:
-			panic(errors.New("invalid value for boolean"))
+			panic(FormatError("invalid value for boolean"))
 		}
 	case reflect.Int16:
 		var i int16

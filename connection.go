@@ -38,8 +38,7 @@ type Connection struct {
 	unixFD          bool
 }
 
-// ConnectSessionBus connects to the session message bus and returns the
-// connection or any error that occured.
+// ConnectSessionBus connects to the session message bus.
 func ConnectSessionBus() (*Connection, error) {
 	address := os.Getenv("DBUS_SESSION_BUS_ADDRESS")
 	if address != "" && address != "autolaunch:" {
@@ -58,8 +57,7 @@ func ConnectSessionBus() (*Connection, error) {
 	return NewConnection(string(b[i+1 : j]))
 }
 
-// ConnectSystemBus connects to the system message bus and returns the
-// connection or any error that occured.
+// ConnectSystemBus connects to the system message bus.
 func ConnectSystemBus() (*Connection, error) {
 	address := os.Getenv("DBUS_SYSTEM_BUS_ADDRESS")
 	if address != "" {
@@ -97,14 +95,13 @@ func NewConnection(address string) (*Connection, error) {
 	return conn, nil
 }
 
-// BusObject returns the message bus object (i.e.
-// conn.Object("org.freedesktop.DBus", "/org/freedesktop/DBus")).
+// BusObject returns the message bus object.
 func (conn *Connection) BusObject() *Object {
 	return conn.busObj
 }
 
-// Close closes the underlying transport of the connection and stops all
-// related goroutines.
+// Close closes the connection. Any blocked operations will return with errors
+// and the channels passed to Eavesdrop and Signal are closed.
 func (conn *Connection) Close() error {
 	close(conn.out)
 	conn.signalsLck.Lock()
@@ -127,9 +124,6 @@ func (conn *Connection) Close() error {
 // discarded.
 //
 // The channel can be reset by passing nil.
-//
-// If the connection is closed by the server or a call to Close, the channel is
-// also closed.
 func (conn *Connection) Eavesdrop(c chan *Message) {
 	conn.eavesdroppedLck.Lock()
 	conn.eavesdropped = c
@@ -257,6 +251,15 @@ func (conn *Connection) Names() []string {
 	return s
 }
 
+// Object returns the object identified by the given destination name and path.
+// It panics if path is not a valid object path.
+func (conn *Connection) Object(dest string, path ObjectPath) *Object {
+	if !path.IsValid() {
+		panic("(*dbus.Connection).Object: invalid path name")
+	}
+	return &Object{conn, dest, path}
+}
+
 // outWorker runs in an own goroutine, encoding and sending messages that are
 // sent to conn.out.
 func (conn *Connection) outWorker() {
@@ -273,6 +276,31 @@ func (conn *Connection) outWorker() {
 		}
 		conn.repliesLck.RUnlock()
 	}
+}
+
+// Send the given message to the message bus. You usually don't need to use
+// this; use the higher-level equivalents (Call, Emit and Export) instead.
+// The returned cookie is nil if msg isn't a message call or if NoReplyExpected
+// is set.
+//
+// The serial member is set to a unique serial before sending.
+func (conn *Connection) Send(msg *Message) Cookie {
+	if err := msg.IsValid(); err != nil {
+		c := make(chan *Reply, 1)
+		c <- &Reply{nil, err}
+		return Cookie(c)
+	}
+	msg.Serial = <-conn.serial
+	if msg.Type == TypeMethodCall && msg.Flags&FlagNoReplyExpected == 0 {
+		conn.repliesLck.Lock()
+		c := make(chan *Reply, 1)
+		conn.replies[msg.Serial] = c
+		conn.repliesLck.Unlock()
+		conn.out <- msg
+		return Cookie(c)
+	}
+	conn.out <- msg
+	return nil
 }
 
 // sendError creates an error message corresponding to the parameters and sends
@@ -330,47 +358,6 @@ func (conn *Connection) serials() {
 	}
 }
 
-// SupportsUnixFDs returns whether the underlying transport supports passing of
-// unix file descriptors. If this is false, method calls containing unix file
-// descriptors will return an error and emitted signals containing them will
-// not be sent.
-func (conn *Connection) SupportsUnixFDs() bool {
-	return conn.unixFD
-}
-
-// Object returns the object identified by the given destination name and path.
-func (conn *Connection) Object(dest string, path ObjectPath) *Object {
-	if !path.IsValid() {
-		panic("invalid DBus path")
-	}
-	return &Object{conn, dest, path}
-}
-
-// Send the given message to the message bus. You usually don't need to use
-// this; use the higher-level equivalents (Call, Emit and Export) instead.
-// The returned cookie is nil if msg isn't a message call or if NoReplyExpected
-// is set.
-//
-// The serial member is set to a unique serial before sending.
-func (conn *Connection) Send(msg *Message) Cookie {
-	if err := msg.IsValid(); err != nil {
-		c := make(chan *Reply, 1)
-		c <- &Reply{nil, err}
-		return Cookie(c)
-	}
-	msg.Serial = <-conn.serial
-	if msg.Type == TypeMethodCall && msg.Flags&FlagNoReplyExpected == 0 {
-		conn.repliesLck.Lock()
-		c := make(chan *Reply, 1)
-		conn.replies[msg.Serial] = c
-		conn.repliesLck.Unlock()
-		conn.out <- msg
-		return Cookie(c)
-	}
-	conn.out <- msg
-	return nil
-}
-
 // Signal sets the channel to which all received signal messages are forwarded.
 // The caller has to make sure that c is sufficiently buffered; if a message
 // arrives when a write to c is not possible, it is discarded.
@@ -380,13 +367,18 @@ func (conn *Connection) Send(msg *Message) Cookie {
 // This channel is "overwritten" by Eavesdrop; i.e., if there currently is a
 // channel for eavesdropped messages, this channel receives all signals, and the
 // channel passed to Signal will not receive any signals.
-//
-// If the connection is closed by the server or a call to Close, the channel is
-// also closed.
 func (conn *Connection) Signal(c chan Signal) {
 	conn.signalsLck.Lock()
 	conn.signals = c
 	conn.signalsLck.Unlock()
+}
+
+// SupportsUnixFDs returns whether the underlying transport supports passing of
+// unix file descriptors. If this is false, method calls containing unix file
+// descriptors will return an error and emitted signals containing them will
+// not be sent.
+func (conn *Connection) SupportsUnixFDs() bool {
+	return conn.unixFD
 }
 
 // Error represents a DBus message of type Error.
@@ -459,6 +451,18 @@ func getTransport(address string) (transport, error) {
 	return nil, err
 }
 
+// dereferenceAll returns a slice that, assuming that vs is a slice of pointers
+// of arbitrary types, containes the values that are obtained from dereferencing
+// all elements in vs.
+func dereferenceAll(vs []interface{}) []interface{} {
+	for i := range vs {
+		v := reflect.ValueOf(vs[i])
+		v = v.Elem()
+		vs[i] = v.Interface()
+	}
+	return vs
+}
+
 // getKey gets a key from a the list of keys. Returns "" on error / not found...
 func getKey(s, key string) string {
 	i := strings.Index(s, key)
@@ -473,16 +477,4 @@ func getKey(s, key string) string {
 		j = len(s)
 	}
 	return s[i+len(key)+1 : j]
-}
-
-// dereferenceAll returns a slice that, assuming that vs is a slice of pointers
-// of arbitrary types, containes the values that are obtained from dereferencing
-// all elements in vs.
-func dereferenceAll(vs []interface{}) []interface{} {
-	for i := range vs {
-		v := reflect.ValueOf(vs[i])
-		v = v.Elem()
-		vs[i] = v.Interface()
-	}
-	return vs
 }

@@ -218,21 +218,21 @@ func (msg *Message) EncodeTo(out io.Writer) error {
 	return nil
 }
 
-// IsValid checks whether message is a valid message and returns an
+// IsValid checks whether msg is a valid message and returns an
 // InvalidMessageError if it is not.
-func (message *Message) IsValid() error {
-	switch message.Order {
+func (msg *Message) IsValid() error {
+	switch msg.Order {
 	case binary.LittleEndian, binary.BigEndian:
 	default:
 		return InvalidMessageError("invalid byte order")
 	}
-	if message.Flags & ^(FlagNoAutoStart|FlagNoReplyExpected) != 0 {
+	if msg.Flags & ^(FlagNoAutoStart|FlagNoReplyExpected) != 0 {
 		return InvalidMessageError("invalid flags")
 	}
-	if message.Type == 0 || message.Type >= typeMax {
+	if msg.Type == 0 || msg.Type >= typeMax {
 		return InvalidMessageError("invalid message type")
 	}
-	for k, v := range message.Headers {
+	for k, v := range msg.Headers {
 		if k == 0 || k >= fieldMax {
 			return InvalidMessageError("invalid header")
 		}
@@ -240,18 +240,18 @@ func (message *Message) IsValid() error {
 			return InvalidMessageError("invalid type of header field")
 		}
 	}
-	for _, v := range requiredFields[message.Type] {
-		if _, ok := message.Headers[v]; !ok {
+	for _, v := range requiredFields[msg.Type] {
+		if _, ok := msg.Headers[v]; !ok {
 			return InvalidMessageError("missing required header")
 		}
 	}
-	if path, ok := message.Headers[FieldPath]; ok {
+	if path, ok := msg.Headers[FieldPath]; ok {
 		if !path.value.(ObjectPath).IsValid() {
 			return InvalidMessageError("invalid path")
 		}
 	}
-	if len(message.Body) != 0 {
-		if _, ok := message.Headers[FieldSignature]; !ok {
+	if len(msg.Body) != 0 {
+		if _, ok := msg.Headers[FieldSignature]; !ok {
 			return InvalidMessageError("missing signature")
 		}
 	}
