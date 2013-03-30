@@ -229,9 +229,7 @@ func (o ObjectPath) IsValid() bool {
 			return false
 		}
 		for _, c := range v {
-			if !((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') ||
-				(c >= 'a' && c <= 'z') || c == '_') {
-
+			if !isMemberChar(c) {
 				return false
 			}
 		}
@@ -302,6 +300,56 @@ func isKeyType(t reflect.Type) bool {
 		return true
 	}
 	return false
+}
+
+// isValidInterface returns whether s is a valid name for an interface.
+func isValidInterface(s string) bool {
+	if len(s) == 0 || len(s) > 255 || s[0] == '.' {
+		return false
+	}
+	elem := strings.Split(s, ".")
+	if len(elem) < 2 {
+		return false
+	}
+	for _, v := range elem {
+		if len(v) == 0 {
+			return false
+		}
+		if v[0] >= '0' && v[0] <= '9' {
+			return false
+		}
+		for _, c := range v {
+			if !isMemberChar(c) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// isValidMember returns whether s is a valid name for a member.
+func isValidMember(s string) bool {
+	if len(s) == 0 || len(s) > 255 {
+		return false
+	}
+	i := strings.Index(s, ".")
+	if i != -1 {
+		return false
+	}
+	if s[0] >= '0' && s[0] <= '9' {
+		return false
+	}
+	for _, c := range s {
+		if !isMemberChar(c) {
+			return false
+		}
+	}
+	return true
+}
+
+func isMemberChar(c rune) bool {
+	return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') ||
+		(c >= 'a' && c <= 'z') || c == '_'
 }
 
 // Try to read a single type from this string. If it was successfull, err is nil

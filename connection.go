@@ -252,11 +252,7 @@ func (conn *Connection) Names() []string {
 }
 
 // Object returns the object identified by the given destination name and path.
-// It panics if path is not a valid object path.
 func (conn *Connection) Object(dest string, path ObjectPath) *Object {
-	if !path.IsValid() {
-		panic("(*dbus.Connection).Object: invalid path name")
-	}
 	return &Object{conn, dest, path}
 }
 

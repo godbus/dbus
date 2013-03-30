@@ -248,7 +248,22 @@ func (msg *Message) IsValid() error {
 	}
 	if path, ok := msg.Headers[FieldPath]; ok {
 		if !path.value.(ObjectPath).IsValid() {
-			return InvalidMessageError("invalid path")
+			return InvalidMessageError("invalid path name")
+		}
+	}
+	if iface, ok := msg.Headers[FieldInterface]; ok {
+		if !isValidInterface(iface.value.(string)) {
+			return InvalidMessageError("invalid interface name")
+		}
+	}
+	if member, ok := msg.Headers[FieldMember]; ok {
+		if !isValidMember(member.value.(string)) {
+			return InvalidMessageError("invalid member name")
+		}
+	}
+	if errname, ok := msg.Headers[FieldErrorName]; ok {
+		if !isValidInterface(errname.value.(string)) {
+			return InvalidMessageError("invalid error name")
 		}
 	}
 	if len(msg.Body) != 0 {

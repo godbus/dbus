@@ -45,9 +45,6 @@ type Object struct {
 // FlagNoReplyExpected, in which case a nil channel is returned.
 func (o *Object) Call(method string, flags Flags, args ...interface{}) Cookie {
 	i := strings.LastIndex(method, ".")
-	if i == -1 {
-		panic("(*dbus.Object).Call: invalid method name")
-	}
 	iface := method[:i]
 	method = method[i+1:]
 	msg := new(Message)
