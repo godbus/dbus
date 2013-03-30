@@ -126,7 +126,7 @@ type Prop struct {
 type Properties struct {
 	m    map[string]map[string]Prop
 	mut  sync.RWMutex
-	conn *dbus.Connection
+	conn *dbus.Conn
 	path dbus.ObjectPath
 }
 
@@ -134,7 +134,7 @@ type Properties struct {
 // The key for the first-level map of props is the name of the interface; the
 // second-level key is the name of the property. The returned structure will be
 // exported as org.freedesktop.DBus.Properties on path.
-func New(conn *dbus.Connection, path dbus.ObjectPath, props map[string]map[string]Prop) *Properties {
+func New(conn *dbus.Conn, path dbus.ObjectPath, props map[string]map[string]Prop) *Properties {
 	p := &Properties{m: props, conn: conn, path: path}
 	conn.Export(p, path, "org.freedesktop.DBus.Properties")
 	return p

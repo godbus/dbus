@@ -14,11 +14,11 @@ import (
 
 const defaultSystemBusAddress = "unix:path=/var/run/dbus/system_bus_socket"
 
-// Connection represents a connection to a message bus (usually, the system or
+// Conn represents a connection to a message bus (usually, the system or
 // session bus).
 //
 // Multiple goroutines may invoke methods on a connection simultaneously.
-type Connection struct {
+type Conn struct {
 	transport
 	uuid            string
 	names           []string
@@ -39,10 +39,10 @@ type Connection struct {
 }
 
 // ConnectSessionBus connects to the session message bus.
-func ConnectSessionBus() (*Connection, error) {
+func ConnectSessionBus() (*Conn, error) {
 	address := os.Getenv("DBUS_SESSION_BUS_ADDRESS")
 	if address != "" && address != "autolaunch:" {
-		return NewConnection(address)
+		return Dial(address)
 	}
 	cmd := exec.Command("dbus-launch")
 	b, err := cmd.CombinedOutput()
@@ -54,23 +54,22 @@ func ConnectSessionBus() (*Connection, error) {
 	if i == -1 || j == -1 {
 		return nil, errors.New("couldn't determine address of the session bus")
 	}
-	return NewConnection(string(b[i+1 : j]))
+	return Dial(string(b[i+1 : j]))
 }
 
 // ConnectSystemBus connects to the system message bus.
-func ConnectSystemBus() (*Connection, error) {
+func ConnectSystemBus() (*Conn, error) {
 	address := os.Getenv("DBUS_SYSTEM_BUS_ADDRESS")
 	if address != "" {
-		return NewConnection(address)
+		return Dial(address)
 	}
-	return NewConnection(defaultSystemBusAddress)
+	return Dial(defaultSystemBusAddress)
 }
 
-// NewConnection establishes a new connection to the message bus specified by
-// address.
-func NewConnection(address string) (*Connection, error) {
+// Dial establishes a new connection to the message bus specified by address.
+func Dial(address string) (*Conn, error) {
 	var err error
-	conn := new(Connection)
+	conn := new(Conn)
 	conn.transport, err = getTransport(address)
 	if err != nil {
 		return nil, err
@@ -96,13 +95,13 @@ func NewConnection(address string) (*Connection, error) {
 }
 
 // BusObject returns the message bus object.
-func (conn *Connection) BusObject() *Object {
+func (conn *Conn) BusObject() *Object {
 	return conn.busObj
 }
 
 // Close closes the connection. Any blocked operations will return with errors
 // and the channels passed to Eavesdrop and Signal are closed.
-func (conn *Connection) Close() error {
+func (conn *Conn) Close() error {
 	close(conn.out)
 	conn.signalsLck.Lock()
 	if conn.signals != nil {
@@ -124,14 +123,14 @@ func (conn *Connection) Close() error {
 // discarded.
 //
 // The channel can be reset by passing nil.
-func (conn *Connection) Eavesdrop(c chan *Message) {
+func (conn *Conn) Eavesdrop(c chan *Message) {
 	conn.eavesdroppedLck.Lock()
 	conn.eavesdropped = c
 	conn.eavesdroppedLck.Unlock()
 }
 
 // hello sends the initial org.freedesktop.DBus.Hello call.
-func (conn *Connection) hello() error {
+func (conn *Conn) hello() error {
 	var s string
 	err := conn.busObj.Call("org.freedesktop.DBus.Hello", 0).Store(&s)
 	if err != nil {
@@ -146,7 +145,7 @@ func (conn *Connection) hello() error {
 
 // inWorker runs in an own goroutine, reading incoming messages from the
 // transport and dispatching them appropiately.
-func (conn *Connection) inWorker() {
+func (conn *Conn) inWorker() {
 	for {
 		msg, err := conn.ReadMessage()
 		if err == nil {
@@ -242,7 +241,7 @@ func (conn *Connection) inWorker() {
 // Names returns the list of all names that are currently owned by this
 // connection. The slice is always at least one element long, the first element
 // being the unique name of the connection.
-func (conn *Connection) Names() []string {
+func (conn *Conn) Names() []string {
 	conn.namesLck.RLock()
 	// copy the slice so it can't be modified
 	s := make([]string, len(conn.names))
@@ -252,13 +251,13 @@ func (conn *Connection) Names() []string {
 }
 
 // Object returns the object identified by the given destination name and path.
-func (conn *Connection) Object(dest string, path ObjectPath) *Object {
+func (conn *Conn) Object(dest string, path ObjectPath) *Object {
 	return &Object{conn, dest, path}
 }
 
 // outWorker runs in an own goroutine, encoding and sending messages that are
 // sent to conn.out.
-func (conn *Connection) outWorker() {
+func (conn *Conn) outWorker() {
 	for msg := range conn.out {
 		err := conn.SendMessage(msg)
 		conn.repliesLck.RLock()
@@ -278,7 +277,7 @@ func (conn *Connection) outWorker() {
 // this; use the higher-level equivalents (Call, Emit and Export) instead.
 // The returned cookie is nil if msg isn't a message call or if NoReplyExpected
 // is set.
-func (conn *Connection) Send(msg *Message) Cookie {
+func (conn *Conn) Send(msg *Message) Cookie {
 	if err := msg.IsValid(); err != nil {
 		c := make(chan *Reply, 1)
 		c <- &Reply{nil, err}
@@ -299,7 +298,7 @@ func (conn *Connection) Send(msg *Message) Cookie {
 
 // sendError creates an error message corresponding to the parameters and sends
 // it to conn.out.
-func (conn *Connection) sendError(e Error, dest string, serial uint32) {
+func (conn *Conn) sendError(e Error, dest string, serial uint32) {
 	msg := new(Message)
 	msg.Order = binary.LittleEndian
 	msg.Type = TypeError
@@ -317,7 +316,7 @@ func (conn *Connection) sendError(e Error, dest string, serial uint32) {
 
 // sendReply creates a method reply message corresponding to the parameters and
 // sends it to conn.out.
-func (conn *Connection) sendReply(dest string, serial uint32, values ...interface{}) {
+func (conn *Conn) sendReply(dest string, serial uint32, values ...interface{}) {
 	msg := new(Message)
 	msg.Order = binary.LittleEndian
 	msg.Type = TypeMethodReply
@@ -334,7 +333,7 @@ func (conn *Connection) sendReply(dest string, serial uint32, values ...interfac
 
 // serials runs in an own goroutine, constantly sending serials on conn.serial
 // and reading serials that are ready for "recycling" from conn.serialUsed.
-func (conn *Connection) serials() {
+func (conn *Conn) serials() {
 	s := uint32(1)
 	used := make(map[uint32]bool)
 	used[0] = true // ensure that 0 is never used
@@ -361,7 +360,7 @@ func (conn *Connection) serials() {
 // This channel is "overwritten" by Eavesdrop; i.e., if there currently is a
 // channel for eavesdropped messages, this channel receives all signals, and the
 // channel passed to Signal will not receive any signals.
-func (conn *Connection) Signal(c chan Signal) {
+func (conn *Conn) Signal(c chan Signal) {
 	conn.signalsLck.Lock()
 	conn.signals = c
 	conn.signalsLck.Unlock()
@@ -371,7 +370,7 @@ func (conn *Connection) Signal(c chan Signal) {
 // unix file descriptors. If this is false, method calls containing unix file
 // descriptors will return an error and emitted signals containing them will
 // not be sent.
-func (conn *Connection) SupportsUnixFDs() bool {
+func (conn *Conn) SupportsUnixFDs() bool {
 	return conn.unixFD
 }
 

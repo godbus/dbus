@@ -49,7 +49,7 @@ type AuthMechanism interface {
 }
 
 // auth does the whole authentication stuff.
-func (conn *Connection) auth() error {
+func (conn *Conn) auth() error {
 	in := bufio.NewReader(conn.transport)
 	_, err := conn.transport.Write([]byte{0})
 	if err != nil {
@@ -119,7 +119,7 @@ func (conn *Connection) auth() error {
 // initial authState and in for reading input. It returns (nil, true) on
 // success, (nil, false) on a REJECTED and (someErr, false) if some other
 // error occured.
-func (conn *Connection) tryAuth(m AuthMechanism, state authState, in *bufio.Reader) (error, bool) {
+func (conn *Conn) tryAuth(m AuthMechanism, state authState, in *bufio.Reader) (error, bool) {
 	for {
 		s, err := authReadLine(in)
 		if err != nil {

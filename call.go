@@ -34,7 +34,7 @@ func (c Cookie) Store(retvalues ...interface{}) error {
 
 // Object represents a remote object on which methods can be invoked.
 type Object struct {
-	conn *Connection
+	conn *Conn
 	dest string
 	path ObjectPath
 }

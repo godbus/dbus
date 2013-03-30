@@ -20,7 +20,7 @@ var (
 
 // handleCall handles the given method call (i.e. looks if it's one of the
 // pre-implemented ones and searches for a corresponding handler if not).
-func (conn *Connection) handleCall(msg *Message) {
+func (conn *Conn) handleCall(msg *Message) {
 	vs := msg.Body
 	name := msg.Headers[FieldMember].value.(string)
 	path := msg.Headers[FieldPath].value.(ObjectPath)
@@ -106,7 +106,7 @@ func (conn *Connection) handleCall(msg *Message) {
 
 // Emit emits the given signal on the message bus. The name parameter must be
 // formatted as "interface.member", e.g., "org.freedesktop.DBus.NameLost".
-func (conn *Connection) Emit(path ObjectPath, name string, values ...interface{}) {
+func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) {
 	i := strings.LastIndex(name, ".")
 	iface := name[:i]
 	member := name[i+1:]
@@ -141,9 +141,9 @@ func (conn *Connection) Emit(path ObjectPath, name string, values ...interface{}
 // time.
 //
 // Export panics if path is not a valid object path.
-func (conn *Connection) Export(v interface{}, path ObjectPath, iface string) {
+func (conn *Conn) Export(v interface{}, path ObjectPath, iface string) {
 	if !path.IsValid() {
-		panic("(*dbus.Connection).Export: invalid path name")
+		panic("(*dbus.Conn).Export: invalid path name")
 	}
 	conn.handlersLck.Lock()
 	if _, ok := conn.handlers[path]; !ok {
@@ -155,7 +155,7 @@ func (conn *Connection) Export(v interface{}, path ObjectPath, iface string) {
 
 // ReleaseName calls org.freedesktop.DBus.ReleaseName. You should use only this
 // method to release a name (see below).
-func (conn *Connection) ReleaseName(name string) (ReleaseNameReply, error) {
+func (conn *Conn) ReleaseName(name string) (ReleaseNameReply, error) {
 	var r uint32
 	err := conn.busObj.Call("org.freedesktop.DBus.ReleaseName", 0, name).Store(&r)
 	if err != nil {
@@ -177,7 +177,7 @@ func (conn *Connection) ReleaseName(name string) (ReleaseNameReply, error) {
 // RequestName calls org.freedesktop.DBus.RequestName. You should use only this
 // method to request a name because package dbus needs to keep track of all
 // names that the connection has.
-func (conn *Connection) RequestName(name string, flags RequestNameFlags) (RequestNameReply, error) {
+func (conn *Conn) RequestName(name string, flags RequestNameFlags) (RequestNameReply, error) {
 	var r uint32
 	err := conn.busObj.Call("org.freedesktop.DBus.RequestName", 0, name, flags).Store(&r)
 	if err != nil {
