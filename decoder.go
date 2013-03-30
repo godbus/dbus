@@ -11,7 +11,7 @@ import (
 //
 // For decoding, the inverse of the encoding that an Encoder applies are used,
 // with the exception of variants. If a VARIANT contains a STRUCT, its decoded
-// value will be of type []interface{} and contain the struct fileds in the
+// value will be of type []interface{} and contain the struct fields in the
 // correct order.
 type Decoder struct {
 	in    io.Reader
