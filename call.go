@@ -7,26 +7,33 @@ import (
 	"strings"
 )
 
-// Cookie represents a pending message reply. To get the reply, simply receive
-// from the channel.
-type Cookie <-chan *Reply
+// Call represents a pending or completed method call. lIf Erris non-nil, it is
+// either an error from the underlying transport or an error message from the peer.
+type Call struct {
+	Destination string
+	Path        ObjectPath
+	Method      string        // Formatted as "interface.method".
+	Args        []interface{} // Original arguments of the call.
+	Body        []interface{} // Holds the response once the call is done.
+	Err         error         // After completion, the error status.
+	Done        chan *Call    // Strobes when the call is complete.
+}
 
-// Store waits for the reply of c and stores the values into the provided pointers.
+// Store stores the body of the reply into the provided pointers.
 // It panics if one of retvalues is not a pointer to a DBus-representable value
 // and returns an error if the signatures of the body and retvalues don't match,
 // or if the reply that was returned contained an error.
-func (c Cookie) Store(retvalues ...interface{}) error {
-	reply := <-c
-	if reply.Err != nil {
-		return reply.Err
+func (c *Call) Store(retvalues ...interface{}) error {
+	if c.Err != nil {
+		return c.Err
 	}
 
 	esig := GetSignature(retvalues...)
-	rsig := GetSignature(reply.Body...)
+	rsig := GetSignature(c.Body...)
 	if esig != rsig {
 		return errors.New("mismatched signature")
 	}
-	for i, v := range reply.Body {
+	for i, v := range c.Body {
 		reflect.ValueOf(retvalues[i]).Elem().Set(reflect.ValueOf(v))
 	}
 	return nil
@@ -39,11 +46,20 @@ type Object struct {
 	path ObjectPath
 }
 
-// Call calls a method with the given arguments. The method parameter must be
-// formatted as "interface.method" (e.g., "org.freedesktop.DBus.Hello"). The
-// returned cookie can be used to get the reply later, unless the flags include
-// FlagNoReplyExpected, in which case a nil channel is returned.
-func (o *Object) Call(method string, flags Flags, args ...interface{}) Cookie {
+// Call calls a method with (*Object).Go and waits for its reply.
+func (o *Object) Call(method string, flags Flags, args ...interface{}) *Call {
+	return <-o.Go(method, flags, make(chan *Call, 1), args...).Done
+}
+
+// Go calls a method with the given arguments asynchronously. The method
+// parameter must be formatted as "interface.method" (e.g.,
+// "org.freedesktop.DBus.Hello"). It returns a Call structure representing this
+// method call. The passed channel will return the same value once the call is
+// done. If ch is nil, a new channel will be allocated. Otherwise, ch has to be
+// buffered or Call will panic.
+//
+// If the flags include FlagNoReplyExpected, nil is returned and ch is ignored.
+func (o *Object) Go(method string, flags Flags, ch chan *Call, args ...interface{}) *Call {
 	i := strings.LastIndex(method, ".")
 	iface := method[:i]
 	method = method[i+1:]
@@ -64,12 +80,23 @@ func (o *Object) Call(method string, flags Flags, args ...interface{}) Cookie {
 		msg.Headers[FieldSignature] = MakeVariant(GetSignature(args...))
 	}
 	if msg.Flags&FlagNoReplyExpected == 0 {
-		o.conn.repliesLck.Lock()
-		c := make(chan *Reply, 1)
-		o.conn.replies[msg.serial] = c
-		o.conn.repliesLck.Unlock()
+		if ch == nil {
+			ch = make(chan *Call, 10)
+		} else if cap(ch) == 0 {
+			panic("(*dbus.Object).Call: unbuffered channel")
+		}
+		call := &Call{
+			Destination: o.dest,
+			Path:        o.path,
+			Method:      method,
+			Args:        args,
+			Done:        ch,
+		}
+		o.conn.callsLck.Lock()
+		o.conn.calls[msg.serial] = call
+		o.conn.callsLck.Unlock()
 		o.conn.out <- msg
-		return Cookie(c)
+		return call
 	}
 	o.conn.out <- msg
 	return nil
@@ -83,11 +110,4 @@ func (o *Object) Destination() string {
 // Path returns the path that calls on o are sent to.
 func (o *Object) Path() ObjectPath {
 	return o.path
-}
-
-// Reply represents a reply to a method call. If Error is non-nil, it is either
-// an error from the underlying transport or an error message from the peer.
-type Reply struct {
-	Body []interface{}
-	Err  error
 }

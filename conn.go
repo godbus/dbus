@@ -30,8 +30,8 @@ type Conn struct {
 	namesLck        sync.RWMutex
 	serial          chan uint32
 	serialUsed      chan uint32
-	replies         map[uint32]chan *Reply
-	repliesLck      sync.RWMutex
+	calls           map[uint32]*Call
+	callsLck        sync.RWMutex
 	handlers        map[ObjectPath]map[string]interface{}
 	handlersLck     sync.RWMutex
 	out             chan *Message
@@ -101,7 +101,7 @@ func Dial(address string) (*Conn, error) {
 		conn.transport.Close()
 		return nil, err
 	}
-	conn.replies = make(map[uint32]chan *Reply)
+	conn.calls = make(map[uint32]*Call)
 	conn.out = make(chan *Message, 10)
 	conn.handlers = make(map[ObjectPath]map[string]interface{})
 	conn.serial = make(chan uint32)
@@ -197,23 +197,20 @@ func (conn *Conn) inWorker() {
 			conn.eavesdroppedLck.Unlock()
 			switch msg.Type {
 			case TypeMethodReply, TypeError:
-				var reply *Reply
 				serial := msg.Headers[FieldReplySerial].value.(uint32)
-				if reply == nil {
+				conn.callsLck.Lock()
+				if c, ok := conn.calls[serial]; ok {
 					if msg.Type == TypeError {
 						name, _ := msg.Headers[FieldErrorName].value.(string)
-						reply = &Reply{nil, Error{name, msg.Body}}
+						c.Err = Error{name, msg.Body}
 					} else {
-						reply = &Reply{msg.Body, nil}
+						c.Body = msg.Body
 					}
-				}
-				conn.repliesLck.Lock()
-				if c, ok := conn.replies[serial]; ok {
-					c <- reply
+					c.Done <- c
 					conn.serialUsed <- serial
-					delete(conn.replies, serial)
+					delete(conn.calls, serial)
 				}
-				conn.repliesLck.Unlock()
+				conn.callsLck.Unlock()
 			case TypeSignal:
 				var signal Signal
 				iface := msg.Headers[FieldInterface].value.(string)
@@ -250,11 +247,12 @@ func (conn *Conn) inWorker() {
 			// anything but to shut down all stuff and returns errors to all
 			// pending replies.
 			conn.Close()
-			conn.repliesLck.RLock()
-			for _, v := range conn.replies {
-				v <- &Reply{nil, err}
+			conn.callsLck.RLock()
+			for _, v := range conn.calls {
+				v.Err = err
+				v.Done <- v
 			}
-			conn.repliesLck.RUnlock()
+			conn.callsLck.RUnlock()
 			return
 		}
 		// invalid messages are ignored
@@ -283,37 +281,45 @@ func (conn *Conn) Object(dest string, path ObjectPath) *Object {
 func (conn *Conn) outWorker() {
 	for msg := range conn.out {
 		err := conn.SendMessage(msg)
-		conn.repliesLck.RLock()
+		conn.callsLck.RLock()
 		if err != nil {
-			if conn.replies[msg.serial] != nil {
-				conn.replies[msg.serial] <- &Reply{nil, err}
+			if c := conn.calls[msg.serial]; c != nil {
+				c.Err = err
+				c.Done <- c
 			}
 			conn.serialUsed <- msg.serial
 		} else if msg.Type != TypeMethodCall {
 			conn.serialUsed <- msg.serial
 		}
-		conn.repliesLck.RUnlock()
+		conn.callsLck.RUnlock()
 	}
 }
 
 // Send the given message to the message bus. You usually don't need to use
 // this; use the higher-level equivalents (Call, Emit and Export) instead.
-// The returned cookie is nil if msg isn't a message call or if NoReplyExpected
+// The returned call is nil if msg isn't a message call or if NoReplyExpected
 // is set.
-func (conn *Conn) Send(msg *Message) Cookie {
-	if err := msg.IsValid(); err != nil {
-		c := make(chan *Reply, 1)
-		c <- &Reply{nil, err}
-		return Cookie(c)
-	}
+func (conn *Conn) Send(msg *Message, ch chan *Call) *Call {
 	msg.serial = <-conn.serial
 	if msg.Type == TypeMethodCall && msg.Flags&FlagNoReplyExpected == 0 {
-		conn.repliesLck.Lock()
-		c := make(chan *Reply, 1)
-		conn.replies[msg.serial] = c
-		conn.repliesLck.Unlock()
+		if ch == nil {
+			ch = make(chan *Call, 5)
+		} else if cap(ch) == 0 {
+			panic("(*dbus.Conn).Send: unbuffered channel")
+		}
+		call := new(Call)
+		call.Destination, _ = msg.Headers[FieldDestination].value.(string)
+		call.Path, _ = msg.Headers[FieldPath].value.(ObjectPath)
+		iface, _ := msg.Headers[FieldInterface].value.(string)
+		member, _ := msg.Headers[FieldMember].value.(string)
+		call.Method = iface + "." + member
+		call.Args = msg.Body
+		call.Done = ch
+		conn.callsLck.Lock()
+		conn.calls[msg.serial] = call
+		conn.callsLck.Unlock()
 		conn.out <- msg
-		return Cookie(c)
+		return call
 	}
 	conn.out <- msg
 	return nil

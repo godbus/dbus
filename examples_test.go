@@ -11,26 +11,6 @@ func ExampleConnection_Emit() {
 	conn.Emit("/foo/bar", "foo.bar.Baz", uint32(0xDAEDBEEF))
 }
 
-func ExampleCookie() {
-	conn, err := SessionBus()
-	if err != nil {
-		panic(err)
-	}
-
-	c := conn.BusObject().Call("org.freedesktop.DBus.ListActivatableNames", 0)
-	select {
-	case reply := <-c:
-		if reply.Err != nil {
-			panic(err)
-		}
-		list := reply.Body[0].([]string)
-		for _, v := range list {
-			fmt.Println(v)
-		}
-		// put some other cases here
-	}
-}
-
 func ExampleObject_Call() {
 	var list []string
 
@@ -45,5 +25,26 @@ func ExampleObject_Call() {
 	}
 	for _, v := range list {
 		fmt.Println(v)
+	}
+}
+
+func ExampleObject_Go() {
+	conn, err := SessionBus()
+	if err != nil {
+		panic(err)
+	}
+
+	ch := make(chan *Call, 10)
+	conn.BusObject().Go("org.freedesktop.DBus.ListActivatableNames", 0, ch)
+	select {
+	case call := <-ch:
+		if call.Err != nil {
+			panic(err)
+		}
+		list := call.Body[0].([]string)
+		for _, v := range list {
+			fmt.Println(v)
+		}
+		// put some other cases here
 	}
 }

@@ -14,10 +14,10 @@ func main() {
 	}
 
 	for _, v := range []string{"method_call", "method_return", "error", "signal"} {
-		reply := <-conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0,
+		call := conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0,
 			"eavesdrop='true',type='"+v+"'")
-		if reply.Err != nil {
-			fmt.Fprintln(os.Stderr, "Failed to add match:", reply.Err)
+		if call.Err != nil {
+			fmt.Fprintln(os.Stderr, "Failed to add match:", call.Err)
 			os.Exit(1)
 		}
 	}
