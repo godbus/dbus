@@ -3,7 +3,7 @@ package dbus
 import "fmt"
 
 func ExampleConnection_Emit() {
-	conn, err := ConnectSessionBus()
+	conn, err := SessionBus()
 	if err != nil {
 		panic(err)
 	}
@@ -12,7 +12,7 @@ func ExampleConnection_Emit() {
 }
 
 func ExampleCookie() {
-	conn, err := ConnectSessionBus()
+	conn, err := SessionBus()
 	if err != nil {
 		panic(err)
 	}
@@ -34,7 +34,7 @@ func ExampleCookie() {
 func ExampleObject_Call() {
 	var list []string
 
-	conn, err := ConnectSessionBus()
+	conn, err := SessionBus()
 	if err != nil {
 		panic(err)
 	}

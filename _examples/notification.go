@@ -3,7 +3,7 @@ package main
 import "github.com/guelfey/go.dbus"
 
 func main() {
-	conn, err := dbus.ConnectSessionBus()
+	conn, err := dbus.SessionBus()
 	if err != nil {
 		panic(err)
 	}

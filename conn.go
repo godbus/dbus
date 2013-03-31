@@ -14,6 +14,11 @@ import (
 
 const defaultSystemBusAddress = "unix:path=/var/run/dbus/system_bus_socket"
 
+var (
+	systemBus  *Conn
+	sessionBus *Conn
+)
+
 // Conn represents a connection to a message bus (usually, the system or
 // session bus).
 //
@@ -38,8 +43,17 @@ type Conn struct {
 	unixFD          bool
 }
 
-// ConnectSessionBus connects to the session message bus.
-func ConnectSessionBus() (*Conn, error) {
+// SessionBus returns the connection to the session bus, connecting to it if not
+// already done.
+func SessionBus() (conn *Conn, err error) {
+	if sessionBus != nil {
+		return sessionBus, nil
+	}
+	defer func() {
+		if conn != nil {
+			sessionBus = conn
+		}
+	}()
 	address := os.Getenv("DBUS_SESSION_BUS_ADDRESS")
 	if address != "" && address != "autolaunch:" {
 		return Dial(address)
@@ -57,8 +71,17 @@ func ConnectSessionBus() (*Conn, error) {
 	return Dial(string(b[i+1 : j]))
 }
 
-// ConnectSystemBus connects to the system message bus.
-func ConnectSystemBus() (*Conn, error) {
+// SystemBus returns the connection to the sytem bus, connecting to it if not
+// already done.
+func SystemBus() (conn *Conn, err error) {
+	if systemBus != nil {
+		return systemBus, nil
+	}
+	defer func() {
+		if conn != nil {
+			systemBus = conn
+		}
+	}()
 	address := os.Getenv("DBUS_SYSTEM_BUS_ADDRESS")
 	if address != "" {
 		return Dial(address)
