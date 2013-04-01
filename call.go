@@ -52,17 +52,21 @@ func (o *Object) Call(method string, flags Flags, args ...interface{}) *Call {
 	return <-o.Go(method, flags, make(chan *Call, 1), args...).Done
 }
 
-// Go calls a method with the given arguments asynchronously. The method
-// parameter must be formatted as "interface.method" (e.g.,
-// "org.freedesktop.DBus.Hello"). It returns a Call structure representing this
-// method call. The passed channel will return the same value once the call is
-// done. If ch is nil, a new channel will be allocated. Otherwise, ch has to be
-// buffered or Call will panic.
+// Go calls a method with the given arguments asynchronously. It returns a
+// Call structure representing this method call. The passed channel will
+// return the same value once the call is done. If ch is nil, a new channel
+// will be allocated. Otherwise, ch has to be buffered or Call will panic.
 //
 // If the flags include FlagNoReplyExpected, nil is returned and ch is ignored.
+//
+// If the method parameter contains a dot ('.'), the part before the last dot
+// specifies the interface on which the method is called.
 func (o *Object) Go(method string, flags Flags, ch chan *Call, args ...interface{}) *Call {
+	iface := ""
 	i := strings.LastIndex(method, ".")
-	iface := method[:i]
+	if i != -1 {
+		iface = method[:i]
+	}
 	method = method[i+1:]
 	msg := new(Message)
 	msg.Order = binary.LittleEndian
