@@ -32,7 +32,7 @@ const (
 
 // AuthMechanisms lists all authentication mechanisms that are tried. To
 // implement your own mechanism, just add it to this map before connecting. The
-// key should be the name that is used for the AUTH command.
+// key must be the name that is used for the AUTH command.
 var AuthMechanisms = map[string]AuthMechanism{
 	"DBUS_COOKIE_SHA1": AuthCookieSha1{},
 	"EXTERNAL":         AuthExternal{},

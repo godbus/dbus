@@ -207,7 +207,7 @@ func (err SignatureError) Error() string {
 // An ObjectPath is an object path as defined by the DBus spec.
 type ObjectPath string
 
-// IsValid returns whether the path is valid.
+// IsValid returns whether the object path is valid.
 func (o ObjectPath) IsValid() bool {
 	s := string(o)
 	if len(s) == 0 {
@@ -244,13 +244,14 @@ type UnixFD int32
 // A UnixFDIndex is the representation of a Unix file descriptor in a message.
 type UnixFDIndex uint32
 
-// Variant represents a DBus variant type.
+// Variant represents the DBus variant type.
 type Variant struct {
 	sig   Signature
 	value interface{}
 }
 
-// MakeVariant converts the given value to a Variant.
+// MakeVariant converts the given value to a Variant. It panics if v cannot be
+// represented as a DBus type.
 func MakeVariant(v interface{}) Variant {
 	return Variant{GetSignature(v), v}
 }

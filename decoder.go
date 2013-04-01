@@ -260,8 +260,7 @@ func (dec *Decoder) decode(v reflect.Value, depth int) {
 	}
 }
 
-// A FormatError represents an error in the wire format (e.g. an invalid value
-// for a boolean).
+// A FormatError is an error in the wire format.
 type FormatError string
 
 func (e FormatError) Error() string {

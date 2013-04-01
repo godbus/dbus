@@ -117,7 +117,8 @@ func Dial(address string) (*Conn, error) {
 	return conn, nil
 }
 
-// BusObject returns the message bus object.
+// BusObject returns the object owned by the bus daemon which handles
+// administrative requests.
 func (conn *Conn) BusObject() *Object {
 	return conn.busObj
 }

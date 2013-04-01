@@ -125,20 +125,17 @@ func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) {
 	conn.out <- msg
 }
 
-// Export the given value as an object on the message bus.
+// Export registers the given value to be exported as an object on the
+// message bus.
 //
 // If a method call on the given path and interface is received, an exported
-// method with the same name is called if the parameters match and the last
-// return value is of type *ErrorMessage. If this value is not nil, it is
-// sent back to the caller as an error. Otherwise, a method reply is sent
-// with the other parameters as its body.
+// method with the same name is called with v as the receiver if the
+// parameters match and the last return value is of type *ErrorMessage.
+// If this *ErrorMessage is not nil, it is sent back to the caller as an error.
+// Otherwise, a method reply is sent with the other return values as its body.
 //
 // Every method call is executed in a new goroutine, so the method may be called
 // in multiple goroutines at once.
-//
-// Multiple DBus interfaces can be implemented on one object by calling Export
-// multiple times and converting the value to different (Go) interfaces each
-// time.
 //
 // Export panics if path is not a valid object path.
 func (conn *Conn) Export(v interface{}, path ObjectPath, iface string) {
@@ -200,7 +197,7 @@ const (
 	ReleaseNameReplyNotOwner
 )
 
-// RequestNameFlags represents the possible flags for the RequestName call.
+// RequestNameFlags represents the possible flags for a RequestName call.
 type RequestNameFlags uint32
 
 const (

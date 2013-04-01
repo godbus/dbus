@@ -7,22 +7,23 @@ import (
 	"strings"
 )
 
-// Call represents a pending or completed method call. lIf Erris non-nil, it is
-// either an error from the underlying transport or an error message from the peer.
+// Call represents a pending or completed method call. If Err is non-nil, it is
+// either an error from the underlying transport or an error message from the
+// peer (with Error as its type).
 type Call struct {
 	Destination string
 	Path        ObjectPath
-	Method      string        // Formatted as "interface.method".
-	Args        []interface{} // Original arguments of the call.
+	Method      string
+	Args        []interface{}
+	Done        chan *Call    // Strobes when the call is complete.
 	Body        []interface{} // Holds the response once the call is done.
 	Err         error         // After completion, the error status.
-	Done        chan *Call    // Strobes when the call is complete.
 }
 
 // Store stores the body of the reply into the provided pointers.
 // It panics if one of retvalues is not a pointer to a DBus-representable value
 // and returns an error if the signatures of the body and retvalues don't match,
-// or if the reply that was returned contained an error.
+// or if the error status is not nil.
 func (c *Call) Store(retvalues ...interface{}) error {
 	if c.Err != nil {
 		return c.Err
@@ -83,7 +84,7 @@ func (o *Object) Go(method string, flags Flags, ch chan *Call, args ...interface
 		if ch == nil {
 			ch = make(chan *Call, 10)
 		} else if cap(ch) == 0 {
-			panic("(*dbus.Object).Call: unbuffered channel")
+			panic("(*dbus.Object).Go: unbuffered channel")
 		}
 		call := &Call{
 			Destination: o.dest,

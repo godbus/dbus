@@ -7,8 +7,8 @@ or system bus). Then, call methods by getting an Object and then calling Go or
 Call on it. Signals can be received by passing a channel to (*Connection).Signal
 and can be emitted via (*Connection).Emit.
 
-Handling method calls is even easier; using (*Connection).Export, you can
-arrange DBus message calls to be directly translated to method calls on a Go
+Handling method calls by peers is even easier; using (*Connection).Export, you
+can arrange DBus methods calls to be directly translated to method calls on a Go
 value.
 
 Unix FD passing deserves special mention. To use it, you should first check that

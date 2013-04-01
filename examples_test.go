@@ -2,7 +2,7 @@ package dbus
 
 import "fmt"
 
-func ExampleConnection_Emit() {
+func ExampleConn_Emit() {
 	conn, err := SessionBus()
 	if err != nil {
 		panic(err)
