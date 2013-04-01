@@ -43,24 +43,24 @@ var IntrospectData = introspect.Interface{
 		{
 			Name: "Get",
 			Args: []introspect.Arg{
-				{"interface", "in", "s"},
-				{"property", "in", "s"},
-				{"value", "out", "v"},
+				{"interface", "s", "in"},
+				{"property", "s", "in"},
+				{"value", "v", "out"},
 			},
 		},
 		{
 			Name: "GetAll",
 			Args: []introspect.Arg{
-				{"interface", "in", "s"},
-				{"props", "out", "a{sv}"},
+				{"interface", "s", "in"},
+				{"props", "a{sv}", "out"},
 			},
 		},
 		{
 			Name: "Set",
 			Args: []introspect.Arg{
-				{"interface", "in", "s"},
-				{"property", "in", "s"},
-				{"value", "in", "v"},
+				{"interface", "s", "in"},
+				{"property", "s", "in"},
+				{"value", "v", "in"},
 			},
 		},
 	},
@@ -68,9 +68,9 @@ var IntrospectData = introspect.Interface{
 		{
 			Name: "PropertiesChanged",
 			Args: []introspect.Arg{
-				{"interface", "out", "s"},
-				{"changed_properties", "out", "a{sv}"},
-				{"invalidates_properties", "out", "as"},
+				{"interface", "s", "out"},
+				{"changed_properties", "a{sv}", "out"},
+				{"invalidates_properties", "as", "out"},
 			},
 		},
 	},

@@ -42,12 +42,12 @@ func main() {
 		Name: "/com/github/guelfey/Demo",
 		Interfaces: []introspect.Interface{
 			introspect.IntrospectData,
-			introspect.Interface{
+			prop.IntrospectData,
+			{
 				Name:       "com.github.guelfey.Demo",
 				Methods:    introspect.Methods(f),
 				Properties: props.Introspection("com.github.guelfey.Demo"),
 			},
-			prop.IntrospectData,
 		},
 	}
 	conn.Export(introspect.NewIntrospectable(n), "/com/github/guelfey/Demo",
