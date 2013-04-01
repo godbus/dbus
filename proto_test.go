@@ -8,45 +8,37 @@ import (
 	"testing"
 )
 
-var tests = []struct {
+var protoTests = []struct {
 	vs         []interface{}
 	marshalled []byte
-	signature  Signature
 }{
 	{
 		[]interface{}{int32(0)},
 		[]byte{0, 0, 0, 0},
-		Signature{"i"},
 	},
 	{
 		[]interface{}{int16(32)},
 		[]byte{0, 32},
-		Signature{"n"},
 	},
 	{
 		[]interface{}{"foo"},
 		[]byte{0, 0, 0, 3, 'f', 'o', 'o', 0},
-		Signature{"s"},
 	},
 	{
 		[]interface{}{Signature{"ai"}},
 		[]byte{2, 'a', 'i', 0},
-		Signature{"g"},
 	},
 	{
 		[]interface{}{[]int16{42, 256}},
 		[]byte{0, 0, 0, 4, 0, 42, 1, 0},
-		Signature{"an"},
 	},
 	{
 		[]interface{}{int16(42), int32(42)},
 		[]byte{0, 42, 0, 0, 0, 0, 0, 42},
-		Signature{"ni"},
 	},
 	{
 		[]interface{}{MakeVariant("foo")},
 		[]byte{1, 's', 0, 0, 0, 0, 0, 3, 'f', 'o', 'o', 0},
-		Signature{"v"},
 	},
 	{
 		[]interface{}{struct {
@@ -54,24 +46,18 @@ var tests = []struct {
 			B int16
 		}{10752, 256}},
 		[]byte{0, 0, 42, 0, 1, 0},
-		Signature{"(in)"},
 	},
 }
 
 func TestProto(t *testing.T) {
-	for i, v := range tests {
+	for i, v := range protoTests {
 		buf := new(bytes.Buffer)
 		enc := NewEncoder(buf, binary.BigEndian)
 		enc.EncodeMulti(v.vs...)
 		marshalled := buf.Bytes()
-		signature := GetSignature(v.vs...)
 		if bytes.Compare(marshalled, v.marshalled) != 0 {
 			t.Errorf("test %d (marshal): got '%v', but expected '%v'\n", i+1, marshalled,
 				v.marshalled)
-		}
-		if signature != v.signature {
-			t.Errorf("test %d (signature): got '%s', but expected '%s'\n", i+1,
-				signature, v.signature)
 		}
 		unmarshalled := reflect.MakeSlice(reflect.TypeOf(v.vs),
 			0, 0)
@@ -85,6 +71,7 @@ func TestProto(t *testing.T) {
 		err := ret[0].Interface()
 		if err != nil {
 			t.Errorf("test %d: %s\n", i+1, err)
+			continue
 		}
 		for j := range v.vs {
 			if !reflect.DeepEqual(unmarshalled.Index(j).Elem().Elem().Interface(), v.vs[j]) {
