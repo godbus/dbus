@@ -422,10 +422,8 @@ func value(s string) (t reflect.Type) {
 		if s[1] == '{' {
 			i := strings.LastIndex(s, "}")
 			t = reflect.MapOf(sigToType[s[2]], value(s[3:i]))
-		} else if s[1] == '(' {
-			t = interfacesType
 		} else {
-			t = reflect.SliceOf(sigToType[s[1]])
+			t = reflect.SliceOf(value(s[1:]))
 		}
 	case '(':
 		t = interfacesType
