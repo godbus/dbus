@@ -132,7 +132,7 @@ func TestProtoVariantStruct(t *testing.T) {
 	}
 }
 
-func TestStructTag(t *testing.T) {
+func TestProtoStructTag(t *testing.T) {
 	type Bar struct {
 		A int32
 		B chan interface{} `dbus:"-"`
@@ -151,31 +151,52 @@ func TestStructTag(t *testing.T) {
 	}
 }
 
-var someMessage = &Message{
+// ordinary org.freedesktop.DBus.Hello call
+var smallMessage = &Message{
 	Order:  binary.LittleEndian,
 	Type:   TypeMethodCall,
-	Flags:  0,
-	serial: 42,
+	serial: 1,
 	Headers: map[HeaderField]Variant{
-		FieldPath:        MakeVariant(ObjectPath("/foo/bar")),
-		FieldInterface:   MakeVariant("foo.bar"),
-		FieldMember:      MakeVariant("Baz"),
-		FieldDestination: MakeVariant("foo.bar"),
-		FieldSignature:   MakeVariant(Signature{"ai(uu)"}),
-	},
-	Body: []interface{}{
-		[]int32{12643, 17888, 20569},
-		struct{ n, m uint32 }{0, 1},
+		FieldDestination: MakeVariant("org.freedesktop.DBus"),
+		FieldPath:        MakeVariant(ObjectPath("/org/freedesktop/DBus")),
+		FieldInterface:   MakeVariant("org.freedesktop.DBus"),
+		FieldMember:      MakeVariant("Hello"),
 	},
 }
 
-func BenchmarkDecodeMessage(b *testing.B) {
+// org.freedesktop.Notifications.Notify
+var bigMessage = &Message{
+	Order:  binary.LittleEndian,
+	Type:   TypeMethodCall,
+	serial: 2,
+	Headers: map[HeaderField]Variant{
+		FieldDestination: MakeVariant("org.freedesktop.Notifications"),
+		FieldPath:        MakeVariant(ObjectPath("/org/freedesktop/Notifications")),
+		FieldInterface:   MakeVariant("org.freedesktop.Notifications"),
+		FieldMember:      MakeVariant("Notify"),
+		FieldSignature:   MakeVariant(Signature{"susssasa{sv}i"}),
+	},
+	Body: []interface{}{
+		"app_name",
+		uint32(0),
+		"dialog-information",
+		"Notification",
+		"This is the body of a notification",
+		[]string{"ok", "Ok"},
+		map[string]Variant{
+			"sound-name": MakeVariant("dialog-information"),
+		},
+		int32(-1),
+	},
+}
+
+func BenchmarkDecodeMessageSmall(b *testing.B) {
 	var err error
 	var rd *bytes.Reader
 
 	b.StopTimer()
 	buf := new(bytes.Buffer)
-	err = someMessage.EncodeTo(buf)
+	err = smallMessage.EncodeTo(buf)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -190,25 +211,43 @@ func BenchmarkDecodeMessage(b *testing.B) {
 	}
 }
 
-func BenchmarkEncodeMessage(b *testing.B) {
+func BenchmarkDecodeMessageBig(b *testing.B) {
 	var err error
+	var rd *bytes.Reader
+
+	b.StopTimer()
+	buf := new(bytes.Buffer)
+	err = bigMessage.EncodeTo(buf)
+	if err != nil {
+		b.Fatal(err)
+	}
+	decoded := buf.Bytes()
+	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		err = someMessage.EncodeTo(ioutil.Discard)
+		rd = bytes.NewReader(decoded)
+		_, err = DecodeMessage(rd)
 		if err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
-func BenchmarkGetSignature(b *testing.B) {
+func BenchmarkEncodeMessageSmall(b *testing.B) {
+	var err error
 	for i := 0; i < b.N; i++ {
-		GetSignature(someMessage.Body...)
+		err = smallMessage.EncodeTo(ioutil.Discard)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
-func BenchmarkSignatureValues(b *testing.B) {
-	s := Signature{"a(bits)a{sv}"}
+func BenchmarkEncodeMessageBig(b *testing.B) {
+	var err error
 	for i := 0; i < b.N; i++ {
-		s.Values()
+		err = bigMessage.EncodeTo(ioutil.Discard)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
