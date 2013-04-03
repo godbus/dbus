@@ -16,6 +16,7 @@ import (
 //       []interface{} and contain the struct fields in the correct order.
 //     - When decoding into a pointer, the pointer is followed unless it is nil,
 //       in which case a new value for it to point to is allocated.
+//     - When decoding into a slice, the decoded values are appended to it.
 type Decoder struct {
 	in    io.Reader
 	order binary.ByteOrder
@@ -166,14 +167,12 @@ func (dec *Decoder) decode(v reflect.Value, depth int) {
 			panic(FormatError("input exceeds container depth limit"))
 		}
 		dec.decode(reflect.ValueOf(&length), depth)
-		slice := reflect.MakeSlice(v.Type(), 0, 0)
 		spos := dec.pos
 		for dec.pos < spos+int(length) {
 			nv := reflect.New(v.Type().Elem())
 			dec.decode(nv, depth)
-			slice = reflect.Append(slice, nv.Elem())
+			v.Set(reflect.Append(v, nv.Elem()))
 		}
-		v.Set(slice)
 	case reflect.Struct:
 		if depth >= 64 && v.Type() != signatureType {
 			panic(FormatError("input exceeds container depth limit"))

@@ -96,6 +96,18 @@ func TestProtoPointer(t *testing.T) {
 	}
 }
 
+func TestProtoSlice(t *testing.T) {
+	b := []byte{1, 2}
+	buf := bytes.NewBuffer([]byte{2, 0, 0, 0, 3, 4})
+	dec := NewDecoder(buf, binary.LittleEndian)
+	if err := dec.Decode(&b); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(b, []byte{1, 2, 3, 4}) {
+		t.Fatal("got", b, "wanted", []byte{1, 2, 3, 4})
+	}
+}
+
 func TestProtoMap(t *testing.T) {
 	m := map[string]uint8{
 		"foo": 23,
