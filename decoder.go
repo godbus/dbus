@@ -17,6 +17,7 @@ import (
 //     - When decoding into a pointer, the pointer is followed unless it is nil,
 //       in which case a new value for it to point to is allocated.
 //     - When decoding into a slice, the decoded values are appended to it.
+//     - Arrays cannot be decoded into.
 type Decoder struct {
 	in    io.Reader
 	order binary.ByteOrder

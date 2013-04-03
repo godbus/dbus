@@ -30,7 +30,7 @@ import (
 //     Variant     | VARIANT
 //     UnixFDIndex | UNIX_FD
 //
-// Slices encode as ARRAYs of their element type.
+// Slices and arrays encode as ARRAYs of their element type.
 //
 // Maps encode as DICTs, provided that their key type is a basic type.
 //
