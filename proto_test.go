@@ -84,14 +84,15 @@ func TestProto(t *testing.T) {
 }
 
 func TestProtoPointer(t *testing.T) {
-	var n *uint32
+	var n uint32
+	var p = &n
 	buf := bytes.NewBuffer([]byte{42, 1, 0, 0})
 	dec := NewDecoder(buf, binary.LittleEndian)
-	if err := dec.Decode(&n); err != nil {
+	if err := dec.Decode(&p); err != nil {
 		t.Fatal(err)
 	}
-	if *n != 298 {
-		t.Error("pointer test: got", *n)
+	if n != 298 {
+		t.Error("pointer test: got", n)
 	}
 }
 

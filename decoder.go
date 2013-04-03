@@ -9,10 +9,13 @@ import (
 
 // A Decoder reads values that are encoded in the DBus wire format.
 //
-// For decoding, the inverse of the encoding that an Encoder applies are used,
-// with the exception of variants. If a VARIANT contains a STRUCT, its decoded
-// value will be of type []interface{} and contain the struct fields in the
-// correct order.
+// For decoding, the inverse of the encoding that an Encoder applies is used,
+// with the following exceptions:
+//
+//     - If a VARIANT contains a STRUCT, its decoded value will be of type
+//       []interface{} and contain the struct fields in the correct order.
+//     - When decoding into a pointer, the pointer is followed unless it is nil,
+//       in which case a new value for it to point to is allocated.
 type Decoder struct {
 	in    io.Reader
 	order binary.ByteOrder
@@ -150,9 +153,13 @@ func (dec *Decoder) decode(v reflect.Value, depth int) {
 		dec.pos += int(length) + 1
 		v.SetString(string(b[:len(b)-1]))
 	case reflect.Ptr:
-		nv := reflect.New(v.Type().Elem())
-		dec.decode(nv, depth)
-		v.Set(nv)
+		if v.IsNil() {
+			nv := reflect.New(v.Type().Elem())
+			dec.decode(nv, depth)
+			v.Set(nv)
+		} else {
+			dec.decode(v, depth)
+		}
 	case reflect.Slice:
 		var length uint32
 		if depth >= 64 {
