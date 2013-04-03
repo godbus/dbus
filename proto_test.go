@@ -156,10 +156,31 @@ func TestProtoStoreStruct(t *testing.T) {
 		A int32
 		B string
 	}
-	c := Call{
-		Body: []interface{}{[]interface{}{int32(42), "foo"}},
+	src := []interface{}{[]interface{}{int32(42), "foo"}}
+	err := Store(src, &foo)
+	if err != nil {
+		t.Fatal(err)
 	}
-	err := c.Store(&foo)
+}
+
+func TestProtoStoreNestedStruct(t *testing.T) {
+	var foo struct {
+		A int32
+		B struct {
+			C string
+			D float64
+		}
+	}
+	src := []interface{}{
+		[]interface{}{
+			int32(42),
+			[]interface{}{
+				"foo",
+				3.14,
+			},
+		},
+	}
+	err := Store(src, &foo)
 	if err != nil {
 		t.Fatal(err)
 	}

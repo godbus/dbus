@@ -1,6 +1,7 @@
 package dbus
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 	"unicode"
@@ -49,6 +50,38 @@ var sigToType = map[byte]reflect.Type{
 	'o': objectPathType,
 	'v': variantType,
 	'h': unixFDIndexType,
+}
+
+// Store copies the values contained in src to dest, which must be a slice of
+// pointers. It converts slices of interfaces from src to corresponding structs
+// in dest. An error is returned if the lengths of src and dest or the types of
+// their elements don't match.
+func Store(src []interface{}, dest ...interface{}) error {
+	if len(src) != len(dest) {
+		return errors.New("dbus.Store: length mismatch")
+	}
+
+	for i, v := range src {
+		if reflect.TypeOf(dest[i]).Elem() == reflect.TypeOf(v) {
+			reflect.ValueOf(dest[i]).Elem().Set(reflect.ValueOf(v))
+		} else if vs, ok := v.([]interface{}); ok {
+			retv := reflect.ValueOf(dest[i]).Elem()
+			if retv.Kind() != reflect.Struct || retv.NumField() != len(vs) {
+				return errors.New("dbus.Store: type mismatch")
+			}
+			ndest := make([]interface{}, retv.NumField())
+			for i := 0; i < retv.NumField(); i++ {
+				ndest[i] = retv.Field(i).Addr().Interface()
+			}
+			err := Store(vs, ndest...)
+			if err != nil {
+				return errors.New("dbus.Store: type mismatch")
+			}
+		} else {
+			return errors.New("dbus.Store: type mismatch")
+		}
+	}
+	return nil
 }
 
 // Signature represents a correct type signature as specified

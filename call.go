@@ -3,7 +3,6 @@ package dbus
 import (
 	"encoding/binary"
 	"errors"
-	"reflect"
 	"strings"
 )
 
@@ -36,31 +35,7 @@ func (c *Call) Store(retvalues ...interface{}) error {
 		return c.Err
 	}
 
-	if len(retvalues) != len(c.Body) {
-		return errSignature
-	}
-
-	for i, v := range c.Body {
-		if reflect.TypeOf(retvalues[i]).Elem() == reflect.TypeOf(v) {
-			reflect.ValueOf(retvalues[i]).Elem().Set(reflect.ValueOf(v))
-		} else if vs, ok := v.([]interface{}); ok {
-			// BUG(guelfey) (*Call).Store is broken for nested structures.
-			retv := reflect.ValueOf(retvalues[i]).Elem()
-			if retv.Kind() != reflect.Struct || retv.NumField() != len(vs) {
-				return errSignature
-			}
-			for i := 0; i < retv.NumField(); i++ {
-				if reflect.TypeOf(vs[i]) == retv.Field(i).Type() {
-					retv.Field(i).Set(reflect.ValueOf(vs[i]))
-				} else {
-					return errSignature
-				}
-			}
-		} else {
-			return errSignature
-		}
-	}
-	return nil
+	return Store(c.Body, retvalues...)
 }
 
 // Object represents a remote object on which methods can be invoked.
