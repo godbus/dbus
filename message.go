@@ -85,7 +85,10 @@ type Message struct {
 	Type
 	Flags
 	Headers map[HeaderField]Variant
-	Body    []interface{}
+
+	// The message body. For incoming messages, structs are represented as a
+	// slice of empty interfaces.
+	Body []interface{}
 
 	serial uint32
 }

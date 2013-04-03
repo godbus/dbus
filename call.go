@@ -7,35 +7,58 @@ import (
 	"strings"
 )
 
-// Call represents a pending or completed method call. If Err is non-nil, it is
-// either an error from the underlying transport or an error message from the
-// peer (with Error as its type).
+// Call represents a pending or completed method call.
 type Call struct {
 	Destination string
 	Path        ObjectPath
 	Method      string
 	Args        []interface{}
-	Done        chan *Call    // Strobes when the call is complete.
-	Body        []interface{} // Holds the response once the call is done.
-	Err         error         // After completion, the error status.
+
+	// Strobes when the call is complete.
+	Done chan *Call
+
+	// After completion, the error status. If this is non-nil, it may be an
+	// error message from the peer (with Error as its type) or some other error.
+	Err error
+
+	// Holds the response once the call is done. Structs are represented as
+	// a slice of empty interfaces.
+	Body []interface{}
 }
 
-// Store stores the body of the reply into the provided pointers.
-// It panics if one of retvalues is not a pointer to a DBus-representable value
-// and returns an error if the signatures of the body and retvalues don't match,
-// or if the error status is not nil.
+var errSignature = errors.New("mismatched signature")
+
+// Store stores the body of the reply into the provided pointers. It returns
+// an error if the signatures of the body and retvalues don't match, or if
+// the error status is not nil.
 func (c *Call) Store(retvalues ...interface{}) error {
 	if c.Err != nil {
 		return c.Err
 	}
 
-	esig := GetSignature(retvalues...)
-	rsig := GetSignature(c.Body...)
-	if esig != rsig {
-		return errors.New("mismatched signature")
+	if len(retvalues) != len(c.Body) {
+		return errSignature
 	}
+
 	for i, v := range c.Body {
-		reflect.ValueOf(retvalues[i]).Elem().Set(reflect.ValueOf(v))
+		if reflect.TypeOf(retvalues[i]).Elem() == reflect.TypeOf(v) {
+			reflect.ValueOf(retvalues[i]).Elem().Set(reflect.ValueOf(v))
+		} else if vs, ok := v.([]interface{}); ok {
+			// BUG(guelfey) (*Call).Store is broken for nested structures.
+			retv := reflect.ValueOf(retvalues[i]).Elem()
+			if retv.Kind() != reflect.Struct || retv.NumField() != len(vs) {
+				return errSignature
+			}
+			for i := 0; i < retv.NumField(); i++ {
+				if reflect.TypeOf(vs[i]) == retv.Field(i).Type() {
+					retv.Field(i).Set(reflect.ValueOf(vs[i]))
+				} else {
+					return errSignature
+				}
+			}
+		} else {
+			return errSignature
+		}
 	}
 	return nil
 }

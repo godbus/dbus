@@ -151,6 +151,20 @@ func TestProtoStructTag(t *testing.T) {
 	}
 }
 
+func TestProtoStoreStruct(t *testing.T) {
+	var foo struct {
+		A int32
+		B string
+	}
+	c := Call{
+		Body: []interface{}{[]interface{}{int32(42), "foo"}},
+	}
+	err := c.Store(&foo)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 // ordinary org.freedesktop.DBus.Hello call
 var smallMessage = &Message{
 	Order:  binary.LittleEndian,
