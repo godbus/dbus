@@ -168,6 +168,8 @@ func TestProtoStoreStruct(t *testing.T) {
 	var foo struct {
 		A int32
 		B string
+		c chan interface{}
+		D interface{} `dbus:"-"`
 	}
 	src := []interface{}{[]interface{}{int32(42), "foo"}}
 	err := Store(src, &foo)

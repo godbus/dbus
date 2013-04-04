@@ -35,7 +35,8 @@ import (
 // Maps encode as DICTs, provided that their key type is a basic type.
 //
 // Structs other than Variant and Signature encode as a STRUCT containing its
-// respective fields. Fields whose tag contains `dbus:"-"` will be skipped.
+// exported fields. Fields whose tag contains `dbus:"-"` and unexported field
+// will be skipped.
 //
 // Pointers encode as the value they're pointed to.
 //

@@ -66,12 +66,21 @@ func Store(src []interface{}, dest ...interface{}) error {
 			reflect.ValueOf(dest[i]).Elem().Set(reflect.ValueOf(v))
 		} else if vs, ok := v.([]interface{}); ok {
 			retv := reflect.ValueOf(dest[i]).Elem()
-			if retv.Kind() != reflect.Struct || retv.NumField() != len(vs) {
+			if retv.Kind() != reflect.Struct {
 				return errors.New("dbus.Store: type mismatch")
 			}
-			ndest := make([]interface{}, retv.NumField())
+			t := retv.Type()
+			ndest := make([]interface{}, 0, retv.NumField())
 			for i := 0; i < retv.NumField(); i++ {
-				ndest[i] = retv.Field(i).Addr().Interface()
+				field := t.Field(i)
+				if unicode.IsUpper([]rune(field.Name)[0]) &&
+					field.Tag.Get("dbus") != "-" {
+
+					ndest = append(ndest, retv.Field(i).Addr().Interface())
+				}
+			}
+			if len(vs) != len(ndest) {
+				return errors.New("dbus.Store: type mismatch")
 			}
 			err := Store(vs, ndest...)
 			if err != nil {
