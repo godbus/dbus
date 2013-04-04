@@ -21,24 +21,11 @@ var (
 // handleCall handles the given method call (i.e. looks if it's one of the
 // pre-implemented ones and searches for a corresponding handler if not).
 func (conn *Conn) handleCall(msg *Message) {
-	vs := msg.Body
 	name := msg.Headers[FieldMember].value.(string)
 	path := msg.Headers[FieldPath].value.(ObjectPath)
 	ifacename := msg.Headers[FieldInterface].value.(string)
 	sender := msg.Headers[FieldSender].value.(string)
 	serial := msg.serial
-	if len(name) == 0 || unicode.IsLower([]rune(name)[0]) {
-		conn.sendError(errmsgUnknownMethod, sender, serial)
-	}
-	conn.handlersLck.RLock()
-	obj, ok := conn.handlers[path]
-	if !ok {
-		conn.sendError(errmsgUnknownMethod, sender, serial)
-		conn.handlersLck.RUnlock()
-		return
-	}
-	iface := obj[ifacename]
-	conn.handlersLck.RUnlock()
 	if ifacename == "org.freedesktop.DBus.Peer" {
 		switch name {
 		case "Ping":
@@ -48,6 +35,18 @@ func (conn *Conn) handleCall(msg *Message) {
 		default:
 			conn.sendError(errmsgUnknownMethod, sender, serial)
 		}
+		return
+	}
+	if len(name) == 0 || unicode.IsLower([]rune(name)[0]) {
+		conn.sendError(errmsgUnknownMethod, sender, serial)
+	}
+	vs := msg.Body
+	conn.handlersLck.RLock()
+	obj, ok := conn.handlers[path]
+	iface := obj[ifacename]
+	conn.handlersLck.RUnlock()
+	if !ok {
+		conn.sendError(errmsgUnknownMethod, sender, serial)
 		return
 	}
 	if iface == nil {
@@ -136,6 +135,9 @@ func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) {
 //
 // Every method call is executed in a new goroutine, so the method may be called
 // in multiple goroutines at once.
+//
+// Method calls on the interface org.freedesktop.DBus.Peer will be automatically
+// handled for every object.
 //
 // Export panics if path is not a valid object path.
 func (conn *Conn) Export(v interface{}, path ObjectPath, iface string) {
