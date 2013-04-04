@@ -84,7 +84,6 @@ func (a AuthCookieSha1) getCookie(context, id []byte) []byte {
 			return b[2]
 		}
 	}
-	panic("not reached")
 }
 
 // generateChallenge returns a random, hex-encoded challenge, or nil on error

@@ -296,10 +296,11 @@ func (conn *Conn) outWorker() {
 	}
 }
 
-// Send the given message to the message bus. You usually don't need to use
-// this; use the higher-level equivalents (Call, Emit and Export) instead.
-// The returned call is nil if msg isn't a message call or if NoReplyExpected
-// is set.
+// Send sends the given message to the message bus. You usually don't need to
+// use this; use the higher-level equivalents (Call / Go, Emit and Export)
+// instead. If msg is a method call and NoReplyExpected is not set, a non-nil
+// call is returned and the same value is sent to ch (which must be buffered)
+// once the call is complete. Otherwise, nil is returned and ch is ignored.
 func (conn *Conn) Send(msg *Message, ch chan *Call) *Call {
 	msg.serial = <-conn.serial
 	if msg.Type == TypeMethodCall && msg.Flags&FlagNoReplyExpected == 0 {
@@ -411,7 +412,7 @@ type Error struct {
 }
 
 func (e Error) Error() string {
-	if len(e.Body) > 1 {
+	if len(e.Body) >= 1 {
 		s, ok := e.Body[0].(string)
 		if ok {
 			return s

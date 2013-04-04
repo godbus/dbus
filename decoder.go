@@ -189,7 +189,7 @@ func (dec *Decoder) decode(v reflect.Value, depth int) {
 			}
 			err, rem := validSingle(sig.str, 0)
 			if err != nil {
-				panic(FormatError(err.Error()))
+				panic(err)
 			}
 			if rem != "" {
 				panic(FormatError("variant signature has multiple types"))
@@ -202,7 +202,7 @@ func (dec *Decoder) decode(v reflect.Value, depth int) {
 				for len(s) != 0 {
 					err, rem := validSingle(s, 0)
 					if err != nil {
-						panic(FormatError(err.Error()))
+						panic(err)
 					}
 					t = value(s[:len(s)-len(rem)])
 					nv := reflect.New(t)

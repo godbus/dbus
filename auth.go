@@ -208,7 +208,6 @@ func (conn *Conn) tryAuth(m AuthMechanism, state authState, in *bufio.Reader) (e
 			panic("invalid auth state")
 		}
 	}
-	panic("not reached")
 }
 
 // authReadLine reads a line and separates it into its fields.

@@ -234,7 +234,7 @@ type SignatureError struct {
 }
 
 func (err SignatureError) Error() string {
-	return "invalid signature: '" + err.Sig + "' (" + err.Reason + ")"
+	return "dbus: invalid signature: '" + err.Sig + "' (" + err.Reason + ")"
 }
 
 // An ObjectPath is an object path as defined by the DBus spec.
