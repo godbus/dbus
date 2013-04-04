@@ -310,13 +310,13 @@ func (v Variant) Value() interface{} {
 
 // alignment returns the alignment of values of type t.
 func alignment(t reflect.Type) int {
-	n, ok := map[reflect.Type]int{
-		variantType:    1,
-		objectPathType: 4,
-		signatureType:  1,
-	}[t]
-	if ok {
-		return n
+	switch t {
+	case variantType:
+		return 1
+	case objectPathType:
+		return 4
+	case signatureType:
+		return 1
 	}
 	switch t.Kind() {
 	case reflect.Uint8:
