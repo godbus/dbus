@@ -56,7 +56,7 @@ func (e InvalidMessageError) Error() string {
 }
 
 // fieldType are the types of the various header fields.
-var fieldTypes = map[HeaderField]reflect.Type{
+var fieldTypes = [fieldMax]reflect.Type{
 	FieldPath:        objectPathType,
 	FieldInterface:   stringType,
 	FieldMember:      stringType,
@@ -70,7 +70,7 @@ var fieldTypes = map[HeaderField]reflect.Type{
 
 // requiredFields lists the header fields that are required by the different
 // message types.
-var requiredFields = map[Type][]HeaderField{
+var requiredFields = [typeMax][]HeaderField{
 	TypeMethodCall:  {FieldPath, FieldMember},
 	TypeMethodReply: {FieldReplySerial},
 	TypeError:       {FieldErrorName, FieldReplySerial},
@@ -186,7 +186,7 @@ func (msg *Message) EncodeTo(out io.Writer) error {
 	if err := msg.IsValid(); err != nil {
 		return err
 	}
-	vs := make([]interface{}, 7)
+	var vs [7]interface{}
 	switch msg.Order {
 	case binary.LittleEndian:
 		vs[0] = byte('l')
@@ -203,16 +203,16 @@ func (msg *Message) EncodeTo(out io.Writer) error {
 	vs[3] = protoVersion
 	vs[4] = uint32(len(body.Bytes()))
 	vs[5] = msg.serial
-	headers := make([]header, 0)
+	headers := make([]header, 0, len(msg.Headers))
 	for k, v := range msg.Headers {
 		headers = append(headers, header{k, v})
 	}
 	vs[6] = headers
-	buf := new(bytes.Buffer)
-	enc = NewEncoder(buf, msg.Order)
-	enc.EncodeMulti(vs...)
+	var buf bytes.Buffer
+	enc = NewEncoder(&buf, msg.Order)
+	enc.EncodeMulti(vs[:]...)
 	enc.align(8)
-	body.WriteTo(buf)
+	body.WriteTo(&buf)
 	if buf.Len() > 1<<27 {
 		return InvalidMessageError("message is too long")
 	}

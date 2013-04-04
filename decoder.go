@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"io"
 	"reflect"
-	"unicode"
 )
 
 // A Decoder reads values that are encoded in the DBus wire format.
@@ -93,8 +92,8 @@ func (dec *Decoder) decode(v reflect.Value, depth int) {
 	dec.align(alignment(v.Type()))
 	switch v.Kind() {
 	case reflect.Uint8:
-		b := make([]byte, 1)
-		if _, err := dec.in.Read(b); err != nil {
+		var b [1]byte
+		if _, err := dec.in.Read(b[:]); err != nil {
 			panic(err)
 		}
 		dec.pos++
@@ -168,9 +167,12 @@ func (dec *Decoder) decode(v reflect.Value, depth int) {
 			panic(FormatError("input exceeds container depth limit"))
 		}
 		dec.decode(reflect.ValueOf(&length), depth)
+		if v.IsNil() {
+			v.Set(reflect.MakeSlice(v.Type(), 0, int(length)))
+		}
 		spos := dec.pos
+		nv := reflect.New(v.Type().Elem())
 		for dec.pos < spos+int(length) {
-			nv := reflect.New(v.Type().Elem())
 			dec.decode(nv, depth)
 			v.Set(reflect.Append(v, nv.Elem()))
 		}
@@ -233,9 +235,7 @@ func (dec *Decoder) decode(v reflect.Value, depth int) {
 		default:
 			for i := 0; i < v.NumField(); i++ {
 				field := t.Field(i)
-				if unicode.IsUpper([]rune(field.Name)[0]) &&
-					field.Tag.Get("dbus") != "-" {
-
+				if field.PkgPath == "" && field.Tag.Get("dbus") != "-" {
 					dec.decode(v.Field(i).Addr(), depth+1)
 				}
 			}
@@ -250,13 +250,13 @@ func (dec *Decoder) decode(v reflect.Value, depth int) {
 		dec.decode(reflect.ValueOf(&length), depth)
 		m := reflect.MakeMap(v.Type())
 		spos := dec.pos
+		kv := reflect.New(v.Type().Key())
+		vv := reflect.New(v.Type().Elem())
 		for dec.pos < spos+int(length) {
 			dec.align(8)
 			if !isKeyType(v.Type().Key()) {
 				panic(invalidTypeError{v.Type()})
 			}
-			kv := reflect.New(v.Type().Key())
-			vv := reflect.New(v.Type().Elem())
 			dec.decode(kv, depth+2)
 			dec.decode(vv, depth+2)
 			m.SetMapIndex(kv.Elem(), vv.Elem())

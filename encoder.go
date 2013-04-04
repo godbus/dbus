@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"io"
 	"reflect"
-	"unicode"
 )
 
 // An Encoder encodes values to the D-Bus wire format.
@@ -108,7 +107,9 @@ func (enc *Encoder) encode(v reflect.Value, depth int) {
 	enc.align(alignment(v.Type()))
 	switch v.Kind() {
 	case reflect.Uint8:
-		if _, err := enc.out.Write([]byte{byte(v.Uint())}); err != nil {
+		var b [1]byte
+		b[0] = byte(v.Uint())
+		if _, err := enc.out.Write(b[:]); err != nil {
 			panic(err)
 		}
 		enc.pos++
@@ -141,7 +142,10 @@ func (enc *Encoder) encode(v reflect.Value, depth int) {
 		enc.pos += 8
 	case reflect.String:
 		enc.encode(reflect.ValueOf(uint32(len(v.String()))), depth)
-		n, err := enc.out.Write([]byte(v.String() + "\x00"))
+		b := make([]byte, v.Len()+1)
+		copy(b, v.String())
+		b[len(b)-1] = 0
+		n, err := enc.out.Write(b)
 		if err != nil {
 			panic(err)
 		}
@@ -152,8 +156,8 @@ func (enc *Encoder) encode(v reflect.Value, depth int) {
 		if depth >= 64 {
 			panic(FormatError("input exceeds container depth limit"))
 		}
-		buf := new(bytes.Buffer)
-		bufenc := NewEncoder(buf, enc.order)
+		var buf bytes.Buffer
+		bufenc := NewEncoder(&buf, enc.order)
 
 		for i := 0; i < v.Len(); i++ {
 			bufenc.encode(v.Index(i), depth+1)
@@ -173,7 +177,10 @@ func (enc *Encoder) encode(v reflect.Value, depth int) {
 		case signatureType:
 			str := v.Field(0)
 			enc.encode(reflect.ValueOf(byte(str.Len())), depth+1)
-			n, err := enc.out.Write([]byte(str.String() + "\x00"))
+			b := make([]byte, str.Len()+1)
+			copy(b, str.String())
+			b[len(b)-1] = 0
+			n, err := enc.out.Write(b)
 			if err != nil {
 				panic(err)
 			}
@@ -185,9 +192,7 @@ func (enc *Encoder) encode(v reflect.Value, depth int) {
 		default:
 			for i := 0; i < v.Type().NumField(); i++ {
 				field := t.Field(i)
-				if unicode.IsUpper([]rune(field.Name)[0]) &&
-					field.Tag.Get("dbus") != "-" {
-
+				if field.PkgPath == "" && field.Tag.Get("dbus") != "-" {
 					enc.encode(v.Field(i), depth+1)
 				}
 			}
@@ -202,8 +207,8 @@ func (enc *Encoder) encode(v reflect.Value, depth int) {
 			panic(invalidTypeError{v.Type()})
 		}
 		keys := v.MapKeys()
-		buf := new(bytes.Buffer)
-		bufenc := NewEncoder(buf, enc.order)
+		var buf bytes.Buffer
+		bufenc := NewEncoder(&buf, enc.order)
 		for _, k := range keys {
 			bufenc.align(8)
 			bufenc.encode(k, depth+2)

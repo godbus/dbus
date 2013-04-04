@@ -4,7 +4,6 @@ import (
 	"errors"
 	"reflect"
 	"strings"
-	"unicode"
 )
 
 var (
@@ -73,9 +72,7 @@ func Store(src []interface{}, dest ...interface{}) error {
 			ndest := make([]interface{}, 0, retv.NumField())
 			for i := 0; i < retv.NumField(); i++ {
 				field := t.Field(i)
-				if unicode.IsUpper([]rune(field.Name)[0]) &&
-					field.Tag.Get("dbus") != "-" {
-
+				if field.PkgPath == "" && field.Tag.Get("dbus") != "-" {
 					ndest = append(ndest, retv.Field(i).Addr().Interface())
 				}
 			}
@@ -160,9 +157,7 @@ func getSignature(t reflect.Type) string {
 		var s string
 		for i := 0; i < t.NumField(); i++ {
 			field := t.Field(i)
-			if unicode.IsUpper([]rune(field.Name)[0]) &&
-				field.Tag.Get("dbus") != "-" {
-
+			if field.PkgPath == "" && field.Tag.Get("dbus") != "-" {
 				s += getSignature(t.Field(i).Type)
 			}
 		}
