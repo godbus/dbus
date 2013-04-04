@@ -18,15 +18,32 @@ var (
 	}
 )
 
+func exportedMethod(v interface{}, name string) reflect.Value {
+	if v == nil {
+		return reflect.Value{}
+	}
+	m := reflect.ValueOf(v).MethodByName(name)
+	if !m.IsValid() {
+		return reflect.Value{}
+	}
+	t := m.Type()
+	if t.NumOut() == 0 ||
+		t.Out(t.NumOut()-1) != reflect.TypeOf(&errmsgInvalidArg) {
+
+		return reflect.Value{}
+	}
+	return m
+}
+
 // handleCall handles the given method call (i.e. looks if it's one of the
 // pre-implemented ones and searches for a corresponding handler if not).
 func (conn *Conn) handleCall(msg *Message) {
 	name := msg.Headers[FieldMember].value.(string)
 	path := msg.Headers[FieldPath].value.(ObjectPath)
-	ifacename := msg.Headers[FieldInterface].value.(string)
+	ifaceName, hasIface := msg.Headers[FieldInterface].value.(string)
 	sender := msg.Headers[FieldSender].value.(string)
 	serial := msg.serial
-	if ifacename == "org.freedesktop.DBus.Peer" {
+	if ifaceName == "org.freedesktop.DBus.Peer" {
 		switch name {
 		case "Ping":
 			conn.sendReply(sender, serial)
@@ -40,31 +57,34 @@ func (conn *Conn) handleCall(msg *Message) {
 	if len(name) == 0 || unicode.IsLower([]rune(name)[0]) {
 		conn.sendError(errmsgUnknownMethod, sender, serial)
 	}
-	vs := msg.Body
-	conn.handlersLck.RLock()
-	obj, ok := conn.handlers[path]
-	iface := obj[ifacename]
-	conn.handlersLck.RUnlock()
-	if !ok {
-		conn.sendError(errmsgUnknownMethod, sender, serial)
-		return
+	var m reflect.Value
+	if hasIface {
+		conn.handlersLck.RLock()
+		obj, ok := conn.handlers[path]
+		if !ok {
+			conn.sendError(errmsgUnknownMethod, sender, serial)
+			conn.handlersLck.RUnlock()
+			return
+		}
+		iface := obj[ifaceName]
+		conn.handlersLck.RUnlock()
+		m = exportedMethod(iface, name)
+	} else {
+		conn.handlersLck.RLock()
+		for _, v := range conn.handlers[path] {
+			m = exportedMethod(v, name)
+			if m.IsValid() {
+				break
+			}
+		}
+		conn.handlersLck.RUnlock()
 	}
-	if iface == nil {
-		conn.sendError(errmsgUnknownMethod, sender, serial)
-		return
-	}
-	m := reflect.ValueOf(iface).MethodByName(name)
 	if !m.IsValid() {
 		conn.sendError(errmsgUnknownMethod, sender, serial)
 		return
 	}
 	t := m.Type()
-	if t.NumOut() == 0 ||
-		t.Out(t.NumOut()-1) != reflect.TypeOf(&errmsgInvalidArg) {
-
-		conn.sendError(errmsgUnknownMethod, sender, serial)
-		return
-	}
+	vs := msg.Body
 	if t.NumIn() != len(vs) {
 		conn.sendError(errmsgInvalidArg, sender, serial)
 		return
