@@ -210,6 +210,19 @@ func (conn *Conn) RequestName(name string, flags RequestNameFlags) (RequestNameR
 	return RequestNameReply(r), nil
 }
 
+// Unexport causes conn to cease handling method calls on the given combination
+// of path and interface.
+func (conn *Conn) Unexport(path ObjectPath, iface string) {
+	conn.handlersLck.Lock()
+	if _, ok := conn.handlers[path]; ok {
+		delete(conn.handlers[path], iface)
+		if len(conn.handlers) == 0 {
+			delete(conn.handlers, path)
+		}
+	}
+	conn.handlersLck.Unlock()
+}
+
 // ReleaseNameReply is the reply to a ReleaseName call.
 type ReleaseNameReply uint32
 
