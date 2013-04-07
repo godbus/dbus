@@ -2,6 +2,7 @@ package dbus
 
 import (
 	"encoding/binary"
+	"errors"
 	"reflect"
 	"strings"
 	"unicode"
@@ -159,10 +160,10 @@ func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) {
 // Method calls on the interface org.freedesktop.DBus.Peer will be automatically
 // handled for every object.
 //
-// Export panics if path is not a valid object path.
-func (conn *Conn) Export(v interface{}, path ObjectPath, iface string) {
+// Export returns an error if path is not a valid path name.
+func (conn *Conn) Export(v interface{}, path ObjectPath, iface string) error {
 	if !path.IsValid() {
-		panic("(*dbus.Conn).Export: invalid path name")
+		return errors.New("invalid path name")
 	}
 	conn.handlersLck.Lock()
 	if _, ok := conn.handlers[path]; !ok {
@@ -170,6 +171,7 @@ func (conn *Conn) Export(v interface{}, path ObjectPath, iface string) {
 	}
 	conn.handlers[path][iface] = v
 	conn.handlersLck.Unlock()
+	return nil
 }
 
 // ReleaseName calls org.freedesktop.DBus.ReleaseName. You should use only this

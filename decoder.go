@@ -58,10 +58,8 @@ func (dec *Decoder) binread(v interface{}) {
 // The input is expected to be aligned as required by the DBus spec.
 func (dec *Decoder) Decode(v interface{}) (err error) {
 	defer func() {
-		if err, ok := recover().(error); ok {
-			if _, ok := err.(invalidTypeError); ok {
-				panic(err)
-			}
+		var ok bool
+		if err, ok = recover().(error); ok {
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
 				err = FormatError("input too short (unexpected EOF)")
 			}
@@ -85,7 +83,7 @@ func (dec *Decoder) DecodeMulti(vs ...interface{}) error {
 // the container nesting.
 func (dec *Decoder) decode(v reflect.Value, depth int) {
 	if v.Kind() != reflect.Ptr {
-		panic(invalidTypeError{v.Type()})
+		panic(InvalidTypeError{v.Type()})
 	}
 
 	v = v.Elem()
@@ -255,7 +253,7 @@ func (dec *Decoder) decode(v reflect.Value, depth int) {
 		for dec.pos < spos+int(length) {
 			dec.align(8)
 			if !isKeyType(v.Type().Key()) {
-				panic(invalidTypeError{v.Type()})
+				panic(InvalidTypeError{v.Type()})
 			}
 			dec.decode(kv, depth+2)
 			dec.decode(vv, depth+2)
@@ -263,7 +261,7 @@ func (dec *Decoder) decode(v reflect.Value, depth int) {
 		}
 		v.Set(m)
 	default:
-		panic(invalidTypeError{v.Type()})
+		panic(InvalidTypeError{v.Type()})
 	}
 }
 

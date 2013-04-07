@@ -26,11 +26,13 @@ var (
 	unixFDIndexType = reflect.TypeOf(UnixFDIndex(0))
 )
 
-type invalidTypeError struct {
-	reflect.Type
+// An InvalidTypeError signals that a value which cannot be represented in the
+// DBus wire format was passed to a function.
+type InvalidTypeError struct {
+	Type reflect.Type
 }
 
-func (err invalidTypeError) Error() string {
+func (err InvalidTypeError) Error() string {
 	return "dbus: invalid type " + err.Type.String()
 }
 
@@ -166,11 +168,11 @@ func getSignature(t reflect.Type) string {
 		return "a" + getSignature(t.Elem())
 	case reflect.Map:
 		if !isKeyType(t.Key()) {
-			panic(invalidTypeError{t})
+			panic(InvalidTypeError{t})
 		}
 		return "a{" + getSignature(t.Key()) + getSignature(t.Elem()) + "}"
 	}
-	panic(invalidTypeError{t})
+	panic(InvalidTypeError{t})
 }
 
 // StringToSig returns the signature represented by this string, or a
@@ -193,7 +195,7 @@ func StringToSig(s string) (sig Signature, err error) {
 	return
 }
 
-// SrintToSigMust behaves like StringToSig, except that it panics if s is not
+// StringToSigMust behaves like StringToSig, except that it panics if s is not
 // valid.
 func StringToSigMust(s string) Signature {
 	sig, err := StringToSig(s)

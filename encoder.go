@@ -40,7 +40,7 @@ import (
 // Pointers encode as the value they're pointed to.
 //
 // Trying to encode any other type (including int and uint) or a slice, map or
-// struct containing an unsupported type will result in a panic.
+// struct containing an unsupported type will result in an InvalidTypeError.
 type Encoder struct {
 	out   io.Writer
 	order binary.ByteOrder
@@ -78,14 +78,7 @@ func (enc *Encoder) binwrite(v interface{}) {
 // are aligned properly as required by the DBus spec.
 func (enc *Encoder) Encode(v interface{}) (err error) {
 	defer func() {
-		err, ok := recover().(error)
-		if ok {
-			// invalidTypeErrors are errors in the program and can't really be
-			// recovered from
-			if _, ok := err.(invalidTypeError); ok {
-				panic(err)
-			}
-		}
+		err, _ = recover().(error)
 	}()
 	enc.encode(reflect.ValueOf(v), 0)
 	return nil
@@ -204,7 +197,7 @@ func (enc *Encoder) encode(v reflect.Value, depth int) {
 			panic(FormatError("input exceeds container depth limit"))
 		}
 		if !isKeyType(v.Type().Key()) {
-			panic(invalidTypeError{v.Type()})
+			panic(InvalidTypeError{v.Type()})
 		}
 		keys := v.MapKeys()
 		var buf bytes.Buffer
@@ -222,6 +215,6 @@ func (enc *Encoder) encode(v reflect.Value, depth int) {
 		}
 		enc.pos += length
 	default:
-		panic(invalidTypeError{v.Type()})
+		panic(InvalidTypeError{v.Type()})
 	}
 }
