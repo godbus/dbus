@@ -131,9 +131,21 @@ func (conn *Conn) handleCall(msg *Message) {
 // Emit emits the given signal on the message bus. The name parameter must be
 // formatted as "interface.member", e.g., "org.freedesktop.DBus.NameLost".
 func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) error {
+	if !path.IsValid() {
+		return errors.New("invalid object path")
+	}
 	i := strings.LastIndex(name, ".")
+	if i == -1 {
+		return errors.New("invalid method name")
+	}
 	iface := name[:i]
 	member := name[i+1:]
+	if !isValidMember(member) {
+		return errors.New("invalid method name")
+	}
+	if !isValidInterface(iface) {
+		return errors.New("invalid interface name")
+	}
 	msg := new(Message)
 	msg.Order = binary.LittleEndian
 	msg.Type = TypeSignal
