@@ -13,6 +13,10 @@ var (
 		"org.freedesktop.DBus.Error.InvalidArgs",
 		[]interface{}{"Invalid type / number of args"},
 	}
+	errmsgNoObject = Error{
+		"org.freedesktop.DBus.Error.NoSuchObject",
+		[]interface{}{"No such object"},
+	}
 	errmsgUnknownMethod = Error{
 		"org.freedesktop.DBus.Error.UnknownMethod",
 		[]interface{}{"Unkown / invalid method"},
@@ -63,7 +67,7 @@ func (conn *Conn) handleCall(msg *Message) {
 		conn.handlersLck.RLock()
 		obj, ok := conn.handlers[path]
 		if !ok {
-			conn.sendError(errmsgUnknownMethod, sender, serial)
+			conn.sendError(errmsgNoObject, sender, serial)
 			conn.handlersLck.RUnlock()
 			return
 		}
@@ -72,6 +76,11 @@ func (conn *Conn) handleCall(msg *Message) {
 		m = exportedMethod(iface, name)
 	} else {
 		conn.handlersLck.RLock()
+		if _, ok := conn.handlers[path]; !ok {
+			conn.sendError(errmsgNoObject, sender, serial)
+			conn.handlersLck.RUnlock()
+			return
+		}
 		for _, v := range conn.handlers[path] {
 			m = exportedMethod(v, name)
 			if m.IsValid() {
