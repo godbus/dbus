@@ -29,10 +29,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, "name already taken")
 		os.Exit(1)
 	}
-	c := make(chan interface{})
+	c := make(chan prop.Change)
 	propsSpec := map[string]map[string]prop.Prop{
-		"com.github.guelfey.Demo": map[string]prop.Prop{
-			"SomeInt": prop.Prop{int32(0), true, c, prop.EmitTrue},
+		"com.github.guelfey.Demo": {
+			"SomeInt": {int32(0), true, c, prop.EmitTrue},
 		},
 	}
 	f := foo("Bar")
@@ -54,6 +54,6 @@ func main() {
 		"org.freedesktop.DBus.Introspectable")
 	fmt.Println("Listening on com.github.guelfey.Demo / /com/github/guelfey/Demo ...")
 	for v := range c {
-		fmt.Println("SomeInt changed to", v)
+		fmt.Println("SomeInt changed to", v.Value)
 	}
 }

@@ -111,13 +111,21 @@ type Prop struct {
 	// If true, the value can be modified by calls to Set.
 	Writable bool
 
-	// If not nil, anytime this property is changed by Set, the new value is
-	// sent to this channel.
-	Chan chan interface{}
+	// If not nil, anytime this property is changed by Set, a corresponding
+	// Change is sent to this channel.
+	Chan chan Change
 
 	// Controls how org.freedesktop.DBus.Properties.PropertiesChanged is
 	// emitted if this property changes.
 	Emit EmitType
+}
+
+// Change represents a change of a property by a call to Set.
+type Change struct {
+	Props *Properties
+	Iface string
+	Name  string
+	Value interface{}
 }
 
 // Properties is a set of values that can be made available to the message bus
@@ -233,7 +241,7 @@ func (p *Properties) Set(iface, property string, newv dbus.Variant) *dbus.Error 
 		if dbus.GetSignature(prop.Value) == newv.Signature() {
 			p.set(iface, property, newv.Value())
 			if prop.Chan != nil {
-				prop.Chan <- newv.Value()
+				prop.Chan <- Change{p, iface, property, newv.Value()}
 			}
 		} else {
 			return ErrInvalidType
