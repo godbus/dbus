@@ -55,7 +55,8 @@ func (o *Object) Call(method string, flags Flags, args ...interface{}) *Call {
 // return the same value once the call is done. If ch is nil, a new channel
 // will be allocated. Otherwise, ch has to be buffered or Call will panic.
 //
-// If the flags include FlagNoReplyExpected, nil is returned and ch is ignored.
+// If the flags include FlagNoReplyExpected, ch is ignored and a Call structure
+// is returned of which only the Err member is valid.
 //
 // If the method parameter contains a dot ('.'), the part before the last dot
 // specifies the interface on which the method is called.
@@ -98,11 +99,24 @@ func (o *Object) Go(method string, flags Flags, ch chan *Call, args ...interface
 		o.conn.callsLck.Lock()
 		o.conn.calls[msg.serial] = call
 		o.conn.callsLck.Unlock()
-		o.conn.out <- msg
+		o.conn.outLck.RLock()
+		if o.conn.closed {
+			call.Err = ErrClosed
+			call.Done <- call
+		} else {
+			o.conn.out <- msg
+		}
+		o.conn.outLck.RUnlock()
 		return call
 	}
-	o.conn.out <- msg
-	return nil
+	o.conn.outLck.RLock()
+	defer o.conn.outLck.RUnlock()
+	if o.conn.closed {
+		return &Call{Err: ErrClosed}
+	} else {
+		o.conn.out <- msg
+		return &Call{Err: nil}
+	}
 }
 
 // Destination returns the destination that calls on o are sent to.

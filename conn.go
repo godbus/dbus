@@ -19,28 +19,41 @@ var (
 	sessionBus *Conn
 )
 
+// ErrClosed is the error returned by calls on a closed connection.
+var ErrClosed = errors.New("closed by user")
+
 // Conn represents a connection to a message bus (usually, the system or
 // session bus).
 //
 // Multiple goroutines may invoke methods on a connection simultaneously.
 type Conn struct {
 	transport
-	uuid            string
-	names           []string
-	namesLck        sync.RWMutex
-	serial          chan uint32
-	serialUsed      chan uint32
-	calls           map[uint32]*Call
-	callsLck        sync.RWMutex
-	handlers        map[ObjectPath]map[string]interface{}
-	handlersLck     sync.RWMutex
-	out             chan *Message
-	signals         chan Signal
-	signalsLck      sync.Mutex
+
+	busObj *Object
+	unixFD bool
+	uuid   string
+
+	names    []string
+	namesLck sync.RWMutex
+
+	serial     chan uint32
+	serialUsed chan uint32
+
+	calls    map[uint32]*Call
+	callsLck sync.RWMutex
+
+	handlers    map[ObjectPath]map[string]interface{}
+	handlersLck sync.RWMutex
+
+	out    chan *Message
+	closed bool
+	outLck sync.RWMutex
+
+	signals    chan Signal
+	signalsLck sync.Mutex
+
 	eavesdropped    chan *Message
 	eavesdroppedLck sync.Mutex
-	busObj          *Object
-	unixFD          bool
 }
 
 // SessionBus returns the connection to the session bus, connecting to it if not
@@ -126,7 +139,10 @@ func (conn *Conn) BusObject() *Object {
 // Close closes the connection. Any blocked operations will return with errors
 // and the channels passed to Eavesdrop and Signal are closed.
 func (conn *Conn) Close() error {
+	conn.outLck.Lock()
 	close(conn.out)
+	conn.closed = true
+	conn.outLck.Unlock()
 	conn.signalsLck.Lock()
 	if conn.signals != nil {
 		close(conn.signals)
@@ -300,8 +316,11 @@ func (conn *Conn) outWorker() {
 // use this; use the higher-level equivalents (Call / Go, Emit and Export)
 // instead. If msg is a method call and NoReplyExpected is not set, a non-nil
 // call is returned and the same value is sent to ch (which must be buffered)
-// once the call is complete. Otherwise, nil is returned and ch is ignored.
+// once the call is complete. Otherwise, ch is ignored and a Call structure is
+// returned of which only the Err member is valid.
 func (conn *Conn) Send(msg *Message, ch chan *Call) *Call {
+	var call *Call
+
 	msg.serial = <-conn.serial
 	if msg.Type == TypeMethodCall && msg.Flags&FlagNoReplyExpected == 0 {
 		if ch == nil {
@@ -309,7 +328,7 @@ func (conn *Conn) Send(msg *Message, ch chan *Call) *Call {
 		} else if cap(ch) == 0 {
 			panic("(*dbus.Conn).Send: unbuffered channel")
 		}
-		call := new(Call)
+		call = new(Call)
 		call.Destination, _ = msg.Headers[FieldDestination].value.(string)
 		call.Path, _ = msg.Headers[FieldPath].value.(ObjectPath)
 		iface, _ := msg.Headers[FieldInterface].value.(string)
@@ -320,11 +339,25 @@ func (conn *Conn) Send(msg *Message, ch chan *Call) *Call {
 		conn.callsLck.Lock()
 		conn.calls[msg.serial] = call
 		conn.callsLck.Unlock()
-		conn.out <- msg
-		return call
+		conn.outLck.RLock()
+		if conn.closed {
+			call.Err = ErrClosed
+			call.Done <- call
+		} else {
+			conn.out <- msg
+		}
+		conn.outLck.RUnlock()
+	} else {
+		conn.outLck.RLock()
+		if conn.closed {
+			call = &Call{Err: ErrClosed}
+		} else {
+			conn.out <- msg
+			call = &Call{Err: nil}
+		}
+		conn.outLck.RUnlock()
 	}
-	conn.out <- msg
-	return nil
+	return call
 }
 
 // sendError creates an error message corresponding to the parameters and sends
@@ -342,7 +375,11 @@ func (conn *Conn) sendError(e Error, dest string, serial uint32) {
 	if len(e.Body) > 0 {
 		msg.Headers[FieldSignature] = MakeVariant(GetSignature(e.Body...))
 	}
-	conn.out <- msg
+	conn.outLck.RLock()
+	if !conn.closed {
+		conn.out <- msg
+	}
+	conn.outLck.RUnlock()
 }
 
 // sendReply creates a method reply message corresponding to the parameters and
@@ -359,7 +396,11 @@ func (conn *Conn) sendReply(dest string, serial uint32, values ...interface{}) {
 	if len(values) > 0 {
 		msg.Headers[FieldSignature] = MakeVariant(GetSignature(values...))
 	}
-	conn.out <- msg
+	conn.outLck.RLock()
+	if !conn.closed {
+		conn.out <- msg
+	}
+	conn.outLck.RUnlock()
 }
 
 // serials runs in an own goroutine, constantly sending serials on conn.serial

@@ -120,13 +120,17 @@ func (conn *Conn) handleCall(msg *Message) {
 		if len(ret) != 1 {
 			reply.Headers[FieldSignature] = MakeVariant(GetSignature(reply.Body...))
 		}
-		conn.out <- reply
+		conn.outLck.RLock()
+		if !conn.closed {
+			conn.out <- reply
+		}
+		conn.outLck.RUnlock()
 	}
 }
 
 // Emit emits the given signal on the message bus. The name parameter must be
 // formatted as "interface.member", e.g., "org.freedesktop.DBus.NameLost".
-func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) {
+func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) error {
 	i := strings.LastIndex(name, ".")
 	iface := name[:i]
 	member := name[i+1:]
@@ -142,7 +146,14 @@ func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) {
 	if len(values) > 0 {
 		msg.Headers[FieldSignature] = MakeVariant(GetSignature(values...))
 	}
-	conn.out <- msg
+	conn.outLck.RLock()
+	defer conn.outLck.RUnlock()
+	if conn.closed {
+		return ErrClosed
+	} else {
+		conn.out <- msg
+		return nil
+	}
 }
 
 // Export registers the given value to be exported as an object on the
