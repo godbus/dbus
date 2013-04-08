@@ -30,9 +30,9 @@ func main() {
 		os.Exit(1)
 	}
 	c := make(chan prop.Change)
-	propsSpec := map[string]map[string]prop.Prop{
+	propsSpec := map[string]map[string]*prop.Prop{
 		"com.github.guelfey.Demo": {
-			"SomeInt": {int32(0), true, c, prop.EmitTrue},
+			"SomeInt": {int32(0), true, prop.EmitTrue, c, nil},
 		},
 	}
 	f := foo("Bar")
