@@ -247,7 +247,7 @@ func (conn *Conn) inWorker() {
 				}
 				signal.Sender = msg.Headers[FieldSender].value.(string)
 				signal.Path = msg.Headers[FieldPath].value.(ObjectPath)
-				signal.Name = member + "." + iface
+				signal.Name = iface + "." + member
 				signal.Body = msg.Body
 				// don't block trying to send a signal
 				conn.signalsLck.Lock()
