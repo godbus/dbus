@@ -45,6 +45,9 @@ func Methods(v interface{}) []Method {
 	t := reflect.TypeOf(v)
 	ms := make([]Method, 0, t.NumMethod())
 	for i := 0; i < t.NumMethod(); i++ {
+		if t.Method(i).PkgPath != "" {
+			continue
+		}
 		mt := t.Method(i).Type
 		if mt.NumOut() == 0 ||
 			mt.Out(mt.NumOut()-1) != reflect.TypeOf(&dbus.Error{"", nil}) {
