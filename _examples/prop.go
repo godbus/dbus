@@ -29,10 +29,17 @@ func main() {
 		fmt.Fprintln(os.Stderr, "name already taken")
 		os.Exit(1)
 	}
-	c := make(chan prop.Change)
 	propsSpec := map[string]map[string]*prop.Prop{
 		"com.github.guelfey.Demo": {
-			"SomeInt": {int32(0), true, prop.EmitTrue, c, nil},
+			"SomeInt": {
+				int32(0),
+				true,
+				prop.EmitTrue,
+				func(c *prop.Change) *dbus.Error {
+					fmt.Println(c.Name, "changed to", c.Value)
+					return nil
+				},
+			},
 		},
 	}
 	f := foo("Bar")
@@ -53,7 +60,9 @@ func main() {
 	conn.Export(introspect.NewIntrospectable(n), "/com/github/guelfey/Demo",
 		"org.freedesktop.DBus.Introspectable")
 	fmt.Println("Listening on com.github.guelfey.Demo / /com/github/guelfey/Demo ...")
-	for v := range c {
-		fmt.Println("SomeInt changed to", v.Value)
+
+	c := make(chan dbus.Signal)
+	conn.Signal(c)
+	for _ = range c {
 	}
 }

@@ -32,8 +32,8 @@ var ErrPropNotFound = &dbus.Error{"org.freedesktop.DBus.Properties.Error.Propert
 // property.
 var ErrReadOnly = &dbus.Error{"org.freedesktop.DBus.Properties.Error.ReadOnly", nil}
 
-// ErrInvalidArg is returned to peers if the Check function of a property
-// returned false.
+// ErrInvalidArg is returned to peers if the type of the property that is being
+// changed and the argument don't match.
 var ErrInvalidArg = &dbus.Error{"org.freedesktop.DBus.Properties.Error.InvalidArg", nil}
 
 // The introspection data for the org.freedesktop.DBus.Properties interface.
@@ -115,14 +115,11 @@ type Prop struct {
 	// emitted if this property changes.
 	Emit EmitType
 
-	// If not nil, anytime this property is changed by Set, a corresponding
-	// Change is sent to this channel.
-	Chan chan Change
-
-	// If not nil, this function is called whenever Set is called with the
-	// new value as its argument. If it returns false, the property is not
-	// changed and an error is returned to the caller of Set.
-	Check func(interface{}) bool
+	// If not nil, anytime this property is changed by Set, this function is
+	// called with an appropiate Change as its argument. If the returned error
+	// is not nil, it is sent back to the caller of Set and the property is not
+	// changed.
+	Callback func(*Change) *dbus.Error
 }
 
 // Change represents a change of a property by a call to Set.
@@ -242,18 +239,19 @@ func (p *Properties) Set(iface, property string, newv dbus.Variant) *dbus.Error 
 	if !ok {
 		return ErrPropNotFound
 	}
-	if prop.Writable {
-		if prop.Check != nil || prop.Check(newv.Value()) {
-			p.set(iface, property, newv.Value())
-			if prop.Chan != nil {
-				prop.Chan <- Change{p, iface, property, newv.Value()}
-			}
-		} else {
-			return ErrInvalidArg
-		}
-	} else {
+	if !prop.Writable {
 		return ErrReadOnly
 	}
+	if newv.Signature() != dbus.GetSignature(prop.Value) {
+		return ErrInvalidArg
+	}
+	if prop.Callback != nil {
+		err := prop.Callback(&Change{p, iface, property, newv.Value()})
+		if err != nil {
+			return err
+		}
+	}
+	p.set(iface, property, newv.Value())
 	return nil
 }
 
