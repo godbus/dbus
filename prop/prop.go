@@ -10,7 +10,7 @@ import (
 
 // EmitType controls how org.freedesktop.DBus.Properties.PropertiesChanged is
 // emitted for a property. If it is EmitTrue, the signal is emitted. If it is
-// EmitInvalidtes, the signal is also emitted, but the new value of the property
+// EmitInvalidates, the signal is also emitted, but the new value of the property
 // is not disclosed.
 type EmitType byte
 

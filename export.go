@@ -19,7 +19,7 @@ var (
 	}
 	errmsgUnknownMethod = Error{
 		"org.freedesktop.DBus.Error.UnknownMethod",
-		[]interface{}{"Unkown / invalid method"},
+		[]interface{}{"Unknown / invalid method"},
 	}
 )
 
