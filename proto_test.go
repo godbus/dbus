@@ -41,6 +41,10 @@ var protoTests = []struct {
 		[]byte{1, 's', 0, 0, 0, 0, 0, 3, 'f', 'o', 'o', 0},
 	},
 	{
+		[]interface{}{MakeVariant(MakeVariant(Signature{"v"}))},
+		[]byte{1, 'v', 0, 1, 'g', 0, 1, 'v', 0},
+	},
+	{
 		[]interface{}{struct {
 			A int32
 			B int16
@@ -198,6 +202,27 @@ func TestProtoStoreNestedStruct(t *testing.T) {
 	err := Store(src, &foo)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestMessage(t *testing.T) {
+	buf := new(bytes.Buffer)
+	message := new(Message)
+	message.Order = binary.LittleEndian
+	message.Type = TypeMethodCall
+	message.serial = 32
+	message.Headers = map[HeaderField]Variant{
+		FieldPath:   MakeVariant(ObjectPath("/org/foo/bar")),
+		FieldMember: MakeVariant("baz"),
+	}
+	message.Body = make([]interface{}, 0)
+	err := message.EncodeTo(buf)
+	if err != nil {
+		t.Error(err)
+	}
+	_, err = DecodeMessage(buf)
+	if err != nil {
+		t.Error(err)
 	}
 }
 
