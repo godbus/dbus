@@ -142,8 +142,8 @@ func (s Signature) Empty() bool {
 
 // Single returns whether the signature represents a single, complete type.
 func (s Signature) Single() bool {
-	_, r := validSingle(s.str, 0)
-	return r == ""
+	err, r := validSingle(s.str, 0)
+	return err != nil && r == ""
 }
 
 // String returns the signature's string representation.
