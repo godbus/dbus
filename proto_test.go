@@ -57,7 +57,7 @@ func TestProto(t *testing.T) {
 	for i, v := range protoTests {
 		buf := new(bytes.Buffer)
 		enc := NewEncoder(buf, binary.BigEndian)
-		enc.EncodeMulti(v.vs...)
+		enc.Encode(v.vs...)
 		marshalled := buf.Bytes()
 		if bytes.Compare(marshalled, v.marshalled) != 0 {
 			t.Errorf("test %d (marshal): got '%v', but expected '%v'\n", i+1, marshalled,
@@ -70,7 +70,7 @@ func TestProto(t *testing.T) {
 				reflect.New(reflect.TypeOf(v.vs[i])))
 		}
 		dec := NewDecoder(bytes.NewReader(v.marshalled), binary.BigEndian)
-		unmarshal := reflect.ValueOf(dec).MethodByName("DecodeMulti")
+		unmarshal := reflect.ValueOf(dec).MethodByName("Decode")
 		ret := unmarshal.CallSlice([]reflect.Value{unmarshalled})
 		err := ret[0].Interface()
 		if err != nil {

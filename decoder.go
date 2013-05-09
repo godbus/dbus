@@ -51,12 +51,12 @@ func (dec *Decoder) binread(v interface{}) {
 	}
 }
 
-// Decode decodes a single value from the decoder and stores it
-// in v. If v isn't a pointer, Decode panics. For the details of decoding,
-// see the documentation of Decoder.
+// Decode decodes values from the decoder and stores them in the locations
+// pointed to by vs. If one element of vs isn't a pointer, Decode panics. For
+// the details of decoding, see the documentation of Decoder.
 //
 // The input is expected to be aligned as required by the DBus spec.
-func (dec *Decoder) Decode(v interface{}) (err error) {
+func (dec *Decoder) Decode(vs ...interface{}) (err error) {
 	defer func() {
 		var ok bool
 		if err, ok = recover().(error); ok {
@@ -65,16 +65,8 @@ func (dec *Decoder) Decode(v interface{}) (err error) {
 			}
 		}
 	}()
-	dec.decode(reflect.ValueOf(v), 0)
-	return nil
-}
-
-// DecodeMulti is a shorthand for decoding multiple values.
-func (dec *Decoder) DecodeMulti(vs ...interface{}) error {
 	for _, v := range vs {
-		if err := dec.Decode(v); err != nil {
-			return err
-		}
+		dec.decode(reflect.ValueOf(v), 0)
 	}
 	return nil
 }

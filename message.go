@@ -127,7 +127,7 @@ func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 
 	msg = new(Message)
 	msg.Order = order
-	err = dec.DecodeMulti(&msg.Type, &msg.Flags, &proto, &length, &msg.serial)
+	err = dec.Decode(&msg.Type, &msg.Flags, &proto, &length, &msg.serial)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +171,7 @@ func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 		vs := sig.Values()
 		buf := bytes.NewBuffer(body)
 		dec = NewDecoder(buf, order)
-		if err = dec.DecodeMulti(vs...); err != nil {
+		if err = dec.Decode(vs...); err != nil {
 			return nil, err
 		}
 		msg.Body = dereferenceAll(vs)
@@ -196,7 +196,7 @@ func (msg *Message) EncodeTo(out io.Writer) error {
 	body := new(bytes.Buffer)
 	enc := NewEncoder(body, msg.Order)
 	if len(msg.Body) != 0 {
-		enc.EncodeMulti(msg.Body...)
+		enc.Encode(msg.Body...)
 	}
 	vs[1] = msg.Type
 	vs[2] = msg.Flags
@@ -210,7 +210,7 @@ func (msg *Message) EncodeTo(out io.Writer) error {
 	vs[6] = headers
 	var buf bytes.Buffer
 	enc = NewEncoder(&buf, msg.Order)
-	enc.EncodeMulti(vs[:]...)
+	enc.Encode(vs[:]...)
 	enc.align(8)
 	body.WriteTo(&buf)
 	if buf.Len() > 1<<27 {

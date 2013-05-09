@@ -74,22 +74,14 @@ func (enc *Encoder) binwrite(v interface{}) {
 	}
 }
 
-// Encode encodes a single value to the underyling reader. All written values
+// Encode encodes the given values to the underyling reader. All written values
 // are aligned properly as required by the DBus spec.
-func (enc *Encoder) Encode(v interface{}) (err error) {
+func (enc *Encoder) Encode(vs ...interface{}) (err error) {
 	defer func() {
 		err, _ = recover().(error)
 	}()
-	enc.encode(reflect.ValueOf(v), 0)
-	return nil
-}
-
-// Encode is a shorthand for multiple Encode calls.
-func (enc *Encoder) EncodeMulti(vs ...interface{}) error {
 	for _, v := range vs {
-		if err := enc.Encode(v); err != nil {
-			return err
-		}
+		enc.encode(reflect.ValueOf(v), 0)
 	}
 	return nil
 }
