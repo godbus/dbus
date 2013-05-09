@@ -156,13 +156,14 @@ func (conn *Conn) Close() error {
 	return conn.transport.Close()
 }
 
-// Eavesdrop changes the channel to which all messages are sent whose
-// destination field is not one of the known names of this connection and which
-// are not signals. The caller has to make sure that c is sufficiently buffered;
+// Eavesdrop causes conn to send all incoming messages to the given channel
+// without further processing. Method replies, errors and signals will not be
+// sent to the appropiate channels and method calls will not be handled. If nil
+// is passed, the normal behaviour is restored.
+//
+// The caller has to make sure that c is sufficiently buffered;
 // if a message arrives when a write to c is not possible, the message is
 // discarded.
-//
-// The channel can be reset by passing nil.
 func (conn *Conn) Eavesdrop(c chan *Message) {
 	conn.eavesdroppedLck.Lock()
 	conn.eavesdropped = c
@@ -189,21 +190,8 @@ func (conn *Conn) inWorker() {
 	for {
 		msg, err := conn.ReadMessage()
 		if err == nil {
-			dest, _ := msg.Headers[FieldDestination].value.(string)
-			found := false
-			conn.namesLck.RLock()
-			if len(conn.names) == 0 {
-				found = true
-			}
-			for _, v := range conn.names {
-				if dest == v {
-					found = true
-					break
-				}
-			}
-			conn.namesLck.RUnlock()
 			conn.eavesdroppedLck.Lock()
-			if !found && (msg.Type != TypeSignal || conn.eavesdropped != nil) {
+			if conn.eavesdropped != nil {
 				select {
 				case conn.eavesdropped <- msg:
 				default:
@@ -212,6 +200,28 @@ func (conn *Conn) inWorker() {
 				continue
 			}
 			conn.eavesdroppedLck.Unlock()
+			dest, _ := msg.Headers[FieldDestination].value.(string)
+			found := false
+			if dest == "" {
+				found = true
+			} else {
+				conn.namesLck.RLock()
+				if len(conn.names) == 0 {
+					found = true
+				}
+				for _, v := range conn.names {
+					if dest == v {
+						found = true
+						break
+					}
+				}
+				conn.namesLck.RUnlock()
+			}
+			if !found {
+				// Eavesdropped a message, but no channel for it is registered.
+				// Ignore it.
+				continue
+			}
 			switch msg.Type {
 			case TypeMethodReply, TypeError:
 				serial := msg.Headers[FieldReplySerial].value.(uint32)
