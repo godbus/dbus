@@ -16,7 +16,7 @@ func main() {
 	conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0,
 		"type='signal',path='/org/freedesktop/DBus',interface='org.freedesktop.DBus',sender='org.freedesktop.DBus'")
 
-	c := make(chan dbus.Signal, 10)
+	c := make(chan *dbus.Signal, 10)
 	conn.Signal(c)
 	for v := range c {
 		fmt.Println(v)

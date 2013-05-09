@@ -196,7 +196,7 @@ func (p *Properties) Introspection(iface string) []introspect.Property {
 	m := p.m[iface]
 	s := make([]introspect.Property, 0, len(m))
 	for k, v := range m {
-		p := introspect.Property{Name: k, Type: dbus.GetSignature(v.Value).String()}
+		p := introspect.Property{Name: k, Type: dbus.SignatureOf(v.Value).String()}
 		if v.Writable {
 			p.Access = "readwrite"
 		} else {
@@ -242,7 +242,7 @@ func (p *Properties) Set(iface, property string, newv dbus.Variant) *dbus.Error 
 	if !prop.Writable {
 		return ErrReadOnly
 	}
-	if newv.Signature() != dbus.GetSignature(prop.Value) {
+	if newv.Signature() != dbus.SignatureOf(prop.Value) {
 		return ErrInvalidArg
 	}
 	if prop.Callback != nil {

@@ -22,16 +22,15 @@ var sigToType = map[byte]reflect.Type{
 	'h': unixFDIndexType,
 }
 
-// Signature represents a correct type signature as specified
-// by the DBus specification.
+// Signature represents a correct type signature as specified by the DBus
+// specification. The zero value represents the empty signature, "".
 type Signature struct {
 	str string
 }
 
-// GetSignature returns the concatenation of all the signatures
-// of the given values. It panics if one of them is not representable
-// in DBus.
-func GetSignature(vs ...interface{}) Signature {
+// SignatureOf returns the concatenation of all the signatures of the given
+// values. It panics if one of them is not representable in DBus.
+func SignatureOf(vs ...interface{}) Signature {
 	var s string
 	for _, v := range vs {
 		s += getSignature(reflect.TypeOf(v))
@@ -39,9 +38,9 @@ func GetSignature(vs ...interface{}) Signature {
 	return Signature{s}
 }
 
-// GetSignatureType returns the signature of the given type. It panics if the
+// SignatureType returns the signature of the given type. It panics if the
 // type is not representable in DBus.
-func GetSignatureType(t reflect.Type) Signature {
+func SignatureOfType(t reflect.Type) Signature {
 	return Signature{getSignature(t)}
 }
 
@@ -105,9 +104,9 @@ func getSignature(t reflect.Type) string {
 	panic(InvalidTypeError{t})
 }
 
-// StringToSig returns the signature represented by this string, or a
+// ParseSignature returns the signature represented by this string, or a
 // SignatureError if the string is not a valid signature.
-func StringToSig(s string) (sig Signature, err error) {
+func ParseSignature(s string) (sig Signature, err error) {
 	if len(s) == 0 {
 		return
 	}
@@ -125,10 +124,10 @@ func StringToSig(s string) (sig Signature, err error) {
 	return
 }
 
-// StringToSigMust behaves like StringToSig, except that it panics if s is not
-// valid.
-func StringToSigMust(s string) Signature {
-	sig, err := StringToSig(s)
+// ParseSignatureMust behaves like ParseSignature, except that it panics if s
+// is not valid.
+func ParseSignatureMust(s string) Signature {
+	sig, err := ParseSignature(s)
 	if err != nil {
 		panic(err)
 	}

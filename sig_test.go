@@ -41,7 +41,7 @@ var sigTests = []struct {
 
 func TestSig(t *testing.T) {
 	for i, v := range sigTests {
-		sig := GetSignature(v.vs...)
+		sig := SignatureOf(v.vs...)
 		if sig != v.sig {
 			t.Errorf("test %d: got %q, expected %q", i+1, sig.str, v.sig.str)
 		}
@@ -77,13 +77,13 @@ var getSigTest = []interface{}{
 
 func BenchmarkGetSignatureSimple(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		GetSignature("", int32(0))
+		SignatureOf("", int32(0))
 	}
 }
 
 func BenchmarkGetSignatureLong(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		GetSignature(getSigTest...)
+		SignatureOf(getSigTest...)
 	}
 }
 

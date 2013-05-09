@@ -81,7 +81,7 @@ func (o *Object) Go(method string, flags Flags, ch chan *Call, args ...interface
 	}
 	msg.Body = args
 	if len(args) > 0 {
-		msg.Headers[FieldSignature] = MakeVariant(GetSignature(args...))
+		msg.Headers[FieldSignature] = MakeVariant(SignatureOf(args...))
 	}
 	if msg.Flags&FlagNoReplyExpected == 0 {
 		if ch == nil {

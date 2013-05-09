@@ -16,7 +16,7 @@ type Variant struct {
 // MakeVariant converts the given value to a Variant. It panics if v cannot be
 // represented as a DBus type.
 func MakeVariant(v interface{}) Variant {
-	return Variant{GetSignature(v), v}
+	return Variant{SignatureOf(v), v}
 }
 
 // format returns a formatted version of v and whether this string can be parsed

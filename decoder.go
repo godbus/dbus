@@ -225,7 +225,7 @@ func (dec *Decoder) decode(v reflect.Value, depth int) {
 				panic(err)
 			}
 			dec.pos += int(length) + 1
-			sig, err := StringToSig(string(b[:len(b)-1]))
+			sig, err := ParseSignature(string(b[:len(b)-1]))
 			if err != nil {
 				panic(err)
 			}

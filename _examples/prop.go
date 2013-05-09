@@ -61,7 +61,7 @@ func main() {
 		"org.freedesktop.DBus.Introspectable")
 	fmt.Println("Listening on com.github.guelfey.Demo / /com/github/guelfey/Demo ...")
 
-	c := make(chan dbus.Signal)
+	c := make(chan *dbus.Signal)
 	conn.Signal(c)
 	for _ = range c {
 	}

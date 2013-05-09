@@ -277,6 +277,12 @@ func (msg *Message) IsValid() error {
 	return nil
 }
 
+// Serial returns the message's serial number. The returned value is only valid
+// for messages received by eavesdropping.
+func (msg *Message) Serial() uint32 {
+	return msg.serial
+}
+
 // String returns a string representation of a message similar to the format of
 // dbus-monitor.
 func (msg *Message) String() string {

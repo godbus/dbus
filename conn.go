@@ -49,7 +49,7 @@ type Conn struct {
 	closed bool
 	outLck sync.RWMutex
 
-	signals    chan Signal
+	signals    chan *Signal
 	signalsLck sync.Mutex
 
 	eavesdropped    chan *Message
@@ -229,7 +229,6 @@ func (conn *Conn) inWorker() {
 				}
 				conn.callsLck.Unlock()
 			case TypeSignal:
-				var signal Signal
 				iface := msg.Headers[FieldInterface].value.(string)
 				member := msg.Headers[FieldMember].value.(string)
 				if iface == "org.freedesktop.DBus" && member == "NameLost" &&
@@ -245,10 +244,12 @@ func (conn *Conn) inWorker() {
 					}
 					conn.namesLck.Unlock()
 				}
-				signal.Sender = msg.Headers[FieldSender].value.(string)
-				signal.Path = msg.Headers[FieldPath].value.(ObjectPath)
-				signal.Name = iface + "." + member
-				signal.Body = msg.Body
+				signal := &Signal{
+					Sender: msg.Headers[FieldSender].value.(string),
+					Path:   msg.Headers[FieldPath].value.(ObjectPath),
+					Name:   iface + "." + member,
+					Body:   msg.Body,
+				}
 				// don't block trying to send a signal
 				conn.signalsLck.Lock()
 				select {
@@ -373,7 +374,7 @@ func (conn *Conn) sendError(e Error, dest string, serial uint32) {
 	msg.Headers[FieldReplySerial] = MakeVariant(serial)
 	msg.Body = e.Body
 	if len(e.Body) > 0 {
-		msg.Headers[FieldSignature] = MakeVariant(GetSignature(e.Body...))
+		msg.Headers[FieldSignature] = MakeVariant(SignatureOf(e.Body...))
 	}
 	conn.outLck.RLock()
 	if !conn.closed {
@@ -394,7 +395,7 @@ func (conn *Conn) sendReply(dest string, serial uint32, values ...interface{}) {
 	msg.Headers[FieldReplySerial] = MakeVariant(serial)
 	msg.Body = values
 	if len(values) > 0 {
-		msg.Headers[FieldSignature] = MakeVariant(GetSignature(values...))
+		msg.Headers[FieldSignature] = MakeVariant(SignatureOf(values...))
 	}
 	conn.outLck.RLock()
 	if !conn.closed {
@@ -432,7 +433,7 @@ func (conn *Conn) serials() {
 // This channel is "overwritten" by Eavesdrop; i.e., if there currently is a
 // channel for eavesdropped messages, this channel receives all signals, and the
 // channel passed to Signal will not receive any signals.
-func (conn *Conn) Signal(c chan Signal) {
+func (conn *Conn) Signal(c chan *Signal) {
 	conn.signalsLck.Lock()
 	conn.signals = c
 	conn.signalsLck.Unlock()

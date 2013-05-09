@@ -58,11 +58,11 @@ func Methods(v interface{}) []Method {
 		m.Name = t.Method(i).Name
 		m.Args = make([]Arg, mt.NumIn()+mt.NumOut()-2)
 		for j := 1; j < mt.NumIn(); j++ {
-			m.Args[j-1] = Arg{"", dbus.GetSignatureType(mt.In(j)).String(), "in"}
+			m.Args[j-1] = Arg{"", dbus.SignatureOfType(mt.In(j)).String(), "in"}
 		}
 		for j := 0; j < mt.NumOut()-1; j++ {
 			m.Args[mt.NumIn()+j-1] = Arg{"",
-				dbus.GetSignatureType(mt.Out(j)).String(), "out"}
+				dbus.SignatureOfType(mt.Out(j)).String(), "out"}
 		}
 		m.Annotations = make([]Annotation, 0)
 		ms = append(ms, m)

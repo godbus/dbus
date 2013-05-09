@@ -127,7 +127,7 @@ func (conn *Conn) handleCall(msg *Message) {
 			reply.Body[i] = ret[i].Interface()
 		}
 		if len(ret) != 1 {
-			reply.Headers[FieldSignature] = MakeVariant(GetSignature(reply.Body...))
+			reply.Headers[FieldSignature] = MakeVariant(SignatureOf(reply.Body...))
 		}
 		conn.outLck.RLock()
 		if !conn.closed {
@@ -165,7 +165,7 @@ func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) erro
 	msg.Headers[FieldPath] = MakeVariant(path)
 	msg.Body = values
 	if len(values) > 0 {
-		msg.Headers[FieldSignature] = MakeVariant(GetSignature(values...))
+		msg.Headers[FieldSignature] = MakeVariant(SignatureOf(values...))
 	}
 	conn.outLck.RLock()
 	defer conn.outLck.RUnlock()
