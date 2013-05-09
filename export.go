@@ -182,8 +182,8 @@ func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) erro
 //
 // If a method call on the given path and interface is received, an exported
 // method with the same name is called with v as the receiver if the
-// parameters match and the last return value is of type *ErrorMessage.
-// If this *ErrorMessage is not nil, it is sent back to the caller as an error.
+// parameters match and the last return value is of type *Error. If this
+// *Error is not nil, it is sent back to the caller as an error.
 // Otherwise, a method reply is sent with the other return values as its body.
 //
 // Every method call is executed in a new goroutine, so the method may be called
