@@ -104,13 +104,23 @@ func SystemBus() (conn *Conn, err error) {
 
 // Dial establishes a new connection to the message bus specified by address.
 func Dial(address string) (*Conn, error) {
-	var err error
-	conn := new(Conn)
-	conn.transport, err = getTransport(address)
+	tr, err := getTransport(address)
 	if err != nil {
 		return nil, err
 	}
-	if err = conn.auth(); err != nil {
+	return newConn(tr)
+}
+
+// NewConn creates a new *Conn from an already established connection.
+func NewConn(conn io.ReadWriteCloser) (*Conn, error) {
+	return newConn(genericTransport{conn})
+}
+
+// newConn creates a new *Conn from a transport.
+func newConn(tr transport) (*Conn, error) {
+	conn := new(Conn)
+	conn.transport = tr
+	if err := conn.auth(); err != nil {
 		conn.transport.Close()
 		return nil, err
 	}
@@ -123,7 +133,7 @@ func Dial(address string) (*Conn, error) {
 	go conn.inWorker()
 	go conn.outWorker()
 	go conn.serials()
-	if err = conn.hello(); err != nil {
+	if err := conn.hello(); err != nil {
 		conn.transport.Close()
 		return nil, err
 	}
