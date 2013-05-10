@@ -3,12 +3,9 @@ Package dbus implements bindings to the DBus message bus system, as well as the
 corresponding encoding format.
 
 For the message bus API, you first need to connect to a bus (usually the session
-or system bus). Then, call methods by getting an Object and then calling Go or
-Call on it. Signals can be received by passing a channel to (*Connection).Signal
-and can be emitted via (*Connection).Emit.
-
-Handling method calls by peers is even easier; using (*Connection).Export, you
-can arrange DBus methods calls to be directly translated to method calls on a Go
+or system bus). The acquired connection then can be used to call methods on
+remote objects and emit or receive signals. Using the Export method, you can
+arrange DBus methods calls to be directly translated to method calls on a Go
 value.
 
 Unix FD passing deserves special mention. To use it, you should first check that
