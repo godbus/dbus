@@ -79,9 +79,14 @@ func BenchmarkServe(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	sessionBus = nil
-	cli, err := SessionBus()
+	cli, err := SessionBusPrivate()
 	if err != nil {
+		b.Fatal(err)
+	}
+	if err = cli.Auth(nil); err != nil {
+		b.Fatal(err)
+	}
+	if err = cli.Hello(); err != nil {
 		b.Fatal(err)
 	}
 	benchmarkServe(b, srv, cli)
@@ -93,9 +98,14 @@ func BenchmarkServeAsync(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	sessionBus = nil
-	cli, err := SessionBus()
+	cli, err := SessionBusPrivate()
 	if err != nil {
+		b.Fatal(err)
+	}
+	if err = cli.Auth(nil); err != nil {
+		b.Fatal(err)
+	}
+	if err = cli.Hello(); err != nil {
 		b.Fatal(err)
 	}
 	benchmarkServeAsync(b, srv, cli)
@@ -120,6 +130,7 @@ func BenchmarkServeSameConnAsync(b *testing.B) {
 
 	benchmarkServeAsync(b, bus, bus)
 }
+
 func benchmarkServe(b *testing.B, srv, cli *Conn) {
 	var r int64
 	var err error

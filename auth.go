@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"os/user"
 )
 
 // AuthStatus represents the Status of an authentication mechanism.
@@ -30,26 +31,30 @@ const (
 	waitingForReject
 )
 
-// AuthMechanisms lists all authentication mechanisms that are tried. To
-// implement your own mechanism, just add it to this map before connecting. The
-// key must be the name that is used for the AUTH command.
-var AuthMechanisms = map[string]AuthMechanism{
-	"DBUS_COOKIE_SHA1": AuthCookieSha1{},
-	"EXTERNAL":         AuthExternal{},
-}
-
-// AuthMechanism defines the behaviour of an authentication mechanism.
-type AuthMechanism interface {
-	// Return the argument to the first AUTH command and the next status.
-	FirstData() (resp []byte, status AuthStatus)
+// Auth defines the behaviour of an authentication mechanism.
+type Auth interface {
+	// Return the name of the mechnism, the argument to the first AUTH command
+	// and the next status.
+	FirstData() (name, resp []byte, status AuthStatus)
 
 	// Process the given DATA command, and return the argument to the DATA
 	// command and the next status. If len(resp) == 0, no DATA command is sent.
 	HandleData(data []byte) (resp []byte, status AuthStatus)
 }
 
-// auth does the whole authentication stuff.
-func (conn *Conn) auth() error {
+// Auth authenticates the connection, trying the given list of authentication
+// mechanisms (in that order). If nil is passed, the EXTERNAL and
+// DBUS_COOKIE_SHA1 mechanisms are tried for the current user. For private
+// connections, this method must be called before sending any messages to the
+// bus. Auth must not be called on shared connections.
+func (conn *Conn) Auth(methods []Auth) error {
+	if methods == nil {
+		u, err := user.Current()
+		if err != nil {
+			return err
+		}
+		methods = []Auth{AuthExternal(u.Username), AuthCookieSha1(u.Username, u.HomeDir)}
+	}
 	in := bufio.NewReader(conn.transport)
 	_, err := conn.transport.Write([]byte{0})
 	if err != nil {
@@ -68,47 +73,52 @@ func (conn *Conn) auth() error {
 	}
 	s = s[1:]
 	for _, v := range s {
-		if m, ok := AuthMechanisms[string(v)]; ok {
-			data, status := m.FirstData()
-			err = authWriteLine(conn.transport, []byte("AUTH"), []byte(v), data)
-			if err != nil {
-				return err
-			}
-			switch status {
-			case AuthOk:
-				err, ok = conn.tryAuth(m, waitingForOk, in)
-			case AuthContinue:
-				err, ok = conn.tryAuth(m, waitingForData, in)
-			default:
-				panic("invalid authentication status")
-			}
-			if err != nil {
-				return err
-			}
-			if ok {
-				if conn.transport.SupportsUnixFDs() {
-					err = authWriteLine(conn, []byte("NEGOTIATE_UNIX_FD"))
-					if err != nil {
-						return err
-					}
-					line, err := authReadLine(in)
-					if err != nil {
-						return err
-					}
-					switch {
-					case bytes.Equal(line[0], []byte("AGREE_UNIX_FD")):
-						conn.EnableUnixFDs()
-						conn.unixFD = true
-					case bytes.Equal(line[0], []byte("ERROR")):
-					default:
-						return errors.New("authentication protocol error")
-					}
-				}
-				err = authWriteLine(conn.transport, []byte("BEGIN"))
+		for _, m := range methods {
+			if name, data, status := m.FirstData(); bytes.Equal(v, name) {
+				var ok bool
+				err = authWriteLine(conn.transport, []byte("AUTH"), []byte(v), data)
 				if err != nil {
 					return err
 				}
-				return nil
+				switch status {
+				case AuthOk:
+					err, ok = conn.tryAuth(m, waitingForOk, in)
+				case AuthContinue:
+					err, ok = conn.tryAuth(m, waitingForData, in)
+				default:
+					panic("invalid authentication status")
+				}
+				if err != nil {
+					return err
+				}
+				if ok {
+					if conn.transport.SupportsUnixFDs() {
+						err = authWriteLine(conn, []byte("NEGOTIATE_UNIX_FD"))
+						if err != nil {
+							return err
+						}
+						line, err := authReadLine(in)
+						if err != nil {
+							return err
+						}
+						switch {
+						case bytes.Equal(line[0], []byte("AGREE_UNIX_FD")):
+							conn.EnableUnixFDs()
+							conn.unixFD = true
+						case bytes.Equal(line[0], []byte("ERROR")):
+						default:
+							return errors.New("authentication protocol error")
+						}
+					}
+					err = authWriteLine(conn.transport, []byte("BEGIN"))
+					if err != nil {
+						return err
+					}
+					go conn.inWorker()
+					go conn.outWorker()
+					go conn.serials()
+					return nil
+				}
 			}
 		}
 	}
@@ -119,7 +129,7 @@ func (conn *Conn) auth() error {
 // initial authState and in for reading input. It returns (nil, true) on
 // success, (nil, false) on a REJECTED and (someErr, false) if some other
 // error occured.
-func (conn *Conn) tryAuth(m AuthMechanism, state authState, in *bufio.Reader) (error, bool) {
+func (conn *Conn) tryAuth(m Auth, state authState, in *bufio.Reader) (error, bool) {
 	for {
 		s, err := authReadLine(in)
 		if err != nil {

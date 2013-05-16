@@ -15,8 +15,10 @@ import (
 const defaultSystemBusAddress = "unix:path=/var/run/dbus/system_bus_socket"
 
 var (
-	systemBus  *Conn
-	sessionBus *Conn
+	systemBus     *Conn
+	systemBusLck  sync.Mutex
+	sessionBus    *Conn
+	sessionBusLck sync.Mutex
 )
 
 // ErrClosed is the error returned by calls on a closed connection.
@@ -24,6 +26,10 @@ var ErrClosed = errors.New("closed by user")
 
 // Conn represents a connection to a message bus (usually, the system or
 // session bus).
+//
+// Connections are either shared or private. Shared connections
+// are shared between calls to the functions that return them. As a result,
+// the methods Close, Auth and Hello must not be called on them.
 //
 // Multiple goroutines may invoke methods on a connection simultaneously.
 type Conn struct {
@@ -56,9 +62,11 @@ type Conn struct {
 	eavesdroppedLck sync.Mutex
 }
 
-// SessionBus returns the connection to the session bus, connecting to it if not
-// already done.
+// SessionBus returns a shared connection to the session bus, connecting to it
+// if not already done.
 func SessionBus() (conn *Conn, err error) {
+	sessionBusLck.Lock()
+	defer sessionBusLck.Unlock()
 	if sessionBus != nil {
 		return sessionBus, nil
 	}
@@ -67,6 +75,21 @@ func SessionBus() (conn *Conn, err error) {
 			sessionBus = conn
 		}
 	}()
+	conn, err = SessionBusPrivate()
+	if err = conn.Auth(nil); err != nil {
+		conn.Close()
+		conn = nil
+		return
+	}
+	if err = conn.Hello(); err != nil {
+		conn.Close()
+		conn = nil
+	}
+	return
+}
+
+// SessionBusPrivate returns a new private connection to the session bus.
+func SessionBusPrivate() (*Conn, error) {
 	address := os.Getenv("DBUS_SESSION_BUS_ADDRESS")
 	if address != "" && address != "autolaunch:" {
 		return Dial(address)
@@ -84,9 +107,11 @@ func SessionBus() (conn *Conn, err error) {
 	return Dial(string(b[i+1 : j]))
 }
 
-// SystemBus returns the connection to the sytem bus, connecting to it if not
-// already done.
+// SystemBus returns a shared connection to the system bus, connecting to it if
+// not already done.
 func SystemBus() (conn *Conn, err error) {
+	systemBusLck.Lock()
+	defer systemBusLck.Unlock()
 	if systemBus != nil {
 		return systemBus, nil
 	}
@@ -95,6 +120,24 @@ func SystemBus() (conn *Conn, err error) {
 			systemBus = conn
 		}
 	}()
+	conn, err = SystemBusPrivate()
+	if err != nil {
+		return
+	}
+	if err = conn.Auth(nil); err != nil {
+		conn.Close()
+		conn = nil
+		return
+	}
+	if err = conn.Hello(); err != nil {
+		conn.Close()
+		conn = nil
+	}
+	return
+}
+
+// SystemBusPrivate returns a new private connection to the system bus.
+func SystemBusPrivate() (*Conn, error) {
 	address := os.Getenv("DBUS_SYSTEM_BUS_ADDRESS")
 	if address != "" {
 		return Dial(address)
@@ -102,7 +145,7 @@ func SystemBus() (conn *Conn, err error) {
 	return Dial(defaultSystemBusAddress)
 }
 
-// Dial establishes a new connection to the message bus specified by address.
+// Dial establishes a new private connection to the message bus specified by address.
 func Dial(address string) (*Conn, error) {
 	tr, err := getTransport(address)
 	if err != nil {
@@ -111,7 +154,7 @@ func Dial(address string) (*Conn, error) {
 	return newConn(tr)
 }
 
-// NewConn creates a new *Conn from an already established connection.
+// NewConn creates a new private *Conn from an already established connection.
 func NewConn(conn io.ReadWriteCloser) (*Conn, error) {
 	return newConn(genericTransport{conn})
 }
@@ -120,23 +163,12 @@ func NewConn(conn io.ReadWriteCloser) (*Conn, error) {
 func newConn(tr transport) (*Conn, error) {
 	conn := new(Conn)
 	conn.transport = tr
-	if err := conn.auth(); err != nil {
-		conn.transport.Close()
-		return nil, err
-	}
 	conn.calls = make(map[uint32]*Call)
 	conn.out = make(chan *Message, 10)
 	conn.handlers = make(map[ObjectPath]map[string]interface{})
 	conn.serial = make(chan uint32)
 	conn.serialUsed = make(chan uint32)
 	conn.busObj = conn.Object("org.freedesktop.DBus", "/org/freedesktop/DBus")
-	go conn.inWorker()
-	go conn.outWorker()
-	go conn.serials()
-	if err := conn.hello(); err != nil {
-		conn.transport.Close()
-		return nil, err
-	}
 	return conn, nil
 }
 
@@ -147,7 +179,8 @@ func (conn *Conn) BusObject() *Object {
 }
 
 // Close closes the connection. Any blocked operations will return with errors
-// and the channels passed to Eavesdrop and Signal are closed.
+// and the channels passed to Eavesdrop and Signal are closed. This method must
+// not be called on shared connections.
 func (conn *Conn) Close() error {
 	conn.outLck.Lock()
 	close(conn.out)
@@ -180,8 +213,10 @@ func (conn *Conn) Eavesdrop(c chan *Message) {
 	conn.eavesdroppedLck.Unlock()
 }
 
-// hello sends the initial org.freedesktop.DBus.Hello call.
-func (conn *Conn) hello() error {
+// Hello sends the initial org.freedesktop.DBus.Hello call. This method must be
+// called after authentication, but before sending any other messages to the
+// bus. Hello must not be called for shared connections.
+func (conn *Conn) Hello() error {
 	var s string
 	err := conn.busObj.Call("org.freedesktop.DBus.Hello", 0).Store(&s)
 	if err != nil {

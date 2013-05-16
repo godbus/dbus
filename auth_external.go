@@ -2,22 +2,25 @@ package dbus
 
 import (
 	"encoding/hex"
-	"os/user"
 )
 
-// AuthExternal implements the EXTERNAL authentication mechanism.
-type AuthExternal struct{}
-
-func (a AuthExternal) FirstData() ([]byte, AuthStatus) {
-	u, err := user.Current()
-	if err != nil {
-		return nil, AuthError
-	}
-	b := make([]byte, 2*len(u.Username))
-	hex.Encode(b, []byte(u.Username))
-	return b, AuthOk
+// AuthExternal returns an Auth that authenticates as the given user with the
+// EXTERNAL mechanism.
+func AuthExternal(user string) Auth {
+	return authExternal{user}
 }
 
-func (a AuthExternal) HandleData(b []byte) ([]byte, AuthStatus) {
+// AuthExternal implements the EXTERNAL authentication mechanism.
+type authExternal struct {
+	user string
+}
+
+func (a authExternal) FirstData() ([]byte, []byte, AuthStatus) {
+	b := make([]byte, 2*len(a.user))
+	hex.Encode(b, []byte(a.user))
+	return []byte("EXTERNAL"), b, AuthOk
+}
+
+func (a authExternal) HandleData(b []byte) ([]byte, AuthStatus) {
 	return nil, AuthError
 }
