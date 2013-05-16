@@ -14,10 +14,7 @@ DBus message bus system.
 
 ### Installation
 
-Because this package needs some new reflection features, it currently requires a
-Go runtime built from the hg tip. (This will change once Go 1.1 is released.)
-
-If you have this, just run:
+This packages requires Go 1.1. If you installed it and set up your GOPATH, just run:
 
 ```
 go get github.com/guelfey/go.dbus

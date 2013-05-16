@@ -26,6 +26,3 @@ implemented here.
 
 */
 package dbus
-
-// BUG(guelfey): This package needs new reflection features that are only
-// availabe from the hg tip until Go 1.1 is released.
