@@ -38,7 +38,7 @@ func SignatureOf(vs ...interface{}) Signature {
 	return Signature{s}
 }
 
-// SignatureType returns the signature of the given type. It panics if the
+// SignatureOfType returns the signature of the given type. It panics if the
 // type is not representable in DBus.
 func SignatureOfType(t reflect.Type) Signature {
 	return Signature{getSignature(t)}

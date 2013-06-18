@@ -53,7 +53,7 @@ func (o *Object) Call(method string, flags Flags, args ...interface{}) *Call {
 // Go calls a method with the given arguments asynchronously. It returns a
 // Call structure representing this method call. The passed channel will
 // return the same value once the call is done. If ch is nil, a new channel
-// will be allocated. Otherwise, ch has to be buffered or Call will panic.
+// will be allocated. Otherwise, ch has to be buffered or Go will panic.
 //
 // If the flags include FlagNoReplyExpected, ch is ignored and a Call structure
 // is returned of which only the Err member is valid.
@@ -113,10 +113,9 @@ func (o *Object) Go(method string, flags Flags, ch chan *Call, args ...interface
 	defer o.conn.outLck.RUnlock()
 	if o.conn.closed {
 		return &Call{Err: ErrClosed}
-	} else {
-		o.conn.out <- msg
-		return &Call{Err: nil}
 	}
+	o.conn.out <- msg
+	return &Call{Err: nil}
 }
 
 // Destination returns the destination that calls on o are sent to.

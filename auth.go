@@ -12,14 +12,17 @@ import (
 type AuthStatus byte
 
 const (
-	// Authentication is finished; next command from the server should be an OK.
+	// AuthOk signals that authentication is finished; the next command
+	// from the server should be an OK.
 	AuthOk AuthStatus = iota
 
-	// Additional data is needed; next command from the server should be a DATA.
+	// AuthContinue signals that additional data is needed; the next command
+	// from the server should be a DATA.
 	AuthContinue
 
-	// Error; the server sent invalid data or some other unexpected thing
-	// happend and the current authentication process should be aborted.
+	// AuthError signals an error; the server sent invalid data or some
+	// other unexpected thing happened and the current authentication
+	// process should be aborted.
 	AuthError
 )
 

@@ -171,10 +171,9 @@ func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) erro
 	defer conn.outLck.RUnlock()
 	if conn.closed {
 		return ErrClosed
-	} else {
-		conn.out <- msg
-		return nil
 	}
+	conn.out <- msg
+	return nil
 }
 
 // Export registers the given value to be exported as an object on the

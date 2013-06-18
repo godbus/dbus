@@ -15,7 +15,12 @@ const protoVersion byte = 1
 type Flags byte
 
 const (
+	// FlagNoReplyExpected signals that the message is not expected to generate
+	// a reply. If this flag is set on outgoing messages, any possible reply
+	// will be discarded.
 	FlagNoReplyExpected Flags = 1 << iota
+	// FlagNoAutoStart signals that the message bus should not automatically
+	// start an application when handling this message.
 	FlagNoAutoStart
 )
 
