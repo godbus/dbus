@@ -169,7 +169,7 @@ func (t *unixTransport) SendMessage(msg *Message) error {
 		msg.Headers[FieldUnixFDs] = MakeVariant(uint32(len(fds)))
 		oob := syscall.UnixRights(fds...)
 		buf := new(bytes.Buffer)
-		msg.EncodeTo(buf)
+		msg.EncodeTo(buf, binary.LittleEndian)
 		n, oobn, err := t.UnixConn.WriteMsgUnix(buf.Bytes(), oob, nil)
 		if err != nil {
 			return err
@@ -178,7 +178,7 @@ func (t *unixTransport) SendMessage(msg *Message) error {
 			return io.ErrShortWrite
 		}
 	} else {
-		if err := msg.EncodeTo(t); err != nil {
+		if err := msg.EncodeTo(t, binary.LittleEndian); err != nil {
 			return nil
 		}
 	}

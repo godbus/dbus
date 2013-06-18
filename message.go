@@ -3,6 +3,7 @@ package dbus
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -84,9 +85,6 @@ var requiredFields = [typeMax][]HeaderField{
 
 // Message represents a single DBus message.
 type Message struct {
-	// must be binary.BigEndian or binary.LittleEndian
-	Order binary.ByteOrder
-
 	Type
 	Flags
 	Headers map[HeaderField]Variant
@@ -103,10 +101,10 @@ type header struct {
 	Variant
 }
 
-// DecodeMessage tries to decode a single message from the given reader.
-// The byte order is figured out from the first byte. The possibly returned
-// error can be an error of the underlying reader, an InvalidMessageError or a
-// FormatError.
+// DecodeMessage tries to decode a single message in the D-Bus wire format
+// from the given reader. The byte order is figured out from the first byte.
+// The possibly returned error can be an error of the underlying reader, an
+// InvalidMessageError or a FormatError.
 func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 	var order binary.ByteOrder
 	var hlength, length uint32
@@ -131,7 +129,6 @@ func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 	dec.pos = 1
 
 	msg = new(Message)
-	msg.Order = order
 	err = dec.Decode(&msg.Type, &msg.Flags, &proto, &length, &msg.serial)
 	if err != nil {
 		return nil, err
@@ -185,21 +182,24 @@ func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 	return
 }
 
-// EncodeTo encodes and sends a message to the given writer. If the message is
-// not valid or an error occurs when writing, an error is returned.
-func (msg *Message) EncodeTo(out io.Writer) error {
+// EncodeTo encodes and sends a message to the given writer. The byte order must
+// be either binary.LittleEndian or binary.BigEndian. If the message is not
+// valid or an error occurs when writing, an error is returned.
+func (msg *Message) EncodeTo(out io.Writer, order binary.ByteOrder) error {
 	if err := msg.IsValid(); err != nil {
 		return err
 	}
 	var vs [7]interface{}
-	switch msg.Order {
+	switch order {
 	case binary.LittleEndian:
 		vs[0] = byte('l')
 	case binary.BigEndian:
 		vs[0] = byte('B')
+	default:
+		return errors.New("dbus: invalid byte order")
 	}
 	body := new(bytes.Buffer)
-	enc := NewEncoder(body, msg.Order)
+	enc := NewEncoder(body, order)
 	if len(msg.Body) != 0 {
 		enc.Encode(msg.Body...)
 	}
@@ -214,7 +214,7 @@ func (msg *Message) EncodeTo(out io.Writer) error {
 	}
 	vs[6] = headers
 	var buf bytes.Buffer
-	enc = NewEncoder(&buf, msg.Order)
+	enc = NewEncoder(&buf, order)
 	enc.Encode(vs[:]...)
 	enc.align(8)
 	body.WriteTo(&buf)
@@ -230,11 +230,6 @@ func (msg *Message) EncodeTo(out io.Writer) error {
 // IsValid checks whether msg is a valid message and returns an
 // InvalidMessageError if it is not.
 func (msg *Message) IsValid() error {
-	switch msg.Order {
-	case binary.LittleEndian, binary.BigEndian:
-	default:
-		return InvalidMessageError("invalid byte order")
-	}
 	if msg.Flags & ^(FlagNoAutoStart|FlagNoReplyExpected) != 0 {
 		return InvalidMessageError("invalid flags")
 	}

@@ -1,6 +1,7 @@
 package dbus
 
 import (
+	"encoding/binary"
 	"errors"
 	"io"
 )
@@ -30,5 +31,5 @@ func (t genericTransport) SendMessage(msg *Message) error {
 			return errors.New("unix fd passing not enabled")
 		}
 	}
-	return msg.EncodeTo(t)
+	return msg.EncodeTo(t, binary.LittleEndian)
 }

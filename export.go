@@ -1,7 +1,6 @@
 package dbus
 
 import (
-	"encoding/binary"
 	"errors"
 	"reflect"
 	"strings"
@@ -116,7 +115,6 @@ func (conn *Conn) handleCall(msg *Message) {
 	}
 	if msg.Flags&FlagNoReplyExpected == 0 {
 		reply := new(Message)
-		reply.Order = binary.LittleEndian
 		reply.Type = TypeMethodReply
 		reply.serial = <-conn.serial
 		reply.Headers = make(map[HeaderField]Variant)
@@ -156,7 +154,6 @@ func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) erro
 		return errors.New("invalid interface name")
 	}
 	msg := new(Message)
-	msg.Order = binary.LittleEndian
 	msg.Type = TypeSignal
 	msg.serial = <-conn.serial
 	msg.Headers = make(map[HeaderField]Variant)

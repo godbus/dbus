@@ -2,7 +2,6 @@ package dbus
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"io"
 	"os"
@@ -420,7 +419,6 @@ func (conn *Conn) Send(msg *Message, ch chan *Call) *Call {
 // it to conn.out.
 func (conn *Conn) sendError(e Error, dest string, serial uint32) {
 	msg := new(Message)
-	msg.Order = binary.LittleEndian
 	msg.Type = TypeError
 	msg.serial = <-conn.serial
 	msg.Headers = make(map[HeaderField]Variant)
@@ -442,7 +440,6 @@ func (conn *Conn) sendError(e Error, dest string, serial uint32) {
 // sends it to conn.out.
 func (conn *Conn) sendReply(dest string, serial uint32, values ...interface{}) {
 	msg := new(Message)
-	msg.Order = binary.LittleEndian
 	msg.Type = TypeMethodReply
 	msg.serial = <-conn.serial
 	msg.Headers = make(map[HeaderField]Variant)

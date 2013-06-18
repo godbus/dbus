@@ -1,7 +1,6 @@
 package dbus
 
 import (
-	"encoding/binary"
 	"errors"
 	"strings"
 )
@@ -68,7 +67,6 @@ func (o *Object) Go(method string, flags Flags, ch chan *Call, args ...interface
 	}
 	method = method[i+1:]
 	msg := new(Message)
-	msg.Order = binary.LittleEndian
 	msg.Type = TypeMethodCall
 	msg.serial = <-o.conn.serial
 	msg.Flags = flags & (FlagNoAutoStart | FlagNoReplyExpected)
