@@ -54,7 +54,7 @@ type Conn struct {
 	closed bool
 	outLck sync.RWMutex
 
-	signals    chan *Signal
+	signals    []chan *Signal
 	signalsLck sync.Mutex
 
 	eavesdropped    chan *Message
@@ -186,8 +186,8 @@ func (conn *Conn) Close() error {
 	conn.closed = true
 	conn.outLck.Unlock()
 	conn.signalsLck.Lock()
-	if conn.signals != nil {
-		close(conn.signals)
+	for _, ch := range conn.signals {
+		close(ch)
 	}
 	conn.signalsLck.Unlock()
 	conn.eavesdroppedLck.Lock()
@@ -304,11 +304,13 @@ func (conn *Conn) inWorker() {
 					Name:   iface + "." + member,
 					Body:   msg.Body,
 				}
-				// don't block trying to send a signal
 				conn.signalsLck.Lock()
-				select {
-				case conn.signals <- signal:
-				default:
+				for _, ch := range conn.signals {
+					// don't block trying to send a signal
+					select {
+					case ch <- signal:
+					default:
+					}
 				}
 				conn.signalsLck.Unlock()
 			case TypeMethodCall:
@@ -476,18 +478,20 @@ func (conn *Conn) serials() {
 	}
 }
 
-// Signal sets the channel to which all received signal messages are forwarded.
-// The caller has to make sure that c is sufficiently buffered; if a message
+// Signal registers the given channel to be passed all received signal messages.
+// The caller has to make sure that ch is sufficiently buffered; if a message
 // arrives when a write to c is not possible, it is discarded.
 //
-// The channel can be reset by passing nil.
+// Multiple of these channels can be registered at the same time. Passing a
+// channel that already is registered will remove it from the list of the
+// registered channels.
 //
-// This channel is "overwritten" by Eavesdrop; i.e., if there currently is a
-// channel for eavesdropped messages, this channel receives all signals, and the
-// channel passed to Signal will not receive any signals.
-func (conn *Conn) Signal(c chan *Signal) {
+// Thess channels are "overwritten" by Eavesdrop; i.e., if there currently is a
+// channel for eavesdropped messages, this channel receives all signals, and
+// none of the channels passed to Signal will receive any signals.
+func (conn *Conn) Signal(ch chan *Signal) {
 	conn.signalsLck.Lock()
-	conn.signals = c
+	conn.signals = append(conn.signals, ch)
 	conn.signalsLck.Unlock()
 }
 
