@@ -188,12 +188,24 @@ func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) erro
 // Method calls on the interface org.freedesktop.DBus.Peer will be automatically
 // handled for every object.
 //
+// Passing nil as the first parameter will cause conn to cease handling calls on
+// the given combination of path and interface.
+//
 // Export returns an error if path is not a valid path name.
 func (conn *Conn) Export(v interface{}, path ObjectPath, iface string) error {
 	if !path.IsValid() {
 		return errors.New("dbus: invalid path name")
 	}
 	conn.handlersLck.Lock()
+	if v == nil {
+		if _, ok := conn.handlers[path]; ok {
+			delete(conn.handlers[path], iface)
+			if len(conn.handlers[path]) == 0 {
+				delete(conn.handlers, path)
+			}
+		}
+		return nil
+	}
 	if _, ok := conn.handlers[path]; !ok {
 		conn.handlers[path] = make(map[string]interface{})
 	}
@@ -240,16 +252,8 @@ func (conn *Conn) RequestName(name string, flags RequestNameFlags) (RequestNameR
 	return RequestNameReply(r), nil
 }
 
-// Unexport causes conn to cease handling method calls on the given combination
-// of path and interface.
 func (conn *Conn) Unexport(path ObjectPath, iface string) {
 	conn.handlersLck.Lock()
-	if _, ok := conn.handlers[path]; ok {
-		delete(conn.handlers[path], iface)
-		if len(conn.handlers) == 0 {
-			delete(conn.handlers, path)
-		}
-	}
 	conn.handlersLck.Unlock()
 }
 
