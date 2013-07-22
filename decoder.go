@@ -6,7 +6,7 @@ import (
 	"reflect"
 )
 
-// A decoder reads values that are encoded in the DBus wire format.
+// A decoder reads values that are encoded in the D-Bus wire format.
 //
 // For decoding, the inverse of the encoding that an Encoder applies is used,
 // with the following exceptions:
@@ -55,7 +55,7 @@ func (dec *decoder) binread(v interface{}) {
 // pointed to by vs. If one element of vs isn't a pointer, Decode panics. For
 // the details of decoding, see the documentation of Decoder.
 //
-// The input is expected to be aligned as required by the DBus spec.
+// The input is expected to be aligned as required by the D-Bus spec.
 func (dec *decoder) Decode(vs ...interface{}) (err error) {
 	defer func() {
 		var ok bool

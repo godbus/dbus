@@ -23,14 +23,14 @@ var sigToType = map[byte]reflect.Type{
 	'h': unixFDIndexType,
 }
 
-// Signature represents a correct type signature as specified by the DBus
+// Signature represents a correct type signature as specified by the D-Bus
 // specification. The zero value represents the empty signature, "".
 type Signature struct {
 	str string
 }
 
 // SignatureOf returns the concatenation of all the signatures of the given
-// values. It panics if one of them is not representable in DBus.
+// values. It panics if one of them is not representable in D-Bus.
 func SignatureOf(vs ...interface{}) Signature {
 	var s string
 	for _, v := range vs {
@@ -40,7 +40,7 @@ func SignatureOf(vs ...interface{}) Signature {
 }
 
 // SignatureOfType returns the signature of the given type. It panics if the
-// type is not representable in DBus.
+// type is not representable in D-Bus.
 func SignatureOfType(t reflect.Type) Signature {
 	return Signature{getSignature(t)}
 }

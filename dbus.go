@@ -27,7 +27,7 @@ var (
 )
 
 // An InvalidTypeError signals that a value which cannot be represented in the
-// DBus wire format was passed to a function.
+// D-Bus wire format was passed to a function.
 type InvalidTypeError struct {
 	Type reflect.Type
 }
@@ -75,7 +75,7 @@ func Store(src []interface{}, dest ...interface{}) error {
 	return nil
 }
 
-// An ObjectPath is an object path as defined by the DBus spec.
+// An ObjectPath is an object path as defined by the D-Bus spec.
 type ObjectPath string
 
 // IsValid returns whether the object path is valid.
@@ -140,7 +140,7 @@ func alignment(t reflect.Type) int {
 	return 1
 }
 
-// isKeyType returns whether t is a valid type for a DBus dict.
+// isKeyType returns whether t is a valid type for a D-Bus dict.
 func isKeyType(t reflect.Type) bool {
 	switch t.Kind() {
 	case reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,

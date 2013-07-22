@@ -1,6 +1,5 @@
 /*
-Package dbus implements bindings to the DBus message bus system, as well as the
-corresponding encoding format.
+Package dbus implements bindings to the D-Bus message bus system.
 
 To use the message bus API, you first need to connect to a bus (usually the
 session or system bus). The acquired connection then can be used to call methods

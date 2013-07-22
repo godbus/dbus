@@ -42,7 +42,7 @@ func (enc *encoder) binwrite(v interface{}) {
 }
 
 // Encode encodes the given values to the underyling reader. All written values
-// are aligned properly as required by the DBus spec.
+// are aligned properly as required by the D-Bus spec.
 func (enc *encoder) Encode(vs ...interface{}) (err error) {
 	defer func() {
 		err, _ = recover().(error)

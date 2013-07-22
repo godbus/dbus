@@ -7,14 +7,14 @@ import (
 	"strconv"
 )
 
-// Variant represents the DBus variant type.
+// Variant represents the D-Bus variant type.
 type Variant struct {
 	sig   Signature
 	value interface{}
 }
 
 // MakeVariant converts the given value to a Variant. It panics if v cannot be
-// represented as a DBus type.
+// represented as a D-Bus type.
 func MakeVariant(v interface{}) Variant {
 	return Variant{SignatureOf(v), v}
 }
@@ -85,7 +85,7 @@ func (v Variant) format() (string, bool) {
 	return `"INVALID"`, true
 }
 
-// Signature returns the DBus signature of the underlying value of v.
+// Signature returns the D-Bus signature of the underlying value of v.
 func (v Variant) Signature() Signature {
 	return v.sig
 }

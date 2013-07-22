@@ -503,7 +503,7 @@ func (conn *Conn) SupportsUnixFDs() bool {
 	return conn.unixFD
 }
 
-// Error represents a DBus message of type Error.
+// Error represents a D-Bus message of type Error.
 type Error struct {
 	Name string
 	Body []interface{}
@@ -519,8 +519,8 @@ func (e Error) Error() string {
 	return e.Name
 }
 
-// Signal represents a DBus message of type Signal. The name member is given in
-// "interface.member" notation, e.g. org.freedesktop.DBus.NameLost.
+// Signal represents a D-Bus message of type Signal. The name member is given in
+// "interface.member" notation, e.g. org.freedesktop.D-Bus.NameLost.
 type Signal struct {
 	Sender string
 	Path   ObjectPath
@@ -528,7 +528,7 @@ type Signal struct {
 	Body   []interface{}
 }
 
-// transport is a DBus transport.
+// transport is a D-Bus transport.
 type transport interface {
 	// Read and Write raw data (for example, for the authentication protocol).
 	io.ReadWriteCloser

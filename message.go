@@ -12,7 +12,7 @@ import (
 
 const protoVersion byte = 1
 
-// Flags represents the possible flags of a DBus message.
+// Flags represents the possible flags of a D-Bus message.
 type Flags byte
 
 const (
@@ -25,7 +25,7 @@ const (
 	FlagNoAutoStart
 )
 
-// Type represents the possible types of a DBus message.
+// Type represents the possible types of a D-Bus message.
 type Type byte
 
 const (
@@ -37,7 +37,7 @@ const (
 )
 
 // HeaderField represents the possible byte codes for the headers
-// of a DBus message.
+// of a D-Bus message.
 type HeaderField byte
 
 const (
@@ -53,7 +53,7 @@ const (
 	fieldMax
 )
 
-// An InvalidMessageError describes the reason why a DBus message is regarded as
+// An InvalidMessageError describes the reason why a D-Bus message is regarded as
 // invalid.
 type InvalidMessageError string
 
@@ -83,7 +83,7 @@ var requiredFields = [typeMax][]HeaderField{
 	TypeSignal:      {FieldPath, FieldInterface, FieldMember},
 }
 
-// Message represents a single DBus message.
+// Message represents a single D-Bus message.
 type Message struct {
 	Type
 	Flags
