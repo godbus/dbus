@@ -1,6 +1,7 @@
 package dbus
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 )
@@ -168,8 +169,8 @@ type SignatureError struct {
 	Reason string
 }
 
-func (err SignatureError) Error() string {
-	return "dbus: invalid signature: '" + err.Sig + "' (" + err.Reason + ")"
+func (e SignatureError) Error() string {
+	return fmt.Sprintf("dbus: invalid signature: %q (%s)", e.Sig, e.Reason)
 }
 
 // Try to read a single type from this string. If it was successfull, err is nil

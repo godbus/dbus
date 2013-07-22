@@ -24,7 +24,7 @@ type Call struct {
 	Body []interface{}
 }
 
-var errSignature = errors.New("mismatched signature")
+var errSignature = errors.New("dbus: mismatched signature")
 
 // Store stores the body of the reply into the provided pointers. It returns
 // an error if the signatures of the body and retvalues don't match, or if
@@ -85,7 +85,7 @@ func (o *Object) Go(method string, flags Flags, ch chan *Call, args ...interface
 		if ch == nil {
 			ch = make(chan *Call, 10)
 		} else if cap(ch) == 0 {
-			panic("(*dbus.Object).Go: unbuffered channel")
+			panic("dbus: unbuffered channel passed to (*Object).Go")
 		}
 		call := &Call{
 			Destination: o.dest,

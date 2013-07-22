@@ -72,7 +72,7 @@ func (conn *Conn) Auth(methods []Auth) error {
 		return err
 	}
 	if len(s) < 2 || !bytes.Equal(s[0], []byte("REJECTED")) {
-		return errors.New("authentication protocol error")
+		return errors.New("dbus: authentication protocol error")
 	}
 	s = s[1:]
 	for _, v := range s {
@@ -89,7 +89,7 @@ func (conn *Conn) Auth(methods []Auth) error {
 				case AuthContinue:
 					err, ok = conn.tryAuth(m, waitingForData, in)
 				default:
-					panic("invalid authentication status")
+					panic("dbus: invalid authentication status")
 				}
 				if err != nil {
 					return err
@@ -110,7 +110,7 @@ func (conn *Conn) Auth(methods []Auth) error {
 							conn.unixFD = true
 						case bytes.Equal(line[0], []byte("ERROR")):
 						default:
-							return errors.New("authentication protocol error")
+							return errors.New("dbus: authentication protocol error")
 						}
 					}
 					err = authWriteLine(conn.transport, []byte("BEGIN"))
@@ -125,7 +125,7 @@ func (conn *Conn) Auth(methods []Auth) error {
 			}
 		}
 	}
-	return errors.New("authentication failed")
+	return errors.New("dbus: authentication failed")
 }
 
 // tryAuth tries to authenticate with m as the mechanism, using state as the
@@ -216,9 +216,9 @@ func (conn *Conn) tryAuth(m Auth, state authState, in *bufio.Reader) (error, boo
 		case state == waitingForReject && string(s[0]) == "REJECTED":
 			return nil, false
 		case state == waitingForReject:
-			return errors.New("authentication protocol error"), false
+			return errors.New("dbus: authentication protocol error"), false
 		default:
-			panic("invalid auth state")
+			panic("dbus: invalid auth state")
 		}
 	}
 }

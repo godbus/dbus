@@ -22,7 +22,7 @@ func (o *oobReader) Read(b []byte) (n int, err error) {
 		return n, err
 	}
 	if flags&syscall.MSG_CTRUNC != 0 {
-		return n, errors.New("control data truncated (too many fds received)")
+		return n, errors.New("dbus: control data truncated (too many fds received)")
 	}
 	o.oob = append(o.oob, o.buf[:oobn]...)
 	return n, nil
@@ -41,7 +41,7 @@ func newUnixTransport(keys string) (transport, error) {
 	path := getKey(keys, "path")
 	switch {
 	case abstract == "" && path == "":
-		return nil, errors.New("bad address: neither path nor abstract set")
+		return nil, errors.New("dbus: invalid address (neither path nor abstract set)")
 	case abstract != "" && path == "":
 		t.UnixConn, err = net.DialUnix("unix", nil, &net.UnixAddr{Name: "@" + abstract, Net: "unix"})
 		if err != nil {
@@ -54,10 +54,9 @@ func newUnixTransport(keys string) (transport, error) {
 			return nil, err
 		}
 		return t, nil
-	case abstract != "" && path != "":
-		return nil, errors.New("bad address: both path and abstract set")
+	default:
+		return nil, errors.New("dbus: invalid address (both path and abstract set)")
 	}
-	panic("not reached")
 }
 
 func (t *unixTransport) EnableUnixFDs() {
@@ -121,7 +120,7 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 	}
 	if unixfds != 0 {
 		if !t.hasUnixFDs {
-			return nil, errors.New("got unix fds on unsupported transport")
+			return nil, errors.New("dbus: got unix fds on unsupported transport")
 		}
 		// read the fds from the OOB data
 		scms, err := syscall.ParseSocketControlMessage(rd.oob)
@@ -129,7 +128,7 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 			return nil, err
 		}
 		if len(scms) != 1 {
-			return nil, errors.New("invalid number of SCM's received")
+			return nil, errors.New("dbus: received more than one socket control message")
 		}
 		fds, err := syscall.ParseUnixRights(&scms[0])
 		if err != nil {
@@ -164,7 +163,7 @@ func (t *unixTransport) SendMessage(msg *Message) error {
 	}
 	if len(fds) != 0 {
 		if !t.hasUnixFDs {
-			return errors.New("unix fd passing not enabled")
+			return errors.New("dbus: unix fd passing not enabled")
 		}
 		msg.Headers[FieldUnixFDs] = MakeVariant(uint32(len(fds)))
 		oob := syscall.UnixRights(fds...)

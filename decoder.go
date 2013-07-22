@@ -61,7 +61,7 @@ func (dec *Decoder) Decode(vs ...interface{}) (err error) {
 		var ok bool
 		if err, ok = recover().(error); ok {
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
-				err = FormatError("input too short (unexpected EOF)")
+				err = FormatError("unexpected EOF")
 			}
 		}
 	}()
@@ -261,5 +261,5 @@ func (dec *Decoder) decode(v reflect.Value, depth int) {
 type FormatError string
 
 func (e FormatError) Error() string {
-	return "dbus format error: " + string(e)
+	return "dbus: wire format error: " + string(e)
 }

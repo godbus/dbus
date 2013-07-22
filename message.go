@@ -58,7 +58,7 @@ const (
 type InvalidMessageError string
 
 func (e InvalidMessageError) Error() string {
-	return "invalid message: " + string(e)
+	return "dbus: invalid message: " + string(e)
 }
 
 // fieldType are the types of the various header fields.

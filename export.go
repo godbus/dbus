@@ -139,19 +139,19 @@ func (conn *Conn) handleCall(msg *Message) {
 // formatted as "interface.member", e.g., "org.freedesktop.DBus.NameLost".
 func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) error {
 	if !path.IsValid() {
-		return errors.New("invalid object path")
+		return errors.New("dbus: invalid object path")
 	}
 	i := strings.LastIndex(name, ".")
 	if i == -1 {
-		return errors.New("invalid method name")
+		return errors.New("dbus: invalid method name")
 	}
 	iface := name[:i]
 	member := name[i+1:]
 	if !isValidMember(member) {
-		return errors.New("invalid method name")
+		return errors.New("dbus: invalid method name")
 	}
 	if !isValidInterface(iface) {
-		return errors.New("invalid interface name")
+		return errors.New("dbus: invalid interface name")
 	}
 	msg := new(Message)
 	msg.Type = TypeSignal
@@ -191,7 +191,7 @@ func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) erro
 // Export returns an error if path is not a valid path name.
 func (conn *Conn) Export(v interface{}, path ObjectPath, iface string) error {
 	if !path.IsValid() {
-		return errors.New("invalid path name")
+		return errors.New("dbus: invalid path name")
 	}
 	conn.handlersLck.Lock()
 	if _, ok := conn.handlers[path]; !ok {

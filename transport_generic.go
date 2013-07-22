@@ -28,7 +28,7 @@ func (t genericTransport) ReadMessage() (*Message, error) {
 func (t genericTransport) SendMessage(msg *Message) error {
 	for _, v := range msg.Body {
 		if _, ok := v.(UnixFD); ok {
-			return errors.New("unix fd passing not enabled")
+			return errors.New("dbus: unix fd passing not enabled")
 		}
 	}
 	return msg.EncodeTo(t, binary.LittleEndian)

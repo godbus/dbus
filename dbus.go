@@ -32,8 +32,8 @@ type InvalidTypeError struct {
 	Type reflect.Type
 }
 
-func (err InvalidTypeError) Error() string {
-	return "dbus: invalid type " + err.Type.String()
+func (e InvalidTypeError) Error() string {
+	return "dbus: invalid type " + e.Type.String()
 }
 
 // Store copies the values contained in src to dest, which must be a slice of

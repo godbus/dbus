@@ -21,7 +21,7 @@ var (
 )
 
 // ErrClosed is the error returned by calls on a closed connection.
-var ErrClosed = errors.New("closed by user")
+var ErrClosed = errors.New("dbus: connection closed by user")
 
 // Conn represents a connection to a message bus (usually, the system or
 // session bus).
@@ -101,7 +101,7 @@ func SessionBusPrivate() (*Conn, error) {
 	i := bytes.IndexByte(b, '=')
 	j := bytes.IndexByte(b, '\n')
 	if i == -1 || j == -1 {
-		return nil, errors.New("couldn't determine address of the session bus")
+		return nil, errors.New("dbus: couldn't determine address of session bus")
 	}
 	return Dial(string(b[i+1 : j]))
 }
@@ -383,7 +383,7 @@ func (conn *Conn) Send(msg *Message, ch chan *Call) *Call {
 		if ch == nil {
 			ch = make(chan *Call, 5)
 		} else if cap(ch) == 0 {
-			panic("(*dbus.Conn).Send: unbuffered channel")
+			panic("dbus: unbuffered channel passed to (*Conn).Send")
 		}
 		call = new(Call)
 		call.Destination, _ = msg.Headers[FieldDestination].value.(string)
@@ -558,12 +558,12 @@ func getTransport(address string) (transport, error) {
 	for _, v := range addresses {
 		i := strings.IndexRune(v, ':')
 		if i == -1 {
-			err = errors.New("bad address: no transport")
+			err = errors.New("dbus: invalid bus address (no transport)")
 			continue
 		}
 		f := m[v[:i]]
 		if f == nil {
-			err = errors.New("bad address: invalid or unsupported transport")
+			err = errors.New("dbus: invalid bus address (invalid or unsupported transport)")
 		}
 		t, err = f(v[i+1:])
 		if err == nil {
