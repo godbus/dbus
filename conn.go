@@ -54,10 +54,10 @@ type Conn struct {
 	closed bool
 	outLck sync.RWMutex
 
-	signals    []chan *Signal
+	signals    []chan<- *Signal
 	signalsLck sync.Mutex
 
-	eavesdropped    chan *Message
+	eavesdropped    chan<- *Message
 	eavesdroppedLck sync.Mutex
 }
 
@@ -203,12 +203,12 @@ func (conn *Conn) Close() error {
 // sent to the appropiate channels and method calls will not be handled. If nil
 // is passed, the normal behaviour is restored.
 //
-// The caller has to make sure that c is sufficiently buffered;
-// if a message arrives when a write to c is not possible, the message is
+// The caller has to make sure that ch is sufficiently buffered;
+// if a message arrives when a write to ch is not possible, the message is
 // discarded.
-func (conn *Conn) Eavesdrop(c chan *Message) {
+func (conn *Conn) Eavesdrop(ch chan<- *Message) {
 	conn.eavesdroppedLck.Lock()
-	conn.eavesdropped = c
+	conn.eavesdropped = ch
 	conn.eavesdroppedLck.Unlock()
 }
 
@@ -486,10 +486,10 @@ func (conn *Conn) serials() {
 // channel that already is registered will remove it from the list of the
 // registered channels.
 //
-// Thess channels are "overwritten" by Eavesdrop; i.e., if there currently is a
+// These channels are "overwritten" by Eavesdrop; i.e., if there currently is a
 // channel for eavesdropped messages, this channel receives all signals, and
 // none of the channels passed to Signal will receive any signals.
-func (conn *Conn) Signal(ch chan *Signal) {
+func (conn *Conn) Signal(ch chan<- *Signal) {
 	conn.signalsLck.Lock()
 	conn.signals = append(conn.signals, ch)
 	conn.signalsLck.Unlock()
