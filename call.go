@@ -19,8 +19,7 @@ type Call struct {
 	// error message from the peer (with Error as its type) or some other error.
 	Err error
 
-	// Holds the response once the call is done. Structs are represented as
-	// a slice of empty interfaces.
+	// Holds the response once the call is done.
 	Body []interface{}
 }
 

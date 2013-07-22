@@ -88,10 +88,7 @@ type Message struct {
 	Type
 	Flags
 	Headers map[HeaderField]Variant
-
-	// The message body. For incoming messages, structs are represented as a
-	// slice of empty interfaces.
-	Body []interface{}
+	Body    []interface{}
 
 	serial uint32
 }
@@ -125,7 +122,7 @@ func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 		return nil, InvalidMessageError("invalid byte order")
 	}
 
-	dec := NewDecoder(rd, order)
+	dec := newDecoder(rd, order)
 	dec.pos = 1
 
 	msg = new(Message)
@@ -144,7 +141,7 @@ func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 	if hlength+length+16 > 1<<27 {
 		return nil, InvalidMessageError("message is too long")
 	}
-	dec = NewDecoder(io.MultiReader(bytes.NewBuffer(b), rd), order)
+	dec = newDecoder(io.MultiReader(bytes.NewBuffer(b), rd), order)
 	dec.pos = 12
 	err = dec.Decode(&headers)
 	if err != nil {
@@ -172,7 +169,7 @@ func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 	if sig.str != "" {
 		vs := sig.Values()
 		buf := bytes.NewBuffer(body)
-		dec = NewDecoder(buf, order)
+		dec = newDecoder(buf, order)
 		if err = dec.Decode(vs...); err != nil {
 			return nil, err
 		}
@@ -199,7 +196,7 @@ func (msg *Message) EncodeTo(out io.Writer, order binary.ByteOrder) error {
 		return errors.New("dbus: invalid byte order")
 	}
 	body := new(bytes.Buffer)
-	enc := NewEncoder(body, order)
+	enc := newEncoder(body, order)
 	if len(msg.Body) != 0 {
 		enc.Encode(msg.Body...)
 	}
@@ -214,7 +211,7 @@ func (msg *Message) EncodeTo(out io.Writer, order binary.ByteOrder) error {
 	}
 	vs[6] = headers
 	var buf bytes.Buffer
-	enc = NewEncoder(&buf, order)
+	enc = newEncoder(&buf, order)
 	enc.Encode(vs[:]...)
 	enc.align(8)
 	body.WriteTo(&buf)

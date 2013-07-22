@@ -102,7 +102,7 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 	if _, err := io.ReadFull(t, headerdata[4:]); err != nil {
 		return nil, err
 	}
-	dec := NewDecoder(bytes.NewBuffer(headerdata), order)
+	dec := newDecoder(bytes.NewBuffer(headerdata), order)
 	dec.pos = 12
 	if err := dec.Decode(&headers); err != nil {
 		return nil, err

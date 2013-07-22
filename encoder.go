@@ -7,56 +7,23 @@ import (
 	"reflect"
 )
 
-// An Encoder encodes values to the D-Bus wire format.
-//
-// The following types are directly encoded as their respective D-Bus
-// equivalents:
-//
-//     Go type     | D-Bus type
-//     ------------+-----------
-//     byte        | BYTE
-//     bool        | BOOLEAN
-//     int16       | INT16
-//     uint16      | UINT16
-//     int32       | INT32
-//     uint32      | UINT32
-//     int64       | INT64
-//     uint64      | UINT64
-//     float64     | DOUBLE
-//     string      | STRING
-//     ObjectPath  | OBJECT_PATH
-//     Signature   | SIGNATURE
-//     Variant     | VARIANT
-//     UnixFDIndex | UNIX_FD
-//
-// Slices and arrays encode as ARRAYs of their element type.
-//
-// Maps encode as DICTs, provided that their key type is a basic type.
-//
-// Structs other than Variant and Signature encode as a STRUCT containing its
-// exported fields. Fields whose tag contains `dbus:"-"` and unexported field
-// will be skipped.
-//
-// Pointers encode as the value they're pointed to.
-//
-// Trying to encode any other type (including int and uint) or a slice, map or
-// struct containing an unsupported type will result in an InvalidTypeError.
-type Encoder struct {
+// An encoder encodes values to the D-Bus wire format.
+type encoder struct {
 	out   io.Writer
 	order binary.ByteOrder
 	pos   int
 }
 
 // NewEncoder returns a new encoder that writes to out in the given byte order.
-func NewEncoder(out io.Writer, order binary.ByteOrder) *Encoder {
-	enc := new(Encoder)
+func newEncoder(out io.Writer, order binary.ByteOrder) *encoder {
+	enc := new(encoder)
 	enc.out = out
 	enc.order = order
 	return enc
 }
 
 // Aligns the next output to be on a multiple of n. Panics on write errors.
-func (enc *Encoder) align(n int) {
+func (enc *encoder) align(n int) {
 	if enc.pos%n != 0 {
 		newpos := (enc.pos + n - 1) & ^(n - 1)
 		empty := make([]byte, newpos-enc.pos)
@@ -68,7 +35,7 @@ func (enc *Encoder) align(n int) {
 }
 
 // Calls binary.Write(enc.out, enc.order, v) and panics on write errors.
-func (enc *Encoder) binwrite(v interface{}) {
+func (enc *encoder) binwrite(v interface{}) {
 	if err := binary.Write(enc.out, enc.order, v); err != nil {
 		panic(err)
 	}
@@ -76,7 +43,7 @@ func (enc *Encoder) binwrite(v interface{}) {
 
 // Encode encodes the given values to the underyling reader. All written values
 // are aligned properly as required by the DBus spec.
-func (enc *Encoder) Encode(vs ...interface{}) (err error) {
+func (enc *encoder) Encode(vs ...interface{}) (err error) {
 	defer func() {
 		err, _ = recover().(error)
 	}()
@@ -88,7 +55,7 @@ func (enc *Encoder) Encode(vs ...interface{}) (err error) {
 
 // encode encodes the given value to the writer and panics on error. depth holds
 // the depth of the container nesting.
-func (enc *Encoder) encode(v reflect.Value, depth int) {
+func (enc *encoder) encode(v reflect.Value, depth int) {
 	enc.align(alignment(v.Type()))
 	switch v.Kind() {
 	case reflect.Uint8:
@@ -142,7 +109,7 @@ func (enc *Encoder) encode(v reflect.Value, depth int) {
 			panic(FormatError("input exceeds container depth limit"))
 		}
 		var buf bytes.Buffer
-		bufenc := NewEncoder(&buf, enc.order)
+		bufenc := newEncoder(&buf, enc.order)
 
 		for i := 0; i < v.Len(); i++ {
 			bufenc.encode(v.Index(i), depth+1)
@@ -193,7 +160,7 @@ func (enc *Encoder) encode(v reflect.Value, depth int) {
 		}
 		keys := v.MapKeys()
 		var buf bytes.Buffer
-		bufenc := NewEncoder(&buf, enc.order)
+		bufenc := newEncoder(&buf, enc.order)
 		for _, k := range keys {
 			bufenc.align(8)
 			bufenc.encode(k, depth+2)

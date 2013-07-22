@@ -56,7 +56,7 @@ var protoTests = []struct {
 func TestProto(t *testing.T) {
 	for i, v := range protoTests {
 		buf := new(bytes.Buffer)
-		enc := NewEncoder(buf, binary.BigEndian)
+		enc := newEncoder(buf, binary.BigEndian)
 		enc.Encode(v.vs...)
 		marshalled := buf.Bytes()
 		if bytes.Compare(marshalled, v.marshalled) != 0 {
@@ -69,7 +69,7 @@ func TestProto(t *testing.T) {
 			unmarshalled = reflect.Append(unmarshalled,
 				reflect.New(reflect.TypeOf(v.vs[i])))
 		}
-		dec := NewDecoder(bytes.NewReader(v.marshalled), binary.BigEndian)
+		dec := newDecoder(bytes.NewReader(v.marshalled), binary.BigEndian)
 		unmarshal := reflect.ValueOf(dec).MethodByName("Decode")
 		ret := unmarshal.CallSlice([]reflect.Value{unmarshalled})
 		err := ret[0].Interface()
@@ -91,7 +91,7 @@ func TestProtoPointer(t *testing.T) {
 	var n uint32
 	var p = &n
 	buf := bytes.NewBuffer([]byte{42, 1, 0, 0})
-	dec := NewDecoder(buf, binary.LittleEndian)
+	dec := newDecoder(buf, binary.LittleEndian)
 	if err := dec.Decode(&p); err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +103,7 @@ func TestProtoPointer(t *testing.T) {
 func TestProtoSlice(t *testing.T) {
 	b := []byte{1, 2}
 	buf := bytes.NewBuffer([]byte{2, 0, 0, 0, 3, 4})
-	dec := NewDecoder(buf, binary.LittleEndian)
+	dec := newDecoder(buf, binary.LittleEndian)
 	if err := dec.Decode(&b); err != nil {
 		t.Fatal(err)
 	}
@@ -119,9 +119,9 @@ func TestProtoMap(t *testing.T) {
 	}
 	var n map[string]uint8
 	buf := new(bytes.Buffer)
-	enc := NewEncoder(buf, binary.LittleEndian)
+	enc := newEncoder(buf, binary.LittleEndian)
 	enc.Encode(m)
-	dec := NewDecoder(buf, binary.LittleEndian)
+	dec := newDecoder(buf, binary.LittleEndian)
 	dec.Decode(&n)
 	if len(n) != 2 || n["foo"] != 23 || n["bar"] != 2 {
 		t.Error("map test: got", n)
@@ -135,9 +135,9 @@ func TestProtoVariantStruct(t *testing.T) {
 		B int16
 	}{1, 2})
 	buf := new(bytes.Buffer)
-	enc := NewEncoder(buf, binary.LittleEndian)
+	enc := newEncoder(buf, binary.LittleEndian)
 	enc.Encode(v)
-	dec := NewDecoder(buf, binary.LittleEndian)
+	dec := newDecoder(buf, binary.LittleEndian)
 	dec.Decode(&variant)
 	sl := variant.Value().([]interface{})
 	v1, v2 := sl[0].(int32), sl[1].(int16)
@@ -159,9 +159,9 @@ func TestProtoStructTag(t *testing.T) {
 	bar1.A = 234
 	bar2.C = 345
 	buf := new(bytes.Buffer)
-	enc := NewEncoder(buf, binary.LittleEndian)
+	enc := newEncoder(buf, binary.LittleEndian)
 	enc.Encode(bar1)
-	dec := NewDecoder(buf, binary.LittleEndian)
+	dec := newDecoder(buf, binary.LittleEndian)
 	dec.Decode(&bar2)
 	if bar1 != bar2 {
 		t.Error("struct tag test: got", bar2)

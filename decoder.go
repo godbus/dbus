@@ -6,7 +6,7 @@ import (
 	"reflect"
 )
 
-// A Decoder reads values that are encoded in the DBus wire format.
+// A decoder reads values that are encoded in the DBus wire format.
 //
 // For decoding, the inverse of the encoding that an Encoder applies is used,
 // with the following exceptions:
@@ -17,23 +17,23 @@ import (
 //       in which case a new value for it to point to is allocated.
 //     - When decoding into a slice, the decoded values are appended to it.
 //     - Arrays cannot be decoded into.
-type Decoder struct {
+type decoder struct {
 	in    io.Reader
 	order binary.ByteOrder
 	pos   int
 }
 
-// NewDecoder returns a new decoder that reads values from in. The input is
+// newDecoder returns a new decoder that reads values from in. The input is
 // expected to be in the given byte order.
-func NewDecoder(in io.Reader, order binary.ByteOrder) *Decoder {
-	dec := new(Decoder)
+func newDecoder(in io.Reader, order binary.ByteOrder) *decoder {
+	dec := new(decoder)
 	dec.in = in
 	dec.order = order
 	return dec
 }
 
 // align aligns the input to the given boundary and panics on error.
-func (dec *Decoder) align(n int) {
+func (dec *decoder) align(n int) {
 	if dec.pos%n != 0 {
 		newpos := (dec.pos + n - 1) & ^(n - 1)
 		empty := make([]byte, newpos-dec.pos)
@@ -45,7 +45,7 @@ func (dec *Decoder) align(n int) {
 }
 
 // Calls binary.Read(dec.in, dec.order, v) and panics on read errors.
-func (dec *Decoder) binread(v interface{}) {
+func (dec *decoder) binread(v interface{}) {
 	if err := binary.Read(dec.in, dec.order, v); err != nil {
 		panic(err)
 	}
@@ -56,7 +56,7 @@ func (dec *Decoder) binread(v interface{}) {
 // the details of decoding, see the documentation of Decoder.
 //
 // The input is expected to be aligned as required by the DBus spec.
-func (dec *Decoder) Decode(vs ...interface{}) (err error) {
+func (dec *decoder) Decode(vs ...interface{}) (err error) {
 	defer func() {
 		var ok bool
 		if err, ok = recover().(error); ok {
@@ -73,7 +73,7 @@ func (dec *Decoder) Decode(vs ...interface{}) (err error) {
 
 // decode decodes a single value and stores it in *v. depth holds the depth of
 // the container nesting.
-func (dec *Decoder) decode(v reflect.Value, depth int) {
+func (dec *decoder) decode(v reflect.Value, depth int) {
 	if v.Kind() != reflect.Ptr {
 		panic(InvalidTypeError{v.Type()})
 	}
