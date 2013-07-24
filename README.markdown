@@ -2,15 +2,13 @@ go.dbus
 -------
 
 go.dbus is a simple library that implements native Go client bindings for the
-DBus message bus system.
+D-Bus message bus system.
 
 ### Features
 
-* Connections are safe to use by multiple goroutines
-* Multiple (as in "2") authentication mechanisms; you can also implement your own
-* Support for the "server" side (handling method calls from peers)
-* Asynchronous method calls
-* Documentation
+* Complete native implementation of the D-Bus message protocol
+* Go-like API (channels for signals / asynchronous method calls, Goroutine-safe connections)
+* Subpackages that help with the introspection / property interfaces
 
 ### Installation
 
@@ -19,6 +17,8 @@ This packages requires Go 1.1. If you installed it and set up your GOPATH, just 
 ```
 go get github.com/guelfey/go.dbus
 ```
+
+If you want to use the subpackages, you can install them the same way.
 
 ### Usage
 
