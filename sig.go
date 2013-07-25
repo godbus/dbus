@@ -151,17 +151,6 @@ func (s Signature) String() string {
 	return s.str
 }
 
-// Values returns a slice of pointers to values that match the given signature.
-func (s Signature) Values() []interface{} {
-	slice := make([]interface{}, 0)
-	str := s.str
-	for str != "" {
-		slice = append(slice, reflect.New(value(str)).Interface())
-		_, str = validSingle(str, 0)
-	}
-	return slice
-}
-
 // A SignatureError indicates that a signature passed to a function or received
 // on a connection is not a valid signature.
 type SignatureError struct {
@@ -189,10 +178,11 @@ func validSingle(s string, depth int) (err error, rem string) {
 		return nil, s[1:]
 	case 'a':
 		if len(s) > 1 && s[1] == '{' {
-			i := strings.LastIndex(s, "}")
+			i := findMatching(s[1:], '{', '}')
 			if i == -1 {
 				return SignatureError{Sig: s, Reason: "unmatched '{'"}, ""
 			}
+			i++
 			rem = s[i+1:]
 			s = s[2:i]
 			if err, _ = validSingle(s[:1], depth+1); err != nil {
@@ -209,7 +199,7 @@ func validSingle(s string, depth int) (err error, rem string) {
 		}
 		return validSingle(s[1:], depth+1)
 	case '(':
-		i := strings.LastIndex(s, ")")
+		i := findMatching(s, '(', ')')
 		if i == -1 {
 			return SignatureError{Sig: s, Reason: "unmatched ')'"}, ""
 		}
@@ -226,9 +216,24 @@ func validSingle(s string, depth int) (err error, rem string) {
 	return SignatureError{Sig: s, Reason: "invalid type character"}, ""
 }
 
-// value returns the type of the given signature. It ignores any left over
+func findMatching(s string, left, right rune) int {
+	n := 0
+	for i, v := range s {
+		if v == left {
+			n++
+		} else if v == right {
+			n--
+		}
+		if n == 0 {
+			return i
+		}
+	}
+	return -1
+}
+
+// typeFor returns the type of the given signature. It ignores any left over
 // characters and panics if s doesn't start with a valid type signature.
-func value(s string) (t reflect.Type) {
+func typeFor(s string) (t reflect.Type) {
 	err, _ := validSingle(s, 0)
 	if err != nil {
 		panic(err)
@@ -241,9 +246,9 @@ func value(s string) (t reflect.Type) {
 	case 'a':
 		if s[1] == '{' {
 			i := strings.LastIndex(s, "}")
-			t = reflect.MapOf(sigToType[s[2]], value(s[3:i]))
+			t = reflect.MapOf(sigToType[s[2]], typeFor(s[3:i]))
 		} else {
-			t = reflect.SliceOf(value(s[1:]))
+			t = reflect.SliceOf(typeFor(s[1:]))
 		}
 	case '(':
 		t = interfacesType

@@ -44,17 +44,10 @@ Pointers encode as the value they're pointed to.
 Trying to encode any other type or a slice, map or struct containing an
 unsupported type will result in an InvalidTypeError.
 
-For incoming messages, the inverse of these rules are used, with the following
-exceptions:
-
-    - If an incoming STRUCT can't be directly converted to a Go struct (because
-      it is, for example, wrapped in a VARIANT), it is stored as a []interface{}
-      containing the struct fields in the correct order. The Store function can
-      be used to convert such values to the proper structs.
-    - When decoding into a pointer, the pointer is followed unless it is nil, in
-      which case a new value for it to point to is allocated.
-    - When decoding into a slice, the decoded values are appended to it.
-    - Arrays cannot be decoded into.
+For incoming messages, the inverse of these rules are used, with the exception
+of STRUCTs. Incoming STRUCTS are represented as a slice of empty interfaces
+containing the struct fields in the correct order. The Store function can be
+used to convert such values to Go structs.
 
 Unix FD passing
 

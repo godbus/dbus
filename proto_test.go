@@ -225,6 +225,17 @@ func TestMessage(t *testing.T) {
 	}
 }
 
+func TestProtoStructInterfaces(t *testing.T) {
+	b := []byte{42}
+	vs, err := newDecoder(bytes.NewReader(b), binary.LittleEndian).DecodeSig(Signature{"(y)"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if vs[0].([]interface{})[0].(byte) != 42 {
+		t.Errorf("wrongs results (got %v)", vs)
+	}
+}
+
 // ordinary org.freedesktop.DBus.Hello call
 var smallMessage = &Message{
 	Type:   TypeMethodCall,

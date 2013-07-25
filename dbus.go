@@ -45,20 +45,32 @@ func Store(src []interface{}, dest ...interface{}) error {
 		return errors.New("dbus.Store: length mismatch")
 	}
 
-	for i, v := range src {
-		if reflect.TypeOf(dest[i]).Elem() == reflect.TypeOf(v) {
-			reflect.ValueOf(dest[i]).Elem().Set(reflect.ValueOf(v))
-		} else if vs, ok := v.([]interface{}); ok {
-			retv := reflect.ValueOf(dest[i]).Elem()
-			if retv.Kind() != reflect.Struct {
+	for i := range src {
+		if err := store(src[i], dest[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func store(src, dest interface{}) error {
+	if reflect.TypeOf(dest).Elem() == reflect.TypeOf(src) {
+		reflect.ValueOf(dest).Elem().Set(reflect.ValueOf(src))
+		return nil
+	} else if hasStruct(dest) {
+		rv := reflect.ValueOf(dest).Elem()
+		switch rv.Kind() {
+		case reflect.Struct:
+			vs, ok := src.([]interface{})
+			if !ok {
 				return errors.New("dbus.Store: type mismatch")
 			}
-			t := retv.Type()
-			ndest := make([]interface{}, 0, retv.NumField())
-			for i := 0; i < retv.NumField(); i++ {
+			t := rv.Type()
+			ndest := make([]interface{}, 0, rv.NumField())
+			for i := 0; i < rv.NumField(); i++ {
 				field := t.Field(i)
 				if field.PkgPath == "" && field.Tag.Get("dbus") != "-" {
-					ndest = append(ndest, retv.Field(i).Addr().Interface())
+					ndest = append(ndest, rv.Field(i).Addr().Interface())
 				}
 			}
 			if len(vs) != len(ndest) {
@@ -68,11 +80,52 @@ func Store(src []interface{}, dest ...interface{}) error {
 			if err != nil {
 				return errors.New("dbus.Store: type mismatch")
 			}
-		} else {
+		case reflect.Slice:
+			sv := reflect.ValueOf(src)
+			if sv.Kind() != reflect.Slice {
+				return errors.New("dbus.Store: type mismatch")
+			}
+			rv.Set(reflect.MakeSlice(rv.Type(), sv.Len(), sv.Len()))
+			for i := 0; i < sv.Len(); i++ {
+				if err := store(sv.Index(i).Interface(), rv.Index(i).Addr().Interface()); err != nil {
+					return err
+				}
+			}
+		case reflect.Map:
+			sv := reflect.ValueOf(src)
+			if sv.Kind() != reflect.Map {
+				return errors.New("dbus.Store: type mismatch")
+			}
+			keys := sv.MapKeys()
+			rv.Set(reflect.MakeMap(sv.Type()))
+			for _, key := range keys {
+				v := reflect.New(sv.Type().Elem())
+				if err := store(v, sv.MapIndex(key).Interface()); err != nil {
+					return err
+				}
+				rv.SetMapIndex(key, v.Elem())
+			}
+		default:
 			return errors.New("dbus.Store: type mismatch")
 		}
+		return nil
+	} else {
+		return errors.New("dbus.Store: type mismatch")
 	}
-	return nil
+}
+
+func hasStruct(v interface{}) bool {
+	t := reflect.TypeOf(v)
+	for {
+		switch t.Kind() {
+		case reflect.Struct:
+			return true
+		case reflect.Slice, reflect.Ptr, reflect.Map:
+			t = t.Elem()
+		default:
+			return false
+		}
+	}
 }
 
 // An ObjectPath is an object path as defined by the D-Bus spec.

@@ -6,17 +6,6 @@ import (
 	"reflect"
 )
 
-// A decoder reads values that are encoded in the D-Bus wire format.
-//
-// For decoding, the inverse of the encoding that an Encoder applies is used,
-// with the following exceptions:
-//
-//     - If a VARIANT contains a STRUCT, its decoded value will be of type
-//       []interface{} and contain the struct fields in the correct order.
-//     - When decoding into a pointer, the pointer is followed unless it is nil,
-//       in which case a new value for it to point to is allocated.
-//     - When decoding into a slice, the decoded values are appended to it.
-//     - Arrays cannot be decoded into.
 type decoder struct {
 	in    io.Reader
 	order binary.ByteOrder
@@ -69,6 +58,86 @@ func (dec *decoder) Decode(vs ...interface{}) (err error) {
 		dec.decode(reflect.ValueOf(v), 0)
 	}
 	return nil
+}
+
+func (dec *decoder) DecodeSig(sig Signature) (vs []interface{}, err error) {
+	defer func() {
+		var ok bool
+		v := recover()
+		if err, ok = v.(error); ok {
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
+				err = FormatError("unexpected EOF")
+			}
+		}
+	}()
+	vs = make([]interface{}, 0)
+	s := sig.str
+	for s != "" {
+		err, rem := validSingle(s, 0)
+		if err != nil {
+			return nil, err
+		}
+		v := dec.decodeSig(s[:len(s)-len(rem)], 0)
+		vs = append(vs, v)
+		s = rem
+	}
+	return vs, nil
+}
+
+func (dec *decoder) decodeSig(s string, depth int) interface{} {
+	if len(s) == 1 {
+		if t, ok := sigToType[s[0]]; ok {
+			v := reflect.New(t)
+			dec.decode(v, depth)
+			return v.Elem().Interface()
+		}
+	}
+	switch s[0] {
+	case 'a':
+		if len(s) > 1 && s[1] == '{' {
+			ksig := s[2:3]
+			vsig := s[3 : len(s)-1]
+			v := reflect.MakeMap(reflect.MapOf(typeFor(ksig), typeFor(vsig)))
+			if depth >= 63 {
+				panic(FormatError("input exceeds container depth limit"))
+			}
+			var length uint32
+			dec.decode(reflect.ValueOf(&length), depth)
+			spos := dec.pos
+			for dec.pos < spos+int(length) {
+				dec.align(8)
+				if !isKeyType(v.Type().Key()) {
+					panic(InvalidTypeError{v.Type()})
+				}
+				kv := dec.decodeSig(ksig, depth+2)
+				vv := dec.decodeSig(vsig, depth+2)
+				v.SetMapIndex(reflect.ValueOf(kv), reflect.ValueOf(vv))
+			}
+			return v.Interface()
+		}
+		var length uint32
+		if depth >= 64 {
+			panic(FormatError("input exceeds container depth limit"))
+		}
+		dec.decode(reflect.ValueOf(&length), depth)
+		v := reflect.MakeSlice(reflect.SliceOf(typeFor(s[1:])), 0, int(length))
+		spos := dec.pos
+		for dec.pos < spos+int(length) {
+			ev := dec.decodeSig(s[1:], depth+1)
+			v = reflect.Append(v, reflect.ValueOf(ev))
+		}
+		return v.Interface()
+	case '(':
+		dec.align(8)
+		v := make([]interface{}, 0)
+		for _, c := range s[1 : len(s)-1] {
+			ev := dec.decodeSig(string(c), depth+1)
+			v = append(v, ev)
+		}
+		return v
+	default:
+		panic(SignatureError{Sig: s})
+	}
 }
 
 // decode decodes a single value and stores it in *v. depth holds the depth of
@@ -186,7 +255,7 @@ func (dec *decoder) decode(v reflect.Value, depth int) {
 			if rem != "" {
 				panic(FormatError("variant signature has multiple types"))
 			}
-			t = value(sig.str)
+			t = typeFor(sig.str)
 			if t == interfacesType {
 				dec.align(8)
 				s := sig.str[1 : len(sig.str)-1]
@@ -196,7 +265,7 @@ func (dec *decoder) decode(v reflect.Value, depth int) {
 					if err != nil {
 						panic(err)
 					}
-					t = value(s[:len(s)-len(rem)])
+					t = typeFor(s[:len(s)-len(rem)])
 					nv := reflect.New(t)
 					dec.decode(nv, depth+1)
 					slice = reflect.Append(slice, nv.Elem())

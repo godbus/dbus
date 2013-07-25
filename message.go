@@ -167,13 +167,13 @@ func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 	}
 	sig, _ := msg.Headers[FieldSignature].value.(Signature)
 	if sig.str != "" {
-		vs := sig.Values()
 		buf := bytes.NewBuffer(body)
 		dec = newDecoder(buf, order)
-		if err = dec.Decode(vs...); err != nil {
+		vs, err := dec.DecodeSig(sig)
+		if err != nil {
 			return nil, err
 		}
-		msg.Body = dereferenceAll(vs)
+		msg.Body = vs
 	}
 
 	return
