@@ -119,7 +119,6 @@ func (conn *Conn) Auth(methods []Auth) error {
 					}
 					go conn.inWorker()
 					go conn.outWorker()
-					go conn.serials()
 					return nil
 				}
 			}

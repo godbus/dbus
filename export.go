@@ -116,7 +116,7 @@ func (conn *Conn) handleCall(msg *Message) {
 	if msg.Flags&FlagNoReplyExpected == 0 {
 		reply := new(Message)
 		reply.Type = TypeMethodReply
-		reply.serial = <-conn.serial
+		reply.serial = conn.getSerial()
 		reply.Headers = make(map[HeaderField]Variant)
 		reply.Headers[FieldDestination] = msg.Headers[FieldSender]
 		reply.Headers[FieldReplySerial] = MakeVariant(msg.serial)
@@ -155,7 +155,7 @@ func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) erro
 	}
 	msg := new(Message)
 	msg.Type = TypeSignal
-	msg.serial = <-conn.serial
+	msg.serial = conn.getSerial()
 	msg.Headers = make(map[HeaderField]Variant)
 	msg.Headers[FieldInterface] = MakeVariant(iface)
 	msg.Headers[FieldMember] = MakeVariant(member)

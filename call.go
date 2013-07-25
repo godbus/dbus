@@ -67,7 +67,7 @@ func (o *Object) Go(method string, flags Flags, ch chan *Call, args ...interface
 	method = method[i+1:]
 	msg := new(Message)
 	msg.Type = TypeMethodCall
-	msg.serial = <-o.conn.serial
+	msg.serial = o.conn.getSerial()
 	msg.Flags = flags & (FlagNoAutoStart | FlagNoReplyExpected)
 	msg.Headers = make(map[HeaderField]Variant)
 	msg.Headers[FieldPath] = MakeVariant(o.path)

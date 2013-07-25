@@ -41,8 +41,9 @@ type Conn struct {
 	names    []string
 	namesLck sync.RWMutex
 
-	serial     chan uint32
-	serialUsed chan uint32
+	serialLck  sync.Mutex
+	nextSerial uint32
+	serialUsed map[uint32]bool
 
 	calls    map[uint32]*Call
 	callsLck sync.RWMutex
@@ -165,8 +166,8 @@ func newConn(tr transport) (*Conn, error) {
 	conn.calls = make(map[uint32]*Call)
 	conn.out = make(chan *Message, 10)
 	conn.handlers = make(map[ObjectPath]map[string]interface{})
-	conn.serial = make(chan uint32)
-	conn.serialUsed = make(chan uint32)
+	conn.nextSerial = 1
+	conn.serialUsed = map[uint32]bool{0: true}
 	conn.busObj = conn.Object("org.freedesktop.DBus", "/org/freedesktop/DBus")
 	return conn, nil
 }
@@ -210,6 +211,17 @@ func (conn *Conn) Eavesdrop(ch chan<- *Message) {
 	conn.eavesdroppedLck.Lock()
 	conn.eavesdropped = ch
 	conn.eavesdroppedLck.Unlock()
+}
+
+// getSerial returns an unused serial.
+func (conn *Conn) getSerial() uint32 {
+	conn.serialLck.Lock()
+	defer conn.serialLck.Unlock()
+	n := conn.nextSerial
+	for conn.serialUsed[n] {
+		n++
+	}
+	return n
 }
 
 // Hello sends the initial org.freedesktop.DBus.Hello call. This method must be
@@ -278,7 +290,9 @@ func (conn *Conn) inWorker() {
 						c.Body = msg.Body
 					}
 					c.Done <- c
-					conn.serialUsed <- serial
+					conn.serialLck.Lock()
+					delete(conn.serialUsed, serial)
+					conn.serialLck.Unlock()
 					delete(conn.calls, serial)
 				}
 				conn.callsLck.Unlock()
@@ -361,9 +375,13 @@ func (conn *Conn) outWorker() {
 				c.Err = err
 				c.Done <- c
 			}
-			conn.serialUsed <- msg.serial
+			conn.serialLck.Lock()
+			delete(conn.serialUsed, msg.serial)
+			conn.serialLck.Unlock()
 		} else if msg.Type != TypeMethodCall {
-			conn.serialUsed <- msg.serial
+			conn.serialLck.Lock()
+			delete(conn.serialUsed, msg.serial)
+			conn.serialLck.Unlock()
 		}
 		conn.callsLck.RUnlock()
 	}
@@ -378,7 +396,7 @@ func (conn *Conn) outWorker() {
 func (conn *Conn) Send(msg *Message, ch chan *Call) *Call {
 	var call *Call
 
-	msg.serial = <-conn.serial
+	msg.serial = conn.getSerial()
 	if msg.Type == TypeMethodCall && msg.Flags&FlagNoReplyExpected == 0 {
 		if ch == nil {
 			ch = make(chan *Call, 5)
@@ -422,7 +440,7 @@ func (conn *Conn) Send(msg *Message, ch chan *Call) *Call {
 func (conn *Conn) sendError(e Error, dest string, serial uint32) {
 	msg := new(Message)
 	msg.Type = TypeError
-	msg.serial = <-conn.serial
+	msg.serial = conn.getSerial()
 	msg.Headers = make(map[HeaderField]Variant)
 	msg.Headers[FieldDestination] = MakeVariant(dest)
 	msg.Headers[FieldErrorName] = MakeVariant(e.Name)
@@ -443,7 +461,7 @@ func (conn *Conn) sendError(e Error, dest string, serial uint32) {
 func (conn *Conn) sendReply(dest string, serial uint32, values ...interface{}) {
 	msg := new(Message)
 	msg.Type = TypeMethodReply
-	msg.serial = <-conn.serial
+	msg.serial = conn.getSerial()
 	msg.Headers = make(map[HeaderField]Variant)
 	msg.Headers[FieldDestination] = MakeVariant(dest)
 	msg.Headers[FieldReplySerial] = MakeVariant(serial)
@@ -456,26 +474,6 @@ func (conn *Conn) sendReply(dest string, serial uint32, values ...interface{}) {
 		conn.out <- msg
 	}
 	conn.outLck.RUnlock()
-}
-
-// serials runs in an own goroutine, constantly sending serials on conn.serial
-// and reading serials that are ready for "recycling" from conn.serialUsed.
-func (conn *Conn) serials() {
-	s := uint32(1)
-	used := make(map[uint32]bool)
-	used[0] = true // ensure that 0 is never used
-	for {
-		select {
-		case conn.serial <- s:
-			used[s] = true
-			s++
-			for used[s] {
-				s++
-			}
-		case n := <-conn.serialUsed:
-			delete(used, n)
-		}
-	}
 }
 
 // Signal registers the given channel to be passed all received signal messages.
