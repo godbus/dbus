@@ -221,6 +221,8 @@ func (conn *Conn) getSerial() uint32 {
 	for conn.serialUsed[n] {
 		n++
 	}
+	conn.serialUsed[n] = true
+	conn.nextSerial = n + 1
 	return n
 }
 
