@@ -44,13 +44,6 @@ var protoTests = []struct {
 		[]interface{}{MakeVariant(MakeVariant(Signature{"v"}))},
 		[]byte{1, 'v', 0, 1, 'g', 0, 1, 'v', 0},
 	},
-	{
-		[]interface{}{struct {
-			A int32
-			B int16
-		}{10752, 256}},
-		[]byte{0, 0, 42, 0, 1, 0},
-	},
 }
 
 func TestProto(t *testing.T) {
@@ -70,45 +63,14 @@ func TestProto(t *testing.T) {
 				reflect.New(reflect.TypeOf(v.vs[i])))
 		}
 		dec := newDecoder(bytes.NewReader(v.marshalled), binary.BigEndian)
-		unmarshal := reflect.ValueOf(dec).MethodByName("Decode")
-		ret := unmarshal.CallSlice([]reflect.Value{unmarshalled})
-		err := ret[0].Interface()
+		vs, err := dec.Decode(SignatureOf(v.vs...))
 		if err != nil {
 			t.Errorf("test %d: %s\n", i+1, err)
 			continue
 		}
-		for j := range v.vs {
-			if !reflect.DeepEqual(unmarshalled.Index(j).Elem().Elem().Interface(), v.vs[j]) {
-				t.Errorf("test %d (unmarshal): got '%v'/'%T', but expected '%v'/'%T'\n",
-					i+1, unmarshalled.Index(j).Elem().Elem().Interface(),
-					unmarshalled.Index(j).Elem().Elem().Interface(), v.vs[j], v.vs[j])
-			}
+		if !reflect.DeepEqual(vs, v.vs) {
+			t.Errorf("test %d (unmarshal): got %#v, but expected %#v\n", i+1, vs, v.vs)
 		}
-	}
-}
-
-func TestProtoPointer(t *testing.T) {
-	var n uint32
-	var p = &n
-	buf := bytes.NewBuffer([]byte{42, 1, 0, 0})
-	dec := newDecoder(buf, binary.LittleEndian)
-	if err := dec.Decode(&p); err != nil {
-		t.Fatal(err)
-	}
-	if n != 298 {
-		t.Error("pointer test: got", n)
-	}
-}
-
-func TestProtoSlice(t *testing.T) {
-	b := []byte{1, 2}
-	buf := bytes.NewBuffer([]byte{2, 0, 0, 0, 3, 4})
-	dec := newDecoder(buf, binary.LittleEndian)
-	if err := dec.Decode(&b); err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(b, []byte{1, 2, 3, 4}) {
-		t.Fatal("got", b, "wanted", []byte{1, 2, 3, 4})
 	}
 }
 
@@ -122,9 +84,15 @@ func TestProtoMap(t *testing.T) {
 	enc := newEncoder(buf, binary.LittleEndian)
 	enc.Encode(m)
 	dec := newDecoder(buf, binary.LittleEndian)
-	dec.Decode(&n)
+	vs, err := dec.Decode(Signature{"a{sy}"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = Store(vs, &n); err != nil {
+		t.Fatal(err)
+	}
 	if len(n) != 2 || n["foo"] != 23 || n["bar"] != 2 {
-		t.Error("map test: got", n)
+		t.Error("got", n)
 	}
 }
 
@@ -138,14 +106,20 @@ func TestProtoVariantStruct(t *testing.T) {
 	enc := newEncoder(buf, binary.LittleEndian)
 	enc.Encode(v)
 	dec := newDecoder(buf, binary.LittleEndian)
-	dec.Decode(&variant)
+	vs, err := dec.Decode(Signature{"v"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = Store(vs, &variant); err != nil {
+		t.Fatal(err)
+	}
 	sl := variant.Value().([]interface{})
 	v1, v2 := sl[0].(int32), sl[1].(int16)
 	if v1 != int32(1) {
-		t.Error("variant struct test: got", v1)
+		t.Error("got", v1, "as first int")
 	}
 	if v2 != int16(2) {
-		t.Error("variant struct test: got", v2)
+		t.Error("got", v2, "as second int")
 	}
 }
 
@@ -162,7 +136,13 @@ func TestProtoStructTag(t *testing.T) {
 	enc := newEncoder(buf, binary.LittleEndian)
 	enc.Encode(bar1)
 	dec := newDecoder(buf, binary.LittleEndian)
-	dec.Decode(&bar2)
+	vs, err := dec.Decode(Signature{"(ii)"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = Store(vs, &bar2); err != nil {
+		t.Fatal(err)
+	}
 	if bar1 != bar2 {
 		t.Error("struct tag test: got", bar2)
 	}
@@ -227,7 +207,7 @@ func TestMessage(t *testing.T) {
 
 func TestProtoStructInterfaces(t *testing.T) {
 	b := []byte{42}
-	vs, err := newDecoder(bytes.NewReader(b), binary.LittleEndian).DecodeSig(Signature{"(y)"})
+	vs, err := newDecoder(bytes.NewReader(b), binary.LittleEndian).Decode(Signature{"(y)"})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -104,11 +104,13 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 	}
 	dec := newDecoder(bytes.NewBuffer(headerdata), order)
 	dec.pos = 12
-	if err := dec.Decode(&headers); err != nil {
+	vs, err := dec.Decode(Signature{"a(yv)"})
+	if err != nil {
 		return nil, err
 	}
+	Store(vs, &headers)
 	for _, v := range headers {
-		if v.HeaderField == FieldUnixFDs {
+		if v.Field == byte(FieldUnixFDs) {
 			unixfds, _ = v.Variant.value.(uint32)
 		}
 	}

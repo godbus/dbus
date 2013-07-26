@@ -94,7 +94,7 @@ type Message struct {
 }
 
 type header struct {
-	HeaderField
+	Field byte
 	Variant
 }
 
@@ -105,7 +105,7 @@ type header struct {
 func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 	var order binary.ByteOrder
 	var hlength, length uint32
-	var proto byte
+	var typ, flags, proto byte
 	var headers []header
 
 	b := make([]byte, 1)
@@ -126,10 +126,15 @@ func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 	dec.pos = 1
 
 	msg = new(Message)
-	err = dec.Decode(&msg.Type, &msg.Flags, &proto, &length, &msg.serial)
+	vs, err := dec.Decode(Signature{"yyyuu"})
 	if err != nil {
 		return nil, err
 	}
+	if err = Store(vs, &typ, &flags, &proto, &length, &msg.serial); err != nil {
+		return nil, err
+	}
+	msg.Type = Type(typ)
+	msg.Flags = Flags(flags)
 
 	// get the header length separately because we need it later
 	b = make([]byte, 4)
@@ -143,14 +148,17 @@ func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 	}
 	dec = newDecoder(io.MultiReader(bytes.NewBuffer(b), rd), order)
 	dec.pos = 12
-	err = dec.Decode(&headers)
+	vs, err = dec.Decode(Signature{"a(yv)"})
 	if err != nil {
+		return nil, err
+	}
+	if err = Store(vs, &headers); err != nil {
 		return nil, err
 	}
 
 	msg.Headers = make(map[HeaderField]Variant)
 	for _, v := range headers {
-		msg.Headers[v.HeaderField] = v.Variant
+		msg.Headers[HeaderField(v.Field)] = v.Variant
 	}
 
 	dec.align(8)
@@ -169,7 +177,7 @@ func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 	if sig.str != "" {
 		buf := bytes.NewBuffer(body)
 		dec = newDecoder(buf, order)
-		vs, err := dec.DecodeSig(sig)
+		vs, err := dec.Decode(sig)
 		if err != nil {
 			return nil, err
 		}
@@ -207,7 +215,7 @@ func (msg *Message) EncodeTo(out io.Writer, order binary.ByteOrder) error {
 	vs[5] = msg.serial
 	headers := make([]header, 0, len(msg.Headers))
 	for k, v := range msg.Headers {
-		headers = append(headers, header{k, v})
+		headers = append(headers, header{byte(k), v})
 	}
 	vs[6] = headers
 	var buf bytes.Buffer
