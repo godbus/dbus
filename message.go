@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
 	"reflect"
 	"strconv"
@@ -35,6 +34,20 @@ const (
 	TypeSignal
 	typeMax
 )
+
+func (t Type) String() string {
+	switch t {
+	case TypeMethodCall:
+		return "method call"
+	case TypeMethodReply:
+		return "reply"
+	case TypeError:
+		return "error"
+	case TypeSignal:
+		return "signal"
+	}
+	return "invalid"
+}
 
 // HeaderField represents the possible byte codes for the headers
 // of a D-Bus message.
@@ -294,21 +307,17 @@ func (msg *Message) String() string {
 	if err := msg.IsValid(); err != nil {
 		return "<invalid>"
 	}
-	s := map[Type]string{
-		TypeMethodCall:  "method call",
-		TypeMethodReply: "reply",
-		TypeError:       "error",
-		TypeSignal:      "signal",
-	}[msg.Type]
+	s := msg.Type.String()
 	if v, ok := msg.Headers[FieldSender]; ok {
 		s += " from " + v.value.(string)
 	}
 	if v, ok := msg.Headers[FieldDestination]; ok {
 		s += " to " + v.value.(string)
-	} else {
-		s += " to <null>"
 	}
 	s += " serial " + strconv.FormatUint(uint64(msg.serial), 10)
+	if v, ok := msg.Headers[FieldReplySerial]; ok {
+		s += " reply_serial " + strconv.FormatUint(uint64(v.value.(uint32)), 10)
+	}
 	if v, ok := msg.Headers[FieldUnixFDs]; ok {
 		s += " unixfds " + strconv.FormatUint(uint64(v.value.(uint32)), 10)
 	}
@@ -319,7 +328,7 @@ func (msg *Message) String() string {
 		s += " interface " + v.value.(string)
 	}
 	if v, ok := msg.Headers[FieldErrorName]; ok {
-		s += " name " + v.value.(string)
+		s += " error " + v.value.(string)
 	}
 	if v, ok := msg.Headers[FieldMember]; ok {
 		s += " member " + v.value.(string)
@@ -328,7 +337,7 @@ func (msg *Message) String() string {
 		s += "\n"
 	}
 	for i, v := range msg.Body {
-		s += "  " + fmt.Sprint(v)
+		s += "  " + MakeVariant(v).String()
 		if i != len(msg.Body)-1 {
 			s += "\n"
 		}
