@@ -19,6 +19,29 @@ func MakeVariant(v interface{}) Variant {
 	return Variant{SignatureOf(v), v}
 }
 
+// ParseVariant parses the given string as a variant as described at
+// https://developer.gnome.org/glib/unstable/gvariant-text.html. If sig is not
+// empty, it is taken to be the expected signature for the variant.
+func ParseVariant(s string, sig Signature) (Variant, error) {
+	ch := varLex(s)
+	p := &varParser{ch: ch}
+	n, err := varMakeNode(p)
+	if err != nil {
+		return Variant{}, err
+	}
+	if sig.str == "" {
+		sig, err = varInfer(n)
+		if err != nil {
+			return Variant{}, err
+		}
+	}
+	v, err := n.Value(sig)
+	if err != nil {
+		return Variant{}, err
+	}
+	return MakeVariant(v), nil
+}
+
 // format returns a formatted version of v and whether this string can be parsed
 // unambigously.
 func (v Variant) format() (string, bool) {
