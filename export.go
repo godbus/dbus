@@ -98,15 +98,17 @@ func (conn *Conn) handleCall(msg *Message) {
 		conn.sendError(errmsgInvalidArg, sender, serial)
 		return
 	}
+	pointers := make([]interface{}, len(vs))
 	for i := 0; i < t.NumIn(); i++ {
-		if t.In(i) != reflect.TypeOf(vs[i]) {
-			conn.sendError(errmsgInvalidArg, sender, serial)
-			return
-		}
+		pointers[i] = reflect.New(t.In(i)).Interface()
+	}
+	if err := Store(vs, pointers...); err != nil {
+		conn.sendError(errmsgInvalidArg, sender, serial)
+		return
 	}
 	params := make([]reflect.Value, len(vs))
 	for i := 0; i < len(vs); i++ {
-		params[i] = reflect.ValueOf(vs[i])
+		params[i] = reflect.ValueOf(pointers[i]).Elem()
 	}
 	ret := m.Call(params)
 	if em := ret[t.NumOut()-1].Interface().(*Error); em != nil {
