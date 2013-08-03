@@ -74,7 +74,15 @@ func varMakeNode(p *varParser) (varNode, error) {
 			} else {
 				sig.str = varTypeMap[t.val]
 			}
-		// TODO(guelfey): byte strings
+		case tokByteString:
+			if sig.str != "" && sig.str != "ay" {
+				return nil, varTypeError{t.val, sig}
+			}
+			b, err := varParseByteString(t.val)
+			if err != nil {
+				return nil, err
+			}
+			return byteStringNode(b), nil
 		default:
 			return nil, fmt.Errorf("unexpected %q", t.val)
 		}
@@ -719,6 +727,84 @@ Loop:
 		}
 	}
 	return n, nil
+}
+
+type byteStringNode []byte
+
+var byteStringSet = sigSet{
+	Signature{"ay"}: true,
+}
+
+func (byteStringNode) Infer() (Signature, error) {
+	return Signature{"ay"}, nil
+}
+
+func (b byteStringNode) String() string {
+	return string(b)
+}
+
+func (b byteStringNode) Sigs() sigSet {
+	return byteStringSet
+}
+
+func (b byteStringNode) Value(sig Signature) (interface{}, error) {
+	if sig.str != "ay" {
+		return nil, varTypeError{b.String(), sig}
+	}
+	return []byte(b), nil
+}
+
+func varParseByteString(s string) ([]byte, error) {
+	// quotes and b at start are guaranteed to be there
+	b := make([]byte, 0, 1)
+	s = s[2 : len(s)-1]
+	for len(s) != 0 {
+		c := s[0]
+		s = s[1:]
+		if c != '\\' {
+			b = append(b, c)
+			continue
+		}
+		c = s[0]
+		s = s[1:]
+		switch c {
+		case 'a':
+			b = append(b, 0x7)
+		case 'b':
+			b = append(b, 0x8)
+		case 'f':
+			b = append(b, 0xc)
+		case 'n':
+			b = append(b, '\n')
+		case 'r':
+			b = append(b, '\r')
+		case 't':
+			b = append(b, '\t')
+		case 'x':
+			if len(s) < 2 {
+				return nil, errors.New("short escape")
+			}
+			n, err := strconv.ParseUint(s[:2], 16, 8)
+			if err != nil {
+				return nil, err
+			}
+			b = append(b, byte(n))
+			s = s[2:]
+		case '0':
+			if len(s) < 3 {
+				return nil, errors.New("short escape")
+			}
+			n, err := strconv.ParseUint(s[:3], 8, 8)
+			if err != nil {
+				return nil, err
+			}
+			b = append(b, byte(n))
+			s = s[3:]
+		default:
+			b = append(b, c)
+		}
+	}
+	return append(b, 0), nil
 }
 
 func varInfer(n varNode) (Signature, error) {

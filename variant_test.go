@@ -50,6 +50,10 @@ var variantParseTests = []struct {
 	{`{"foo": 1}`, map[string]int32{"foo": 1}},
 	{`{"a": <1>, "b": <"foo">}`,
 		map[string]Variant{"a": MakeVariant(int32(1)), "b": MakeVariant("foo")}},
+	{`b''`, []byte{0}},
+	{`b"abc"`, []byte{'a', 'b', 'c', 0}},
+	{`b"\x01\0002\n"`, []byte{1, 2, '\n', 0}},
+	{`[[0], b""]`, [][]byte{{0}, {0}}},
 }
 
 func TestParseVariant(t *testing.T) {
