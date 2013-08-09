@@ -4,57 +4,90 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io/ioutil"
+	"math"
 	"reflect"
 	"testing"
 )
 
 var protoTests = []struct {
-	vs         []interface{}
-	marshalled []byte
+	vs           []interface{}
+	bigEndian    []byte
+	littleEndian []byte
 }{
 	{
 		[]interface{}{int32(0)},
 		[]byte{0, 0, 0, 0},
+		[]byte{0, 0, 0, 0},
 	},
 	{
-		[]interface{}{int16(32)},
-		[]byte{0, 32},
+		[]interface{}{true, false},
+		[]byte{0, 0, 0, 1, 0, 0, 0, 0},
+		[]byte{1, 0, 0, 0, 0, 0, 0, 0},
+	},
+	{
+		[]interface{}{byte(0), uint16(12), int16(32), uint32(43)},
+		[]byte{0, 0, 0, 12, 0, 32, 0, 0, 0, 0, 0, 43},
+		[]byte{0, 0, 12, 0, 32, 0, 0, 0, 43, 0, 0, 0},
+	},
+	{
+		[]interface{}{int64(-1), uint64(1<<64 - 1)},
+		bytes.Repeat([]byte{255}, 16),
+		bytes.Repeat([]byte{255}, 16),
+	},
+	{
+		[]interface{}{math.Inf(+1)},
+		[]byte{0x7f, 0xf0, 0, 0, 0, 0, 0, 0},
+		[]byte{0, 0, 0, 0, 0, 0, 0xf0, 0x7f},
 	},
 	{
 		[]interface{}{"foo"},
 		[]byte{0, 0, 0, 3, 'f', 'o', 'o', 0},
+		[]byte{3, 0, 0, 0, 'f', 'o', 'o', 0},
 	},
 	{
 		[]interface{}{Signature{"ai"}},
+		[]byte{2, 'a', 'i', 0},
 		[]byte{2, 'a', 'i', 0},
 	},
 	{
 		[]interface{}{[]int16{42, 256}},
 		[]byte{0, 0, 0, 4, 0, 42, 1, 0},
-	},
-	{
-		[]interface{}{int16(42), int32(42)},
-		[]byte{0, 42, 0, 0, 0, 0, 0, 42},
+		[]byte{4, 0, 0, 0, 42, 0, 0, 1},
 	},
 	{
 		[]interface{}{MakeVariant("foo")},
 		[]byte{1, 's', 0, 0, 0, 0, 0, 3, 'f', 'o', 'o', 0},
+		[]byte{1, 's', 0, 0, 3, 0, 0, 0, 'f', 'o', 'o', 0},
 	},
 	{
 		[]interface{}{MakeVariant(MakeVariant(Signature{"v"}))},
 		[]byte{1, 'v', 0, 1, 'g', 0, 1, 'v', 0},
+		[]byte{1, 'v', 0, 1, 'g', 0, 1, 'v', 0},
+	},
+	{
+		[]interface{}{map[int32]bool{42: true}},
+		[]byte{0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 42, 0, 0, 0, 1},
+		[]byte{8, 0, 0, 0, 0, 0, 0, 0, 42, 0, 0, 0, 1, 0, 0, 0},
 	},
 }
 
 func TestProto(t *testing.T) {
 	for i, v := range protoTests {
 		buf := new(bytes.Buffer)
-		enc := newEncoder(buf, binary.BigEndian)
-		enc.Encode(v.vs...)
+		bigEnc := newEncoder(buf, binary.BigEndian)
+		bigEnc.Encode(v.vs...)
 		marshalled := buf.Bytes()
-		if bytes.Compare(marshalled, v.marshalled) != 0 {
-			t.Errorf("test %d (marshal): got '%v', but expected '%v'\n", i+1, marshalled,
-				v.marshalled)
+		if bytes.Compare(marshalled, v.bigEndian) != 0 {
+			t.Errorf("test %d (marshal be): got '%v', but expected '%v'\n", i+1, marshalled,
+				v.bigEndian)
+		}
+		buf.Reset()
+		litEnc := newEncoder(buf, binary.LittleEndian)
+		litEnc.Encode(v.vs...)
+		marshalled = buf.Bytes()
+		if bytes.Compare(marshalled, v.littleEndian) != 0 {
+			t.Errorf("test %d (marshal le): got '%v', but expected '%v'\n", i+1, marshalled,
+				v.littleEndian)
 		}
 		unmarshalled := reflect.MakeSlice(reflect.TypeOf(v.vs),
 			0, 0)
@@ -62,15 +95,25 @@ func TestProto(t *testing.T) {
 			unmarshalled = reflect.Append(unmarshalled,
 				reflect.New(reflect.TypeOf(v.vs[i])))
 		}
-		dec := newDecoder(bytes.NewReader(v.marshalled), binary.BigEndian)
-		vs, err := dec.Decode(SignatureOf(v.vs...))
+		bigDec := newDecoder(bytes.NewReader(v.bigEndian), binary.BigEndian)
+		vs, err := bigDec.Decode(SignatureOf(v.vs...))
 		if err != nil {
-			t.Errorf("test %d: %s\n", i+1, err)
+			t.Errorf("test %d (unmarshal be): %s\n", i+1, err)
 			continue
 		}
 		if !reflect.DeepEqual(vs, v.vs) {
-			t.Errorf("test %d (unmarshal): got %#v, but expected %#v\n", i+1, vs, v.vs)
+			t.Errorf("test %d (unmarshal be): got %#v, but expected %#v\n", i+1, vs, v.vs)
 		}
+		litDec := newDecoder(bytes.NewReader(v.littleEndian), binary.LittleEndian)
+		vs, err = litDec.Decode(SignatureOf(v.vs...))
+		if err != nil {
+			t.Errorf("test %d (unmarshal le): %s\n", i+1, err)
+			continue
+		}
+		if !reflect.DeepEqual(vs, v.vs) {
+			t.Errorf("test %d (unmarshal le): got %#v, but expected %#v\n", i+1, vs, v.vs)
+		}
+
 	}
 }
 
