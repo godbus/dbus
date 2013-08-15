@@ -220,11 +220,13 @@ func varNumAs(s string, sig Signature) (interface{}, error) {
 		return nil, varTypeError{s, sig}
 	}
 	base := 10
-	if strings.HasPrefix(s, "0") {
-		base = 8
-	}
 	if strings.HasPrefix(s, "0x") {
 		base = 16
+		s = s[2:]
+	}
+	if strings.HasPrefix(s, "0") && len(s) != 1 {
+		base = 8
+		s = s[1:]
 	}
 	if isUnsigned {
 		i, err := strconv.ParseUint(s, base, size)
@@ -615,8 +617,8 @@ func (n dictNode) Sigs() sigSet {
 func (n dictNode) Value(sig Signature) (interface{}, error) {
 	set := n.Sigs()
 	if set.Empty() {
-		// no type intofmation -> empty dict
-		return reflect.MakeMap(typeFor(sig.str)), nil
+		// no type information -> empty dict
+		return reflect.MakeMap(typeFor(sig.str)).Interface(), nil
 	}
 	if !set[sig] {
 		return nil, varTypeError{n.String(), sig}

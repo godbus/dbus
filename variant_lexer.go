@@ -155,7 +155,8 @@ func varLexNormal(l *varLexer) lexState {
 					l.emit(tokBool)
 					continue
 				}
-			} else if l.pos+5 <= len(l.input) {
+			}
+			if l.pos+5 <= len(l.input) {
 				if l.input[l.pos:l.pos+5] == "false" {
 					l.pos += 5
 					l.emit(tokBool)
