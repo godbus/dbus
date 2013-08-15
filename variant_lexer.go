@@ -39,14 +39,14 @@ type varLexer struct {
 	start  int
 	pos    int
 	width  int
-	tokens chan varToken
+	tokens []varToken
 }
 
 type lexState func(*varLexer) lexState
 
-func varLex(s string) chan varToken {
-	l := &varLexer{input: s, tokens: make(chan varToken)}
-	go l.run()
+func varLex(s string) []varToken {
+	l := &varLexer{input: s}
+	l.run()
 	return l.tokens
 }
 
@@ -63,15 +63,15 @@ func (l *varLexer) backup() {
 }
 
 func (l *varLexer) emit(t varTokenType) {
-	l.tokens <- varToken{t, l.input[l.start:l.pos]}
+	l.tokens = append(l.tokens, varToken{t, l.input[l.start:l.pos]})
 	l.start = l.pos
 }
 
 func (l *varLexer) errorf(format string, v ...interface{}) lexState {
-	l.tokens <- varToken{
+	l.tokens = append(l.tokens, varToken{
 		tokError,
 		fmt.Sprintf(format, v...),
-	}
+	})
 	return nil
 }
 
@@ -95,7 +95,6 @@ func (l *varLexer) run() {
 	for state := varLexNormal; state != nil; {
 		state = state(l)
 	}
-	close(l.tokens)
 }
 
 func (l *varLexer) peek() rune {
@@ -133,6 +132,11 @@ func varLexNormal(l *varLexer) lexState {
 		case r == '@':
 			l.backup()
 			return varLexType
+		case unicode.IsSpace(r):
+			l.ignore()
+		case unicode.IsNumber(r) || r == '+' || r == '-':
+			l.backup()
+			return varLexNumber
 		case r == 'b':
 			pos := l.start
 			if n := l.peek(); n == '"' || n == '\'' {
@@ -141,11 +145,7 @@ func varLexNormal(l *varLexer) lexState {
 			// not a byte string; try to parse it as a type or bool below
 			l.pos = pos + 1
 			l.width = 1
-		case unicode.IsSpace(r):
-			l.ignore()
-		case unicode.IsNumber(r) || r == '+' || r == '-':
-			l.backup()
-			return varLexNumber
+			fallthrough
 		default:
 			// either a bool or a type. Try bools first.
 			l.backup()
@@ -153,16 +153,17 @@ func varLexNormal(l *varLexer) lexState {
 				if l.input[l.pos:l.pos+4] == "true" {
 					l.pos += 4
 					l.emit(tokBool)
+					continue
 				}
 			} else if l.pos+5 <= len(l.input) {
 				if l.input[l.pos:l.pos+5] == "false" {
 					l.pos += 5
 					l.emit(tokBool)
+					continue
 				}
-			} else {
-				// must be a type.
-				return varLexType
 			}
+			// must be a type.
+			return varLexType
 		}
 	}
 }

@@ -23,8 +23,8 @@ func MakeVariant(v interface{}) Variant {
 // https://developer.gnome.org/glib/unstable/gvariant-text.html. If sig is not
 // empty, it is taken to be the expected signature for the variant.
 func ParseVariant(s string, sig Signature) (Variant, error) {
-	ch := varLex(s)
-	p := &varParser{ch: ch}
+	tokens := varLex(s)
+	p := &varParser{tokens: tokens}
 	n, err := varMakeNode(p)
 	if err != nil {
 		return Variant{}, err

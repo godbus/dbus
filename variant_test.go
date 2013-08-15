@@ -54,6 +54,8 @@ var variantParseTests = []struct {
 	{`b"abc"`, []byte{'a', 'b', 'c', 0}},
 	{`b"\x01\0002\n"`, []byte{1, 2, '\n', 0}},
 	{`[[0], b""]`, [][]byte{{0}, {0}}},
+	{"int16 0", int16(0)},
+	{"byte 0", byte(0)},
 }
 
 func TestParseVariant(t *testing.T) {

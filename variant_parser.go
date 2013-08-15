@@ -12,21 +12,21 @@ import (
 )
 
 type varParser struct {
-	ch    chan varToken
-	saved varToken
+	tokens []varToken
+	i      int
 }
 
-func (p *varParser) backup(t varToken) {
-	p.saved = t
+func (p *varParser) backup() {
+	p.i--
 }
 
 func (p *varParser) next() varToken {
-	if p.saved.typ != tokEOF {
-		t := p.saved
-		p.saved = varToken{}
+	if p.i < len(p.tokens) {
+		t := p.tokens[p.i]
+		p.i++
 		return t
 	}
-	return <-p.ch
+	return varToken{typ: tokEOF}
 }
 
 type varNode interface {
@@ -471,7 +471,7 @@ func varMakeArrayNode(p *varParser, sig Signature) (varNode, error) {
 	if t := p.next(); t.typ == tokArrayEnd {
 		return n, nil
 	} else {
-		p.backup(t)
+		p.backup()
 	}
 Loop:
 	for {
@@ -482,7 +482,7 @@ Loop:
 		case tokError:
 			return nil, errors.New(t.val)
 		}
-		p.backup(t)
+		p.backup()
 		cn, err := varMakeNode(p)
 		if err != nil {
 			return nil, err
@@ -653,7 +653,7 @@ func varMakeDictNode(p *varParser, sig Signature) (varNode, error) {
 	if t := p.next(); t.typ == tokDictEnd {
 		return n, nil
 	} else {
-		p.backup(t)
+		p.backup()
 	}
 Loop:
 	for {
@@ -664,7 +664,7 @@ Loop:
 		case tokError:
 			return nil, errors.New(t.val)
 		}
-		p.backup(t)
+		p.backup()
 		kn, err := varMakeNode(p)
 		if err != nil {
 			return nil, err
@@ -696,7 +696,7 @@ Loop:
 		case tokError:
 			return nil, errors.New(t.val)
 		}
-		p.backup(t)
+		p.backup()
 		vn, err := varMakeNode(p)
 		if err != nil {
 			return nil, err
