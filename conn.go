@@ -306,11 +306,7 @@ func (conn *Conn) inWorker() {
 				member := msg.Headers[FieldMember].value.(string)
 				// as per http://dbus.freedesktop.org/doc/dbus-specification.html ,
 				// sender is optional for signals.
-				senderH := msg.Headers[FieldSender]
-				if senderH.value == nil {
-					senderH = MakeVariant("")
-				}
-				sender := senderH.value.(string)
+				sender, _ := msg.Headers[FieldSender].value.(string)
 				if iface == "org.freedesktop.DBus" && member == "NameLost" &&
 					sender == "org.freedesktop.DBus" {
 
