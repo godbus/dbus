@@ -76,6 +76,9 @@ func SessionBus() (conn *Conn, err error) {
 		}
 	}()
 	conn, err = SessionBusPrivate()
+	if err != nil {
+		return
+	}
 	if err = conn.Auth(nil); err != nil {
 		conn.Close()
 		conn = nil
