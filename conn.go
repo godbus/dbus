@@ -304,8 +304,15 @@ func (conn *Conn) inWorker() {
 			case TypeSignal:
 				iface := msg.Headers[FieldInterface].value.(string)
 				member := msg.Headers[FieldMember].value.(string)
+				// as per http://dbus.freedesktop.org/doc/dbus-specification.html ,
+				// sender is optional for signals.
+				senderH := msg.Headers[FieldSender]
+				if senderH.value == nil {
+					senderH = MakeVariant("")
+				}
+				sender := senderH.value.(string)
 				if iface == "org.freedesktop.DBus" && member == "NameLost" &&
-					msg.Headers[FieldSender].value.(string) == "org.freedesktop.DBus" {
+					sender == "org.freedesktop.DBus" {
 
 					name, _ := msg.Body[0].(string)
 					conn.namesLck.Lock()
@@ -318,7 +325,7 @@ func (conn *Conn) inWorker() {
 					conn.namesLck.Unlock()
 				}
 				signal := &Signal{
-					Sender: msg.Headers[FieldSender].value.(string),
+					Sender: sender,
 					Path:   msg.Headers[FieldPath].value.(ObjectPath),
 					Name:   iface + "." + member,
 					Body:   msg.Body,
