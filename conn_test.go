@@ -16,6 +16,29 @@ func TestSystemBus(t *testing.T) {
 	}
 }
 
+func TestSend(t *testing.T) {
+	bus, err := SessionBus()
+	if err != nil {
+		t.Error(err)
+	}
+	ch := make(chan *Call, 1)
+	msg := &Message{
+		Type:  TypeMethodCall,
+		Flags: 0,
+		Headers: map[HeaderField]Variant{
+			FieldDestination: MakeVariant(bus.Names()[0]),
+			FieldPath:        MakeVariant(ObjectPath("/org/freedesktop/DBus")),
+			FieldInterface:   MakeVariant("org.freedesktop.DBus.Peer"),
+			FieldMember:      MakeVariant("Ping"),
+		},
+	}
+	call := bus.Send(msg, ch)
+	<-ch
+	if call.Err != nil {
+		t.Error(call.Err)
+	}
+}
+
 type server struct{}
 
 func (server) Double(i int64) (int64, *Error) {
