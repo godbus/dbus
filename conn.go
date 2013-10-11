@@ -502,9 +502,9 @@ func (conn *Conn) Signal(ch chan<- *Signal) {
 }
 
 func (obj *Object) GetProperty(p string) (Variant, error) {
-	idx    := strings.LastIndex(p, ".")
-	iface  := p[:idx]
-	prop   := p[idx+1:]
+	idx := strings.LastIndex(p, ".")
+	iface := p[:idx]
+	prop := p[idx+1:]
 
 	result := new(Variant)
 	err := obj.Call("org.freedesktop.DBus.Properties.Get", 0, iface, prop).Store(result)
