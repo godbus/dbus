@@ -501,6 +501,13 @@ func (conn *Conn) Signal(ch chan<- *Signal) {
 	conn.signalsLck.Unlock()
 }
 
+func (obj *Object) Get(inter, prop string) (result *Variant, err error) {
+	result = new(Variant)
+	err = obj.Call("Get", 0, inter, prop).Store(result)
+
+	return
+}
+
 // SupportsUnixFDs returns whether the underlying transport supports passing of
 // unix file descriptors. If this is false, method calls containing unix file
 // descriptors will return an error and emitted signals containing them will
