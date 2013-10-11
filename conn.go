@@ -503,7 +503,7 @@ func (conn *Conn) Signal(ch chan<- *Signal) {
 
 func (obj *Object) Get(inter, prop string) (result *Variant, err error) {
 	result = new(Variant)
-	err = obj.Call("Get", 0, inter, prop).Store(result)
+	err = obj.Call("org.freedesktop.DBus.Properties.Get", 0, inter, prop).Store(result)
 
 	return
 }
