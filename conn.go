@@ -505,7 +505,7 @@ func (obj *Object) GetProperty(p string) (Variant, error) {
 
 	idx := strings.LastIndex(p, ".")
 	if idx == -1 || idx+1 == len(p) {
-		return *new(Variant), errors.New("Invalid Property " + p + ".")
+		return *new(Variant), errors.New("dbus: invalid property " + p)
 	}
 
 	iface := p[:idx]
