@@ -502,14 +502,23 @@ func (conn *Conn) Signal(ch chan<- *Signal) {
 }
 
 func (obj *Object) GetProperty(p string) (Variant, error) {
+
 	idx := strings.LastIndex(p, ".")
+	if idx == -1 || idx+1 == len(p) {
+		return *new(Variant), errors.New("Invalid Property " + p + ".")
+	}
+
 	iface := p[:idx]
 	prop := p[idx+1:]
 
 	result := new(Variant)
 	err := obj.Call("org.freedesktop.DBus.Properties.Get", 0, iface, prop).Store(result)
 
-	return *result, err
+	if err != nil {
+		return *new(Variant), err
+	}
+
+	return *result, nil
 }
 
 // SupportsUnixFDs returns whether the underlying transport supports passing of
