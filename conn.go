@@ -505,20 +505,20 @@ func (obj *Object) GetProperty(p string) (Variant, error) {
 
 	idx := strings.LastIndex(p, ".")
 	if idx == -1 || idx+1 == len(p) {
-		return *new(Variant), errors.New("dbus: invalid property " + p)
+		return Variant{}, errors.New("dbus: invalid property " + p)
 	}
 
 	iface := p[:idx]
 	prop := p[idx+1:]
 
-	result := new(Variant)
-	err := obj.Call("org.freedesktop.DBus.Properties.Get", 0, iface, prop).Store(result)
+	result := Variant{}
+	err := obj.Call("org.freedesktop.DBus.Properties.Get", 0, iface, prop).Store(&result)
 
 	if err != nil {
-		return *new(Variant), err
+		return Variant{}, err
 	}
 
-	return *result, nil
+	return result, nil
 }
 
 // SupportsUnixFDs returns whether the underlying transport supports passing of
