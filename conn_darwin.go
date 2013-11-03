@@ -12,5 +12,9 @@ func SessionBusPlatform() (*Conn, error) {
 		return nil, err
 	}
 
+	if len(b) == 0 {
+		return nil, errors.New("dbus: couldn't determine address of session bus")
+	}
+
 	return Dial("unix:path=" + string(b[:len(b)-1]))
 }
