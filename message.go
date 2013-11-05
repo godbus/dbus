@@ -106,6 +106,8 @@ type Message struct {
 	serial uint32
 }
 
+type Sender string
+
 type header struct {
 	Field byte
 	Variant

@@ -94,20 +94,28 @@ func (conn *Conn) handleCall(msg *Message) {
 	}
 	t := m.Type()
 	vs := msg.Body
-	if t.NumIn() != len(vs) {
-		conn.sendError(errmsgInvalidArg, sender, serial)
-		return
-	}
-	pointers := make([]interface{}, len(vs))
+	pointers := make([]interface{}, t.NumIn())
+	decode := make([]interface{}, 0, len(vs))
 	for i := 0; i < t.NumIn(); i++ {
-		pointers[i] = reflect.New(t.In(i)).Interface()
+		tp := t.In(i)
+		val := reflect.New(tp)
+		pointers[i] = val.Interface()
+		if tp == reflect.TypeOf((*Sender)(nil)).Elem() {
+			val.Elem().SetString(sender)
+		} else {
+			decode = append(decode, pointers[i])
+		}
 	}
-	if err := Store(vs, pointers...); err != nil {
+	if len(decode) != len(vs) {
 		conn.sendError(errmsgInvalidArg, sender, serial)
 		return
 	}
-	params := make([]reflect.Value, len(vs))
-	for i := 0; i < len(vs); i++ {
+	if err := Store(vs, decode...); err != nil {
+		conn.sendError(errmsgInvalidArg, sender, serial)
+		return
+	}
+	params := make([]reflect.Value, len(pointers))
+	for i := 0; i < len(pointers); i++ {
 		params[i] = reflect.ValueOf(pointers[i]).Elem()
 	}
 	ret := m.Call(params)
