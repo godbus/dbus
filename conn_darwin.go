@@ -1,6 +1,7 @@
 package dbus
 
 import (
+	"errors"
 	"os/exec"
 )
 
