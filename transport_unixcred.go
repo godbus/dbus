@@ -20,4 +20,3 @@ func (t *unixTransport) SendNullByte() error {
 	}
 	return nil
 }
-
