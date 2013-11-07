@@ -196,6 +196,11 @@ func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) erro
 // *Error is not nil, it is sent back to the caller as an error.
 // Otherwise, a method reply is sent with the other return values as its body.
 //
+// Any parameters with the special type Sender are set to the sender of the
+// dbus message when the method is called. Parameters of this type do not
+// contribute to the dbus signature of the method (i.e. the method is exposed
+// as if the parameters of type Sender were not there).
+//
 // Every method call is executed in a new goroutine, so the method may be called
 // in multiple goroutines at once.
 //
