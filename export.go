@@ -22,6 +22,8 @@ var (
 	}
 )
 
+// Sender is a type which can be used in exported methods to receive the message
+// sender.
 type Sender string
 
 func exportedMethod(v interface{}, name string) reflect.Value {
