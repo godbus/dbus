@@ -22,6 +22,8 @@ var (
 	}
 )
 
+type Sender string
+
 func exportedMethod(v interface{}, name string) reflect.Value {
 	if v == nil {
 		return reflect.Value{}
