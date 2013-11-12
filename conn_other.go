@@ -8,7 +8,7 @@ import (
 	"os/exec"
 )
 
-func SessionBusPlatform() (*Conn, error) {
+func sessionBusPlatform() (*Conn, error) {
 	cmd := exec.Command("dbus-launch")
 	b, err := cmd.CombinedOutput()
 

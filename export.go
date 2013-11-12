@@ -254,11 +254,6 @@ func (conn *Conn) RequestName(name string, flags RequestNameFlags) (RequestNameR
 	return RequestNameReply(r), nil
 }
 
-func (conn *Conn) Unexport(path ObjectPath, iface string) {
-	conn.handlersLck.Lock()
-	conn.handlersLck.Unlock()
-}
-
 // ReleaseNameReply is the reply to a ReleaseName call.
 type ReleaseNameReply uint32
 
