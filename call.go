@@ -60,7 +60,7 @@ func (o *Object) GetProperty(p string) (Variant, error) {
 	prop := p[idx+1:]
 
 	result := Variant{}
-	err := obj.Call("org.freedesktop.DBus.Properties.Get", 0, iface, prop).Store(&result)
+	err := o.Call("org.freedesktop.DBus.Properties.Get", 0, iface, prop).Store(&result)
 
 	if err != nil {
 		return Variant{}, err
