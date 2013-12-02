@@ -30,6 +30,8 @@ func (o *oobReader) Read(b []byte) (n int, err error) {
 type unixTransport struct {
 	*net.UnixConn
 	hasUnixFDs bool
+	hasPeerUid bool
+	peerUid    uint32
 }
 
 func newUnixTransport(keys string) (transport, error) {

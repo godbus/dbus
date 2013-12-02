@@ -15,6 +15,18 @@ func (t genericTransport) SendNullByte() error {
 	return err
 }
 
+func (t genericTransport) ReadNullByte() error {
+	res := []byte{0}
+	n, err := t.Read(res)
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+
 func (t genericTransport) SupportsUnixFDs() bool {
 	return false
 }

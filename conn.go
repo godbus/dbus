@@ -535,6 +535,9 @@ type transport interface {
 	// Send the initial null byte used for the EXTERNAL mechanism.
 	SendNullByte() error
 
+	// Recieve the initial null byte used for the EXTERNAL mechanism.
+	ReadNullByte() error
+
 	// Returns whether this transport supports passing Unix FDs.
 	SupportsUnixFDs() bool
 

@@ -3,6 +3,7 @@ package dbus
 import (
 	"bufio"
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"io"
 	"os"
@@ -35,6 +36,30 @@ const (
 	waitingForReject
 )
 
+// ServerAuthStatus represents the Status of an authentication mechanism on the server side
+type ServerAuthStatus byte
+
+const (
+	// ServerAuthOk signals that authentication is finished; the next command
+	// from the server should be an OK.
+	ServerAuthOk ServerAuthStatus = iota
+
+	// ServerAuthContinue signals that additional data is needed; the next command
+	// from the server should be a DATA.
+	ServerAuthContinue
+
+	// ServerAuthRejected signals an rejected authentication
+	ServerAuthRejected
+)
+
+type serverAuthState byte
+
+const (
+	serverWaitingForAuth serverAuthState = iota
+	serverWaitingForData
+	serverWaitingForBegin
+)
+
 // Auth defines the behaviour of an authentication mechanism.
 type Auth interface {
 	// Return the name of the mechnism, the argument to the first AUTH command
@@ -44,6 +69,22 @@ type Auth interface {
 	// Process the given DATA command, and return the argument to the DATA
 	// command and the next status. If len(resp) == 0, no DATA command is sent.
 	HandleData(data []byte) (resp []byte, status AuthStatus)
+}
+
+// ServerAuth defines the behaviour of an authentication mechanism on the server.
+type ServerAuth interface {
+	// Return the name of the mechanism
+	Name() string
+	// Return true if the mechanism is supported for this transport
+	Supported(tr transport) bool
+
+	// Process the initial AUTH request, and return the argument to the
+	// DATA command and the next status. If len(resp) == 0, no DATA command is sent.
+	HandleAuth(data []byte, tr transport) (resp []byte, status ServerAuthStatus)
+
+	// Process a DATA authentication request, and return the argument to the
+	// DATA command and the next status. If len(resp) == 0, no DATA command is sent.
+	HandleData(data []byte) (resp []byte, status ServerAuthStatus)
 }
 
 // Auth authenticates the connection, trying the given list of authentication
@@ -250,4 +291,154 @@ func authWriteLine(out io.Writer, data ...[]byte) error {
 		return io.ErrUnexpectedEOF
 	}
 	return nil
+}
+
+// ServerAuth authenticates the connecting client, using the given
+// list of authentication mechanisms. If nil is passed, the EXTERNAL
+// mechanisms are used. For new server connections this method must be
+// called before sending any messages to the connection.  ServerAuth
+// must not be called on shared connections.
+func (conn *Conn) ServerAuth(methods []ServerAuth, uuid string) error {
+	if methods == nil {
+		methods = []ServerAuth{ServerAuthExternal(nil)}
+	}
+
+	in := bufio.NewReader(conn.transport)
+	err := conn.transport.ReadNullByte()
+	if err != nil {
+		return err
+	}
+
+	rejected_reply := [][]byte{[]byte("REJECTED")}
+	for _, m := range methods {
+		if m.Supported(conn.transport) {
+			rejected_reply = append(rejected_reply, []byte(m.Name()))
+		}
+	}
+
+	var currentMethod ServerAuth
+	state := serverWaitingForAuth
+	for {
+		s, err := authReadLine(in)
+		if err != nil {
+			return err
+		}
+		switch {
+		case state == serverWaitingForAuth && string(s[0]) == "AUTH":
+			currentMethod = nil
+			if len(s) >= 2 {
+				for _, m := range methods {
+					if m.Name() == string(s[1]) {
+						currentMethod = m
+						break
+					}
+				}
+			}
+
+			if currentMethod == nil {
+				err = authWriteLine(conn.transport, rejected_reply...)
+				if err != nil {
+					return err
+				}
+			} else {
+				data, status := currentMethod.HandleAuth(s[2], conn.transport)
+
+				if status == ServerAuthOk {
+					b := make([]byte, 2*len(uuid))
+					hex.Encode(b, []byte(uuid))
+					err = authWriteLine(conn.transport, []byte("OK"), b)
+					if err != nil {
+						return err
+					}
+					state = serverWaitingForBegin
+				} else if status == ServerAuthContinue {
+					err = authWriteLine(conn.transport, []byte("DATA"), data)
+					if err != nil {
+						return err
+					}
+					state = serverWaitingForData
+				} else if status == ServerAuthRejected {
+					err = authWriteLine(conn.transport, rejected_reply...)
+					if err != nil {
+						return err
+					}
+				}
+			}
+			break
+		case state == serverWaitingForAuth && string(s[0]) == "BEGIN":
+			conn.Close()
+			return errors.New("dbus: authentication protocol error")
+		case state == serverWaitingForAuth && string(s[0]) == "ERROR":
+			err = authWriteLine(conn.transport, rejected_reply...)
+			if err != nil {
+				return err
+			}
+			break
+
+		case state == serverWaitingForData && string(s[0]) == "DATA" && len(s) >= 2:
+			data, status := currentMethod.HandleData(s[1])
+
+			if status == ServerAuthOk {
+				err = authWriteLine(conn.transport, []byte("OK"))
+				if err != nil {
+					return err
+				}
+				state = serverWaitingForBegin
+			} else if status == ServerAuthContinue {
+				err = authWriteLine(conn.transport, []byte("DATA"), data)
+				if err != nil {
+					return err
+				}
+				state = serverWaitingForData
+			} else if status == ServerAuthRejected {
+				err = authWriteLine(conn.transport, rejected_reply...)
+				if err != nil {
+					return err
+				}
+				state = serverWaitingForAuth
+			}
+			break
+		case state == serverWaitingForData && string(s[0]) == "BEGIN":
+			conn.Close()
+			return errors.New("dbus: authentication protocol error")
+			break
+		case state == serverWaitingForData && (string(s[0]) == "CANCEL" || string(s[0]) == "ERROR"):
+			err = authWriteLine(conn.transport, rejected_reply...)
+			if err != nil {
+				return err
+			}
+			state = serverWaitingForAuth
+			break
+
+		case state == serverWaitingForBegin && string(s[0]) == "BEGIN":
+			go conn.inWorker()
+			go conn.outWorker()
+			return nil
+			break
+		case state == serverWaitingForBegin && (string(s[0]) == "CANCEL" || string(s[0]) == "ERROR"):
+			err = authWriteLine(conn.transport, rejected_reply...)
+			if err != nil {
+				return err
+			}
+			state = serverWaitingForAuth
+			break
+		case state == serverWaitingForBegin && string(s[0]) == "NEGOTIATE_UNIX_FD":
+			if conn.transport.SupportsUnixFDs() {
+				err = authWriteLine(conn.transport, []byte("AGREE_UNIX_FD"))
+			} else {
+				err = authWriteLine(conn.transport, []byte("ERROR"))
+			}
+			if err != nil {
+				return err
+			}
+			break
+
+		default:
+			err = authWriteLine(conn.transport, []byte("ERROR"))
+			if err != nil {
+				return err
+			}
+			break
+		}
+	}
 }
