@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/guelfey/go.dbus"
+	"github.com/godbus/dbus"
 	"os"
 )
 

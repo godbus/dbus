@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/guelfey/go.dbus"
-	"github.com/guelfey/go.dbus/introspect"
+	"github.com/godbus/dbus"
+	"github.com/godbus/dbus/introspect"
 	"os"
 )
 
