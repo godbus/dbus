@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"os"
-	"os/user"
 	"strconv"
 )
 
@@ -55,11 +54,7 @@ type Auth interface {
 func (conn *Conn) Auth(methods []Auth) error {
 	if methods == nil {
 		uid := strconv.Itoa(os.Getuid())
-		u, err := user.Current()
-		if err != nil {
-			return err
-		}
-		methods = []Auth{AuthExternal(uid), AuthCookieSha1(uid, u.HomeDir)}
+		methods = []Auth{AuthExternal(uid), AuthCookieSha1(uid, getHomeDir())}
 	}
 	in := bufio.NewReader(conn.transport)
 	err := conn.transport.SendNullByte()
