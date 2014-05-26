@@ -504,6 +504,10 @@ type Error struct {
 	Body []interface{}
 }
 
+func NewError(name string, body []interface{}) *Error {
+	return &Error{name, body}
+}
+
 func (e Error) Error() string {
 	if len(e.Body) >= 1 {
 		s, ok := e.Body[0].(string)
