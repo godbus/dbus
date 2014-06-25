@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"github.com/godbus/dbus"
 	"reflect"
+	"strings"
 )
 
 // Introspectable implements org.freedesktop.Introspectable.
@@ -31,7 +32,7 @@ func NewIntrospectable(n *Node) Introspectable {
 	if err != nil {
 		panic(err)
 	}
-	return Introspectable(b)
+	return Introspectable(strings.TrimSpace(IntrospectDeclarationString) + string(b))
 }
 
 // Introspect implements org.freedesktop.Introspectable.Introspect.
