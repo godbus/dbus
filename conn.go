@@ -317,11 +317,7 @@ func (conn *Conn) inWorker() {
 				}
 				conn.signalsLck.Lock()
 				for _, ch := range conn.signals {
-					// don't block trying to send a signal
-					select {
-					case ch <- signal:
-					default:
-					}
+					ch <- signal
 				}
 				conn.signalsLck.Unlock()
 			case TypeMethodCall:
