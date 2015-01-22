@@ -208,6 +208,8 @@ func (conn *Conn) Close() error {
 	conn.signalQueueLck.Unlock()
 
 	conn.signalsLck.Lock()
+	// This is to avoid closing channels user decided to remove
+	// from signal channels list
 	conn.processPendingSignalChannels()
 	for _, ch := range conn.signals {
 		close(ch)
@@ -416,15 +418,30 @@ func (conn *Conn) nextSignal() *Signal {
 	return nil
 }
 
-// processPendingSignalChannels adds new pending channels to main
-// signal channels array.
+// processPendingSignalChannels either adds new pending channels to
+// signal channels list or removes them if they already existed there.
 //
 // It is assumed that conn.signalsLck is locked.
 func (conn *Conn) processPendingSignalChannels() {
+	signalsMap := make(map[chan<- *Signal]struct{}, len(conn.signals))
+	for _, ch := range conn.signals {
+		signalsMap[ch] = struct{}{}
+	}
 	conn.pendingSignalChannelsLck.Lock()
-	conn.signals = append(conn.signals, conn.pendingSignalChannels...)
+	for _, ch := range conn.pendingSignalChannels {
+		if _, ok := signalsMap[ch]; ok {
+			delete(signalsMap, ch)
+		} else {
+			signalsMap[ch] = struct{}{}
+		}
+	}
 	conn.pendingSignalChannels = nil
 	conn.pendingSignalChannelsLck.Unlock()
+
+	conn.signals = nil
+	for ch, _ := range signalsMap {
+		conn.signals = append(conn.signals, ch)
+	}
 }
 
 // handleSignal sends given signal to user-provided signal
