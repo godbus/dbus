@@ -56,6 +56,16 @@ type Conn struct {
 	signals    []chan<- *Signal
 	signalsLck sync.Mutex
 
+	shutdownSigWorker chan struct{}
+
+	pendingSignalChannels    []chan<- *Signal
+	pendingSignalChannelsLck sync.Mutex
+
+	signalQueue               []*Signal
+	signalQueueWakeUp         chan struct{}
+	signalQueueConsumerAsleep bool
+	signalQueueLck            sync.Mutex
+
 	eavesdropped    chan<- *Message
 	eavesdroppedLck sync.Mutex
 }
@@ -161,6 +171,8 @@ func newConn(tr transport) (*Conn, error) {
 	conn.nextSerial = 1
 	conn.serialUsed = map[uint32]bool{0: true}
 	conn.busObj = conn.Object("org.freedesktop.DBus", "/org/freedesktop/DBus")
+	conn.shutdownSigWorker = make(chan struct{})
+	conn.signalQueueWakeUp = make(chan struct{}, 1)
 	return conn, nil
 }
 
@@ -182,14 +194,26 @@ func (conn *Conn) Close() error {
 		conn.outLck.Unlock()
 		return nil
 	}
+
 	close(conn.out)
 	conn.closed = true
 	conn.outLck.Unlock()
+
+	close(conn.shutdownSigWorker)
+	conn.signalQueueLck.Lock()
+	// This is to avoid unnecessary wakeup of sigWorker
+	tmp := conn.signalQueueWakeUp
+	conn.signalQueueWakeUp = nil
+	close(tmp)
+	conn.signalQueueLck.Unlock()
+
 	conn.signalsLck.Lock()
+	conn.processPendingSignalChannels()
 	for _, ch := range conn.signals {
 		close(ch)
 	}
 	conn.signalsLck.Unlock()
+
 	conn.eavesdroppedLck.Lock()
 	if conn.eavesdropped != nil {
 		close(conn.eavesdropped)
@@ -322,11 +346,19 @@ func (conn *Conn) inWorker() {
 					Name:   iface + "." + member,
 					Body:   msg.Body,
 				}
-				conn.signalsLck.Lock()
-				for _, ch := range conn.signals {
-					ch <- signal
+				conn.signalQueueLck.Lock()
+				// When we are closing the connection
+				// we set the conn.signalQueueWakeUp
+				// to nil to avoid unnecessary signal
+				// queueing and sigWorker wakeups.
+				if conn.signalQueueWakeUp != nil {
+					conn.signalQueue = append(conn.signalQueue, signal)
+					if conn.signalQueueConsumerAsleep {
+						conn.signalQueueConsumerAsleep = false
+						conn.signalQueueWakeUp <- struct{}{}
+					}
 				}
-				conn.signalsLck.Unlock()
+				conn.signalQueueLck.Unlock()
 			case TypeMethodCall:
 				go conn.handleCall(msg)
 			}
@@ -345,6 +377,77 @@ func (conn *Conn) inWorker() {
 		}
 		// invalid messages are ignored
 	}
+}
+
+// sigWorker gets signals from signal queue and handles them
+// appropriately.
+func (conn *Conn) sigWorker() {
+	for {
+		signal := conn.nextSignal()
+		if signal != nil {
+			closing := conn.handleSignal(signal)
+			if closing {
+				return
+			}
+		} else {
+			select {
+			case <-conn.signalQueueWakeUp:
+			case <-conn.shutdownSigWorker:
+				return
+			}
+		}
+	}
+}
+
+// nextSignal gets next signal from queue or nil if there was no
+// signal in queue.
+func (conn *Conn) nextSignal() *Signal {
+	conn.signalQueueLck.Lock()
+	defer conn.signalQueueLck.Unlock()
+	for len(conn.signalQueue) > 0 {
+		signal := conn.signalQueue[0]
+		conn.signalQueue = conn.signalQueue[1:]
+		if signal != nil {
+			return signal
+		}
+	}
+
+	conn.signalQueueConsumerAsleep = true
+	return nil
+}
+
+// processPendingSignalChannels adds new pending channels to main
+// signal channels array.
+//
+// It is assumed that conn.signalsLck is locked.
+func (conn *Conn) processPendingSignalChannels() {
+	conn.pendingSignalChannelsLck.Lock()
+	conn.signals = append(conn.signals, conn.pendingSignalChannels...)
+	conn.pendingSignalChannels = nil
+	conn.pendingSignalChannelsLck.Unlock()
+}
+
+// handleSignal sends given signal to user-provided signal
+// channels. This function might be long-running when signal channel
+// has no space left in buffer.
+//
+// Returns a boolean saying if connection is about to be closed.
+//
+// Should be called by sigWorker only.
+func (conn *Conn) handleSignal(signal *Signal) bool {
+	conn.signalsLck.Lock()
+	defer conn.signalsLck.Unlock()
+
+	conn.processPendingSignalChannels()
+
+	for _, ch := range conn.signals {
+		select {
+		case ch <- signal:
+		case <-conn.shutdownSigWorker:
+			return true
+		}
+	}
+	return false
 }
 
 // Names returns the list of all names that are currently owned by this
@@ -480,9 +583,10 @@ func (conn *Conn) sendReply(dest string, serial uint32, values ...interface{}) {
 	conn.outLck.RUnlock()
 }
 
-// Signal registers the given channel to be passed all received signal messages.
-// The caller has to make sure that ch is sufficiently buffered; if a message
-// arrives when a write to c is not possible, it is discarded.
+// Signal registers the given channel to be passed all received signal
+// messages. Note that if a channel has no space left in buffer then
+// signal handling will be stuck. This is to make sure that no signals
+// are lost.
 //
 // Multiple of these channels can be registered at the same time. Passing a
 // channel that already is registered will remove it from the list of the
@@ -492,9 +596,9 @@ func (conn *Conn) sendReply(dest string, serial uint32, values ...interface{}) {
 // channel for eavesdropped messages, this channel receives all signals, and
 // none of the channels passed to Signal will receive any signals.
 func (conn *Conn) Signal(ch chan<- *Signal) {
-	conn.signalsLck.Lock()
-	conn.signals = append(conn.signals, ch)
-	conn.signalsLck.Unlock()
+	conn.pendingSignalChannelsLck.Lock()
+	conn.pendingSignalChannels = append(conn.pendingSignalChannels, ch)
+	conn.pendingSignalChannelsLck.Unlock()
 }
 
 // SupportsUnixFDs returns whether the underlying transport supports passing of
