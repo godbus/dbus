@@ -267,8 +267,8 @@ func (conn *Conn) Hello() error {
 	return nil
 }
 
-// inWorker runs in an own goroutine, reading incoming messages from the
-// transport and dispatching them appropriately.
+// inWorker reads incoming messages from the transport and dispatches
+// them appropriately.
 func (conn *Conn) inWorker() {
 	for {
 		msg, err := conn.ReadMessage()
@@ -484,8 +484,7 @@ func (conn *Conn) Object(dest string, path ObjectPath) *Object {
 	return &Object{conn, dest, path}
 }
 
-// outWorker runs in an own goroutine, encoding and sending messages that are
-// sent to conn.out.
+// outWorker encodes and sends messages that are sent to conn.out.
 func (conn *Conn) outWorker() {
 	for msg := range conn.out {
 		err := conn.SendMessage(msg)
