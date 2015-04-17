@@ -127,8 +127,10 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		if depth >= 64 {
 			panic(FormatError("input exceeds container depth limit"))
 		}
-		// Lookahead offset: 4 bytes for uint32 length, plus alignment
-		offset := enc.pos + 4 + enc.padding(4, alignment(v.Type().Elem()))
+		// Lookahead offset: 4 bytes for uint32 length (with alignment),
+		// plus alignment for elements.
+		n := enc.padding(0, 4) + 4
+		offset := enc.pos + n + enc.padding(n, alignment(v.Type().Elem()))
 
 		var buf bytes.Buffer
 		bufenc := newEncoderAtOffset(&buf, offset, enc.order)
@@ -181,8 +183,10 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 			panic(InvalidTypeError{v.Type()})
 		}
 		keys := v.MapKeys()
-		// Lookahead offset: 4 bytes for uint32 length, plus 8-byte alignment
-		offset := enc.pos + 4 + enc.padding(4, 8)
+		// Lookahead offset: 4 bytes for uint32 length (with alignment),
+		// plus 8-byte alignment
+		n := enc.padding(0, 4) + 4
+		offset := enc.pos + n + enc.padding(n, 8)
 
 		var buf bytes.Buffer
 		bufenc := newEncoderAtOffset(&buf, offset, enc.order)
