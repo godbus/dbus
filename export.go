@@ -225,6 +225,7 @@ func (conn *Conn) Export(v interface{}, path ObjectPath, iface string) error {
 				delete(conn.handlers, path)
 			}
 		}
+		conn.handlersLck.Unlock()
 		return nil
 	}
 	if _, ok := conn.handlers[path]; !ok {
