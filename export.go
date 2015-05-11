@@ -218,6 +218,7 @@ func (conn *Conn) Export(v interface{}, path ObjectPath, iface string) error {
 		return errors.New("dbus: invalid path name")
 	}
 	conn.handlersLck.Lock()
+	defer conn.handlersLck.Unlock()
 	if v == nil {
 		if _, ok := conn.handlers[path]; ok {
 			delete(conn.handlers[path], iface)
@@ -225,14 +226,12 @@ func (conn *Conn) Export(v interface{}, path ObjectPath, iface string) error {
 				delete(conn.handlers, path)
 			}
 		}
-		conn.handlersLck.Unlock()
 		return nil
 	}
 	if _, ok := conn.handlers[path]; !ok {
 		conn.handlers[path] = make(map[string]interface{})
 	}
 	conn.handlers[path][iface] = v
-	conn.handlersLck.Unlock()
 	return nil
 }
 
