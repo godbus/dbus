@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+	"encoding/json"
 	"sort"
 	"strconv"
 )
@@ -12,6 +13,10 @@ import (
 type Variant struct {
 	sig   Signature
 	value interface{}
+}
+
+func (v Variant) MarshalJSON() ([]byte, error) {
+	return json.Marshal(v.Value())
 }
 
 // MakeVariant converts the given value to a Variant. It panics if v cannot be
