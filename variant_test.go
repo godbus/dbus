@@ -2,6 +2,7 @@ package dbus
 
 import "reflect"
 import "testing"
+import "encoding/json"
 
 var variantFormatTests = []struct {
 	v interface{}
@@ -73,6 +74,35 @@ func TestParseVariant(t *testing.T) {
 		}
 		if !reflect.DeepEqual(nv.value, v.v) {
 			t.Errorf("test %d: got %q, wanted %q", i+1, nv, v.v)
+		}
+	}
+}
+
+var variantJsonTests = []struct {
+	v interface{}
+	s string
+}{
+	{int32(1), `1`},
+	{"foo", `"foo"`},
+	{ObjectPath("/org/foo"), `"/org/foo"`},
+	{[]byte{}, `""`},
+	{[]int32{1, 2}, `[1,2]`},
+	{[]int64{1, 2}, `[1,2]`},
+	{[][]int32{{3, 4}, {5, 6}}, `[[3,4],[5,6]]`},
+	{[]Variant{MakeVariant(int32(1)), MakeVariant(1.0)}, `[1,1]`},
+	{map[string]int32{"one": 1, "two": 2}, `{"one":1,"two":2}`},
+	{map[string]Variant{}, `{}`},
+}
+
+func TestVariantJson(t *testing.T) {
+	for i, v := range variantJsonTests {
+		mv, err := json.Marshal(MakeVariant(v.v))
+		if(err != nil) {
+			t.Errorf("test %d: marshalling failed: %s", i+1, err)
+			continue
+		} else if (string(mv) != v.s) {
+			t.Errorf("test %d: got: <%s>, wanted: <%s>", i+1, mv, v.s)
+			continue
 		}
 	}
 }

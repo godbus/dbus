@@ -1,6 +1,7 @@
 package dbus
 
 import (
+	"encoding/json"
 	"errors"
 	"reflect"
 	"strings"
@@ -130,6 +131,10 @@ func hasStruct(v interface{}) bool {
 
 // An ObjectPath is an object path as defined by the D-Bus spec.
 type ObjectPath string
+
+func (op ObjectPath) MarshalJSON() ([]byte, error) {
+	return json.Marshal(string(op))
+}
 
 // IsValid returns whether the object path is valid.
 func (o ObjectPath) IsValid() bool {
