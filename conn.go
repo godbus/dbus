@@ -303,18 +303,33 @@ func (conn *Conn) inWorker() {
 				// as per http://dbus.freedesktop.org/doc/dbus-specification.html ,
 				// sender is optional for signals.
 				sender, _ := msg.Headers[FieldSender].value.(string)
-				if iface == "org.freedesktop.DBus" && member == "NameLost" &&
-					sender == "org.freedesktop.DBus" {
-
-					name, _ := msg.Body[0].(string)
-					conn.namesLck.Lock()
-					for i, v := range conn.names {
-						if v == name {
-							copy(conn.names[i:], conn.names[i+1:])
-							conn.names = conn.names[:len(conn.names)-1]
+				if iface == "org.freedesktop.DBus" && sender == "org.freedesktop.DBus" {
+					if member == "NameLost" {
+						// If we lost the name on the bus, remove it from our
+						// tracking list.
+						name, ok := msg.Body[0].(string)
+						if !ok {
+							panic("Unable to read the lost name")
 						}
+						conn.namesLck.Lock()
+						for i, v := range conn.names {
+							if v == name {
+								conn.names = append(conn.names[:i],
+									conn.names[i+1:]...)
+							}
+						}
+						conn.namesLck.Unlock()
+					} else if member == "NameAcquired" {
+						// If we acquired the name on the bus, add it to our
+						// tracking list.
+						name, ok := msg.Body[0].(string)
+						if !ok {
+							panic("Unable to read the acquired name")
+						}
+						conn.namesLck.Lock()
+						conn.names = append(conn.names, name)
+						conn.namesLck.Unlock()
 					}
-					conn.namesLck.Unlock()
 				}
 				signal := &Signal{
 					Sender: sender,

@@ -235,40 +235,22 @@ func (conn *Conn) Export(v interface{}, path ObjectPath, iface string) error {
 	return nil
 }
 
-// ReleaseName calls org.freedesktop.DBus.ReleaseName. You should use only this
-// method to release a name (see below).
+// ReleaseName calls org.freedesktop.DBus.ReleaseName and awaits a response.
 func (conn *Conn) ReleaseName(name string) (ReleaseNameReply, error) {
 	var r uint32
 	err := conn.busObj.Call("org.freedesktop.DBus.ReleaseName", 0, name).Store(&r)
 	if err != nil {
 		return 0, err
 	}
-	if r == uint32(ReleaseNameReplyReleased) {
-		conn.namesLck.Lock()
-		for i, v := range conn.names {
-			if v == name {
-				copy(conn.names[i:], conn.names[i+1:])
-				conn.names = conn.names[:len(conn.names)-1]
-			}
-		}
-		conn.namesLck.Unlock()
-	}
 	return ReleaseNameReply(r), nil
 }
 
-// RequestName calls org.freedesktop.DBus.RequestName. You should use only this
-// method to request a name because package dbus needs to keep track of all
-// names that the connection has.
+// RequestName calls org.freedesktop.DBus.RequestName and awaits a response.
 func (conn *Conn) RequestName(name string, flags RequestNameFlags) (RequestNameReply, error) {
 	var r uint32
 	err := conn.busObj.Call("org.freedesktop.DBus.RequestName", 0, name, flags).Store(&r)
 	if err != nil {
 		return 0, err
-	}
-	if r == uint32(RequestNameReplyPrimaryOwner) {
-		conn.namesLck.Lock()
-		conn.names = append(conn.names, name)
-		conn.namesLck.Unlock()
 	}
 	return RequestNameReply(r), nil
 }
