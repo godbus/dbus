@@ -32,7 +32,7 @@ var ErrClosed = errors.New("dbus: connection closed by user")
 type Conn struct {
 	transport
 
-	busObj *Object
+	busObj BusObject
 	unixFD bool
 	uuid   string
 
@@ -166,7 +166,7 @@ func newConn(tr transport) (*Conn, error) {
 
 // BusObject returns the object owned by the bus daemon which handles
 // administrative requests.
-func (conn *Conn) BusObject() *Object {
+func (conn *Conn) BusObject() BusObject {
 	return conn.busObj
 }
 
@@ -360,7 +360,7 @@ func (conn *Conn) Names() []string {
 }
 
 // Object returns the object identified by the given destination name and path.
-func (conn *Conn) Object(dest string, path ObjectPath) *Object {
+func (conn *Conn) Object(dest string, path ObjectPath) BusObject {
 	return &Object{conn, dest, path}
 }
 
