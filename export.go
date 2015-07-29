@@ -2,9 +2,9 @@ package dbus
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
-	"unicode"
 )
 
 var (
@@ -22,16 +22,49 @@ var (
 	}
 )
 
+// exportWithMapping represents an exported struct along with a method name
+// mapping to allow for exporting lower-case methods, etc.
+type exportWithMapping struct {
+	export interface{}
+
+	// Method name mapping; key -> struct method, value -> dbus method.
+	mapping map[string]string
+}
+
 // Sender is a type which can be used in exported methods to receive the message
 // sender.
 type Sender string
 
-func exportedMethod(v interface{}, name string) reflect.Value {
-	if v == nil {
+func exportedMethod(export exportWithMapping, name string) reflect.Value {
+	if export.export == nil {
 		return reflect.Value{}
 	}
-	m := reflect.ValueOf(v).MethodByName(name)
-	if !m.IsValid() {
+
+	// If a mapping was included in the export, check the map to see if we
+	// should be looking for a different method in the export.
+	if export.mapping != nil {
+		for key, value := range export.mapping {
+			if value == name {
+				name = key
+				break
+			}
+
+			// Catch the case where a method is aliased but the client is calling
+			// the original, e.g. the "Foo" method was exported mapped to
+			// "foo," and dbus client called the original "Foo."
+			if key == name {
+				return reflect.Value{}
+			}
+		}
+	}
+
+	value := reflect.ValueOf(export.export)
+	m := value.MethodByName(name)
+
+	// Catch the case of attempting to call an unexported method
+	method, ok := value.Type().MethodByName(name)
+
+	if !m.IsValid() || !ok || method.PkgPath != "" {
 		return reflect.Value{}
 	}
 	t := m.Type()
@@ -62,7 +95,7 @@ func (conn *Conn) handleCall(msg *Message) {
 		}
 		return
 	}
-	if len(name) == 0 || unicode.IsLower([]rune(name)[0]) {
+	if len(name) == 0 {
 		conn.sendError(errmsgUnknownMethod, sender, serial)
 	}
 	var m reflect.Value
@@ -214,11 +247,23 @@ func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) erro
 //
 // Export returns an error if path is not a valid path name.
 func (conn *Conn) Export(v interface{}, path ObjectPath, iface string) error {
+	return conn.ExportWithMap(v, nil, path, iface)
+}
+
+// ExportWithMap works exactly like Export but provides the ability to remap
+// method names (e.g. export a lower-case method).
+//
+// The keys in the map are the real method names (exported on the struct), and
+// the values are the method names to be exported on DBus.
+func (conn *Conn) ExportWithMap(v interface{}, mapping map[string]string, path ObjectPath, iface string) error {
 	if !path.IsValid() {
-		return errors.New("dbus: invalid path name")
+		return fmt.Errorf(`dbus: Invalid path name: "%s"`, path)
 	}
+
 	conn.handlersLck.Lock()
 	defer conn.handlersLck.Unlock()
+
+	// Remove a previous export if the interface is nil
 	if v == nil {
 		if _, ok := conn.handlers[path]; ok {
 			delete(conn.handlers[path], iface)
@@ -226,12 +271,19 @@ func (conn *Conn) Export(v interface{}, path ObjectPath, iface string) error {
 				delete(conn.handlers, path)
 			}
 		}
+
 		return nil
 	}
+
+	// If this is the first handler for this path, make a new map to hold all
+	// handlers for this path.
 	if _, ok := conn.handlers[path]; !ok {
-		conn.handlers[path] = make(map[string]interface{})
+		conn.handlers[path] = make(map[string]exportWithMapping)
 	}
-	conn.handlers[path][iface] = v
+
+	// Finally, save this handler
+	conn.handlers[path][iface] = exportWithMapping{export: v, mapping: mapping}
+
 	return nil
 }
 
