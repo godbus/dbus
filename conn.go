@@ -49,9 +49,10 @@ type Conn struct {
 	handlers    map[ObjectPath]map[string]exportWithMapping
 	handlersLck sync.RWMutex
 
-	out    chan *Message
-	closed bool
-	outLck sync.RWMutex
+	out     chan *Message
+	closed  bool
+	outLck  sync.RWMutex
+	outWait sync.WaitGroup
 
 	signals    []chan<- *Signal
 	signalsLck sync.Mutex
@@ -195,6 +196,7 @@ func (conn *Conn) Close() error {
 		close(conn.eavesdropped)
 	}
 	conn.eavesdroppedLck.Unlock()
+	conn.outWait.Wait()
 	return conn.transport.Close()
 }
 
@@ -400,6 +402,7 @@ func (conn *Conn) outWorker() {
 		}
 		conn.callsLck.RUnlock()
 	}
+	conn.outWait.Done()
 }
 
 // Send sends the given message to the message bus. You usually don't need to
