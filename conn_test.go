@@ -92,8 +92,7 @@ func TestSignal(t *testing.T) {
 
 	conn, err := SessionBus()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to connect to session bus:", err)
-		os.Exit(1)
+		t.Fatalf("Failed to connect to session bus:", err)
 	}
 
 	call := conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0,
