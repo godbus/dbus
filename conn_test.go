@@ -1,6 +1,12 @@
 package dbus
 
-import "testing"
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"testing"
+	"time"
+)
 
 func TestSessionBus(t *testing.T) {
 	_, err := SessionBus()
@@ -36,6 +42,82 @@ func TestSend(t *testing.T) {
 	<-ch
 	if call.Err != nil {
 		t.Error(call.Err)
+	}
+}
+
+const (
+	objName    = "com.github.godbus.SignalTest"
+	objPath    = "/com/github/godbus/SignalTest"
+	signalName = "com.github.godbus.SignalTest.TestSignal"
+)
+
+// sendSignalAndExit sends a test signal over the session bus and
+// immediately terminating the process. This is ran as a child process
+// from TestSignal().
+// In the older versions of this library Close might not wait for all
+// outgoing messages to be sent out, and so some messages could be lost.
+func sendSignalAndExit() {
+	conn, err := SessionBusPrivate()
+	if err != nil {
+		panic(err)
+	}
+	if err = conn.Auth(nil); err != nil {
+		panic(err)
+	}
+	if err = conn.Hello(); err != nil {
+		panic(err)
+	}
+	reply, err := conn.RequestName(objName, NameFlagDoNotQueue)
+	if err != nil {
+		panic(err)
+	}
+	if reply != RequestNameReplyPrimaryOwner {
+		panic(fmt.Errorf("%s: name already taken", objName))
+	}
+	if err = conn.Emit(objPath, signalName, ""); err != nil {
+		panic(err)
+	}
+	if err = conn.Close(); err != nil {
+		panic(err)
+	}
+	os.Exit(0)
+}
+
+func TestSignal(t *testing.T) {
+	// This test is a regression test for bug
+	// https://github.com/guelfey/go.dbus/issues/57
+	//
+	// It works by spawning a child process that emits a signal
+	// and then catching that signal from the main process.
+
+	conn, err := SessionBus()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to connect to session bus:", err)
+		os.Exit(1)
+	}
+
+	call := conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0,
+		fmt.Sprintf("type='signal',path='%s',interface='%s',sender='%s'",
+			objPath, objName, objName))
+	if call.Err != nil {
+		t.Fatal(call.Err)
+	}
+
+	c := make(chan *Signal, 1)
+	conn.Signal(c)
+
+	err = exec.Command(os.Args[0], "signal").Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case signal := <-c:
+		if signal.Name != signalName {
+			t.Errorf("Wrong signal: %s", signal)
+		}
+	case <-time.After(time.Second * 1):
+		t.Error("Timeout waiting for signal")
 	}
 }
 
@@ -196,4 +278,11 @@ func benchmarkServeAsync(b *testing.B, srv, cli *Conn) {
 		obj.Go("org.guelfey.DBus.Test.Double", 0, c, int64(i))
 	}
 	<-done
+}
+
+func TestMain(m *testing.M) {
+	if len(os.Args) == 2 && os.Args[1] == "signal" {
+		sendSignalAndExit()
+	}
+	os.Exit(m.Run())
 }
