@@ -64,6 +64,11 @@ func init() {
 	transports["unix"] = newUnixTransport
 }
 
+func (t *unixTransport) SendNullByte() error {
+	t.hasUnixFDs = true
+	return nil
+}
+
 func (t *unixTransport) EnableUnixFDs() {
 	t.hasUnixFDs = true
 }
