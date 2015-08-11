@@ -9,6 +9,57 @@ func TestSessionBus(t *testing.T) {
 	}
 }
 
+// TestSessionBusPrivate creates two session bus connections and verifies that
+// objects exported via one connection are visible via the other.
+func TestSessionBusPrivate(t *testing.T) {
+	const objName = "com.github.godbus.BusTest"
+
+	conn1, err := SessionBusPrivate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn2, err := SessionBusPrivate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if conn1 == conn2 {
+		t.Fatal("SessionBusPrivate returned the same object twice")
+	}
+	if err = conn1.Auth(nil); err != nil {
+		t.Fatal(err)
+	}
+	if err = conn1.Hello(); err != nil {
+		t.Fatal(err)
+	}
+	if err = conn2.Auth(nil); err != nil {
+		t.Fatal(err)
+	}
+	if err = conn2.Hello(); err != nil {
+		t.Fatal(err)
+	}
+
+	reply, err := conn1.RequestName(objName, NameFlagDoNotQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reply != RequestNameReplyPrimaryOwner {
+		t.Fatalf("%s: name already taken", objName)
+	}
+
+	var names []string
+	err = conn2.BusObject().Call("org.freedesktop.DBus.ListNames", 0).Store(&names)
+	if err != nil {
+		t.Fatalf("Failed to get list of owned names:", err)
+	}
+
+	for _, name := range names {
+		if objName == name {
+			return
+		}
+	}
+	t.Errorf("%s is missing from the list of known objects: %s", objName, names)
+}
+
 func TestSystemBus(t *testing.T) {
 	_, err := SystemBus()
 	if err != nil {
@@ -19,7 +70,7 @@ func TestSystemBus(t *testing.T) {
 func TestSend(t *testing.T) {
 	bus, err := SessionBus()
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	ch := make(chan *Call, 1)
 	msg := &Message{

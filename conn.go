@@ -9,7 +9,10 @@ import (
 	"sync"
 )
 
-const defaultSystemBusAddress = "unix:path=/var/run/dbus/system_bus_socket"
+const (
+	defaultSystemBusAddress = "unix:path=/var/run/dbus/system_bus_socket"
+	sessionBusAddressEnv    = "DBUS_SESSION_BUS_ADDRESS"
+)
 
 var (
 	systemBus     *Conn
@@ -91,7 +94,7 @@ func SessionBus() (conn *Conn, err error) {
 
 // SessionBusPrivate returns a new private connection to the session bus.
 func SessionBusPrivate() (*Conn, error) {
-	address := os.Getenv("DBUS_SESSION_BUS_ADDRESS")
+	address := os.Getenv(sessionBusAddressEnv)
 	if address != "" && address != "autolaunch:" {
 		return Dial(address)
 	}
