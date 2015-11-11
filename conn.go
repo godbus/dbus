@@ -589,7 +589,6 @@ func getTransport(address string) (transport, error) {
 			err = errors.New("dbus: invalid bus address (invalid or unsupported transport)")
 			continue
 		}
-		fmt.Printf("Error here : TCP Not handled")
 		t, err = f(v[i+1:])
 		if err == nil {
 			return t, nil
