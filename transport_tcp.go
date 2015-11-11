@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"strconv"
 )
 
 type oobTReader struct {
@@ -34,10 +35,14 @@ func newTCPTransport(keys string) (transport, error) {
 	switch {
 	case host != "" && port != "":
 		hostParsed, _, err := net.ParseCIDR(host)
-		if err := nil {
+		if err != nil {
 			return nil, err
 		}
-		t.TCPConn, err = net.DialTCP("tcp", nil, &net.TCPAddr{IP: hostParsed,Port: port, Zone: ""})
+		portParsed, err := strconv.Atoi(port)
+		if err != nil {
+			return nil, err
+		}
+		t.TCPConn, err = net.DialTCP("tcp", nil, &net.TCPAddr{IP: hostParsed,Port: portParsed, Zone: ""})
 		if err != nil {
 			return nil, err
 		}
