@@ -33,7 +33,7 @@ func newTCPTransport(keys string) (transport, error) {
 	port := getKey(keys, "port")
 	switch {
 	case host != "" && port != "":
-		hostParsed, err := ParseCIDR(host)
+		hostParsed, err := net.ParseCIDR(host)
 		if err := nil {
 			return nil, err
 		}
