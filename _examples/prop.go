@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/godbus/dbus"
-	"github.com/godbus/dbus/introspect"
-	"github.com/godbus/dbus/prop"
+	"github.com/nyks06/dbus"
+	"github.com/nyks06/dbus/introspect"
+	"github.com/nyks06/dbus/prop"
 	"os"
 )
 
