@@ -7,7 +7,6 @@ import (
 	"errors"
 	"io"
 	"net"
-	"syscall"
 )
 
 type oobReader struct {
@@ -17,7 +16,7 @@ type oobReader struct {
 }
 
 func (o *oobReader) Read(b []byte) (n int, err error) {
-	n, err := o.conn.Read(b)
+	n, err = o.conn.Read(b)
 	return n, err
 }
 
@@ -46,6 +45,11 @@ func newTCPTransport(keys string) (transport, error) {
 
 func init() {
 	transports["tcp"] = newTCPTransport
+}
+
+func (t *TCPTransport) SendNullByte() error {
+	_, err := t.Write([]byte{0})
+	return err
 }
 
 func (t *TCPTransport) EnableUnixFDs() {
