@@ -10,17 +10,6 @@ import (
 	"strconv"
 )
 
-type oobTReader struct {
-	conn *net.TCPConn
-	oob  []byte
-	buf  [4096]byte
-}
-
-func (o *oobTReader) Read(b []byte) (n int, err error) {
-	n, err = o.conn.Read(b)
-	return n, err
-}
-
 type TCPTransport struct {
 	*net.TCPConn
 	hasUnixFDs bool
@@ -32,10 +21,7 @@ func newTCPTransport(keys string) (transport, error) {
 	port := getKey(keys, "port")
 	switch {
 	case host != "" && port != "":
-		hostParsed, _, err := net.ParseCIDR(host)
-		if err != nil {
-			return nil, err
-		}
+		hostParsed := net.ParseIP(host)
 		portParsed, err := strconv.Atoi(port)
 		if err != nil {
 			return nil, err
@@ -69,13 +55,10 @@ func (t *TCPTransport) ReadMessage() (*Message, error) {
 		csheader   [16]byte
 		order      binary.ByteOrder
 	)
-	// To be sure that all bytes of out-of-band data are read, we use a special
-	// reader that uses ReadUnix on the underlying connection instead of Read
-	// and gathers the out-of-band data in a buffer.
-	rd := &oobTReader{conn: t.TCPConn}
+
 	// read the first 16 bytes (the part of the header that has a constant size),
 	// from which we can figure out the length of the rest of the message
-	if _, err := io.ReadFull(rd, csheader[:]); err != nil {
+	if _, err := io.ReadFull(t.TCPConn, csheader[:]); err != nil {
 		return nil, err
 	}
 	switch csheader[0] {
@@ -109,7 +92,7 @@ func (t *TCPTransport) ReadMessage() (*Message, error) {
 	all := make([]byte, 16+hlen+blen)
 	copy(all, csheader[:])
 	copy(all[16:], headerdata[4:])
-	if _, err := io.ReadFull(rd, all[16+hlen:]); err != nil {
+	if _, err := io.ReadFull(t.TCPConn, all[16+hlen:]); err != nil {
 		return nil, err
 	}
 	return DecodeMessage(bytes.NewBuffer(all))
