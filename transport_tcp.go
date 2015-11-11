@@ -67,7 +67,6 @@ func (t *TCPTransport) ReadMessage() (*Message, error) {
 	var (
 		blen, hlen uint32
 		csheader   [16]byte
-		headers    []header
 		order      binary.ByteOrder
 	)
 	// To be sure that all bytes of out-of-band data are read, we use a special
@@ -103,7 +102,7 @@ func (t *TCPTransport) ReadMessage() (*Message, error) {
 	}
 	dec := newDecoder(bytes.NewBuffer(headerdata), order)
 	dec.pos = 12
-	vs, err := dec.Decode(Signature{"a(yv)"})
+	_, err := dec.Decode(Signature{"a(yv)"})
 	if err != nil {
 		return nil, err
 	}
