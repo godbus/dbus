@@ -27,8 +27,6 @@ type TCPTransport struct {
 }
 
 func newTCPTransport(keys string) (transport, error) {
-	var err error
-
 	t := new(TCPTransport)
 	host := getKey(keys, "host")
 	port := getKey(keys, "port")
@@ -71,7 +69,6 @@ func (t *TCPTransport) ReadMessage() (*Message, error) {
 		csheader   [16]byte
 		headers    []header
 		order      binary.ByteOrder
-		unixfds    uint32
 	)
 	// To be sure that all bytes of out-of-band data are read, we use a special
 	// reader that uses ReadUnix on the underlying connection instead of Read
@@ -109,12 +106,6 @@ func (t *TCPTransport) ReadMessage() (*Message, error) {
 	vs, err := dec.Decode(Signature{"a(yv)"})
 	if err != nil {
 		return nil, err
-	}
-	Store(vs, &headers)
-	for _, v := range headers {
-		if v.Field == byte(FieldUnixFDs) {
-			unixfds, _ = v.Variant.value.(uint32)
-		}
 	}
 	all := make([]byte, 16+hlen+blen)
 	copy(all, csheader[:])
