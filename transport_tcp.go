@@ -9,13 +9,13 @@ import (
 	"net"
 )
 
-type oobReader struct {
+type oobTReader struct {
 	conn *net.TCPConn
 	oob  []byte
 	buf  [4096]byte
 }
 
-func (o *oobReader) Read(b []byte) (n int, err error) {
+func (o *oobTReader) Read(b []byte) (n int, err error) {
 	n, err = o.conn.Read(b)
 	return n, err
 }
@@ -33,7 +33,11 @@ func newTCPTransport(keys string) (transport, error) {
 	port := getKey(keys, "port")
 	switch {
 	case host != "" && port != "":
-		t.TCPConn, err = net.DialTCP("tcp", nil, &net.TCPAddr{IP: host,Port: port, Zone: ""})
+		hostParsed, err := ParseCIDR(host)
+		if err := nil {
+			return nil, err
+		}
+		t.TCPConn, err = net.DialTCP("tcp", nil, &net.TCPAddr{IP: hostParsed,Port: port, Zone: ""})
 		if err != nil {
 			return nil, err
 		}
@@ -67,7 +71,7 @@ func (t *TCPTransport) ReadMessage() (*Message, error) {
 	// To be sure that all bytes of out-of-band data are read, we use a special
 	// reader that uses ReadUnix on the underlying connection instead of Read
 	// and gathers the out-of-band data in a buffer.
-	rd := &oobReader{conn: t.TCPConn}
+	rd := &oobTReader{conn: t.TCPConn}
 	// read the first 16 bytes (the part of the header that has a constant size),
 	// from which we can figure out the length of the rest of the message
 	if _, err := io.ReadFull(rd, csheader[:]); err != nil {
