@@ -622,5 +622,6 @@ func getKey(s, key string) string {
 	if j == -1 {
 		j = len(save)
 	}
+	fmt.Printf("%s\n", save[len(key)+1 : j])
 	return save[len(key)+1 : j]
 }
