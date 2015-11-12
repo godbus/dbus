@@ -617,10 +617,10 @@ func getKey(s, key string) string {
 	if i+len(key)+1 >= len(s) || s[i+len(key)] != '=' {
 		return ""
 	}
-	s = s[i:]
-	j := strings.Index(s, ",")
+	save := s[i:]
+	j := strings.Index(save, ",")
 	if j == -1 {
-		j = len(s)
+		j = len(save)
 	}
-	return s[i+len(key)+1 : j]
+	return save[len(key)+1 : j]
 }
