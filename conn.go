@@ -3,7 +3,6 @@ package dbus
 import (
 	"errors"
 	"io"
-	"fmt"
 	"os"
 	"reflect"
 	"strings"
