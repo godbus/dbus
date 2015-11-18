@@ -20,12 +20,19 @@ func newTCPTransport(keys string) (transport, error) {
 	port := getKey(keys, "port")
 	switch {
 	case host != "" && port != "":
-		hostParsed := net.ParseIP(host)
+		hostTemp, err := net.LookupHost(host)
+		if err != nil {
+			return nil, err
+		}
+		if len(host) < 1 {
+			return nil, errors.New("dbus: invalid address or address not found")
+		}
+		hostParsed := net.ParseIP(hostTemp[0])
 		portParsed, err := strconv.Atoi(port)
 		if err != nil {
 			return nil, err
 		}
-		t.TCPConn, err = net.DialTCP("tcp", nil, &net.TCPAddr{IP: hostParsed,Port: portParsed, Zone: ""})
+		t.TCPConn, err = net.DialTCP("tcp", nil, &net.TCPAddr{IP: hostParsed, Port: portParsed, Zone: ""})
 		if err != nil {
 			return nil, err
 		}
