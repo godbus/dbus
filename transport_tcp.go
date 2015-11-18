@@ -25,7 +25,7 @@ func newTCPTransport(keys string) (transport, error) {
 			return nil, err
 		}
 		if len(host) < 1 {
-			return nil, errors.New("dbus: invalid address or address not found")
+			return nil, errors.New("dbus: invalid address (LookupHost returned nothing)")
 		}
 		hostParsed := net.ParseIP(hostTemp[0])
 		portParsed, err := strconv.Atoi(port)
