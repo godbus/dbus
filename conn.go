@@ -513,8 +513,8 @@ func (conn *Conn) Signal(ch chan<- *Signal) {
 // RemoveSignal removes the given channel from the list of the registered channels.
 func (conn *Conn) RemoveSignal(ch chan<- *Signal) {
 	conn.signalsLck.Lock()
-	for i, c := range conn.signals {
-		if c == ch {
+	for i := len(conn.signals) - 1; i >= 0; i-- {
+		if ch == conn.signals[i] {
 			conn.signals = append(conn.signals[:i], conn.signals[i+1:]...)
 		}
 	}
