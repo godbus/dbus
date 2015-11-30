@@ -19,7 +19,7 @@ func TestSystemBus(t *testing.T) {
 func TestSend(t *testing.T) {
 	bus, err := SessionBus()
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	ch := make(chan *Call, 1)
 	msg := &Message{
