@@ -515,7 +515,9 @@ func (conn *Conn) RemoveSignal(ch chan<- *Signal) {
 	conn.signalsLck.Lock()
 	for i := len(conn.signals) - 1; i >= 0; i-- {
 		if ch == conn.signals[i] {
-			conn.signals = append(conn.signals[:i], conn.signals[i+1:]...)
+			copy(conn.signals[i:], conn.signals[i+1:])
+			conn.signals[len(conn.signals)-1] = nil
+			conn.signals = conn.signals[:len(conn.signals)-1]
 		}
 	}
 	conn.signalsLck.Unlock()
