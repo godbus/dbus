@@ -126,6 +126,23 @@ func (conn *Conn) handleCall(msg *Message) {
 			conn.sendError(errmsgUnknownMethod, sender, serial)
 		}
 		return
+	} else if ifaceName == "org.freedesktop.DBus.Introspectable" && name == "Introspect" {
+		if _, ok := conn.handlers[path]; !ok {
+			xml := "<node>"
+			for h, _ := range conn.handlers {
+				p := string(path)
+				if p != "/" {
+					p += "/"
+				}
+				if strings.HasPrefix(string(h), p) {
+					node_name := strings.Split(string(h[len(p):]), "/")[0]
+					xml = xml + "\n    <node name=\"" + node_name + "\"/>"
+				}
+			}
+			xml += "\n</node>"
+			conn.sendReply(sender, serial, xml)
+			return
+		}
 	}
 	if len(name) == 0 {
 		conn.sendError(errmsgUnknownMethod, sender, serial)
