@@ -46,7 +46,7 @@ type Conn struct {
 	calls    map[uint32]*Call
 	callsLck sync.RWMutex
 
-	handlers    map[ObjectPath]map[string]exportWithMapping
+	handlers    map[ObjectPath]map[string]exportedObj
 	handlersLck sync.RWMutex
 
 	out    chan *Message
@@ -157,7 +157,7 @@ func newConn(tr transport) (*Conn, error) {
 	conn.transport = tr
 	conn.calls = make(map[uint32]*Call)
 	conn.out = make(chan *Message, 10)
-	conn.handlers = make(map[ObjectPath]map[string]exportWithMapping)
+	conn.handlers = make(map[ObjectPath]map[string]exportedObj)
 	conn.nextSerial = 1
 	conn.serialUsed = map[uint32]bool{0: true}
 	conn.busObj = conn.Object("org.freedesktop.DBus", "/org/freedesktop/DBus")
