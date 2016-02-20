@@ -372,3 +372,170 @@ func TestExportSubtreeWithMap_bypassAlias(t *testing.T) {
 		t.Error("Expected an error due to calling actual method, not alias")
 	}
 }
+
+func TestExportMethodTable(t *testing.T) {
+	connection, err := SessionBus()
+	if err != nil {
+		t.Fatalf("Unexpected error connecting to session bus: %s", err)
+	}
+
+	name := connection.Names()[0]
+	export := &fooExport{}
+	tbl := make(map[string]interface{})
+	tbl["Foo"] = func(message Message, param string) (string, *Error) {
+		return export.Foo(message, param)
+	}
+	tbl["Foo2"] = export.Foo
+	connection.ExportMethodTable(tbl, "/org/guelfey/DBus/Test", "org.guelfey.DBus.Test")
+
+	object := connection.Object(name, "/org/guelfey/DBus/Test")
+
+	var response string
+	err = object.Call("org.guelfey.DBus.Test.Foo", 0, "qux").Store(&response)
+	if err != nil {
+		t.Errorf("Unexpected error calling Foo: %s", err)
+	}
+
+	if response != "foo" {
+		t.Errorf(`Response was %s, expected "foo"`, response)
+	}
+
+	if export.message.serial == 0 {
+		t.Error("Expected the raw message, got an invalid one")
+	}
+
+	err = object.Call("org.guelfey.DBus.Test.Foo2", 0, "qux").Store(&response)
+	if err != nil {
+		t.Errorf("Unexpected error calling Foo: %s", err)
+	}
+
+	if response != "foo" {
+		t.Errorf(`Response was %s, expected "foo"`, response)
+	}
+
+	if export.message.serial == 0 {
+		t.Error("Expected the raw message, got an invalid one")
+	}
+
+	// Now remove export
+	connection.Export(nil, "/org/guelfey/DBus/Test", "org.guelfey.DBus.Test")
+	err = object.Call("org.guelfey.DBus.Test.Foo", 0, "qux").Store(&response)
+	if err == nil {
+		t.Error("Expected an error since the export was removed")
+	}
+}
+
+func TestExportSubtreeMethodTable(t *testing.T) {
+	connection, err := SessionBus()
+	if err != nil {
+		t.Fatalf("Unexpected error connecting to session bus: %s", err)
+	}
+
+	name := connection.Names()[0]
+
+	export := &fooExport{}
+	tbl := make(map[string]interface{})
+	tbl["Foo"] = func(message Message, param string) (string, *Error) {
+		return export.Foo(message, param)
+	}
+	tbl["Foo2"] = export.Foo
+	connection.ExportSubtreeMethodTable(tbl, "/org/guelfey/DBus/Test", "org.guelfey.DBus.Test")
+
+	// Call a subpath of the exported path
+	object := connection.Object(name, "/org/guelfey/DBus/Test/Foo")
+
+	var response string
+	err = object.Call("org.guelfey.DBus.Test.Foo", 0, "qux").Store(&response)
+	if err != nil {
+		t.Errorf("Unexpected error calling Foo: %s", err)
+	}
+
+	if response != "foo" {
+		t.Errorf(`Response was %s, expected "foo"`, response)
+	}
+
+	if export.message.serial == 0 {
+		t.Error("Expected the raw message, got an invalid one")
+	}
+
+	err = object.Call("org.guelfey.DBus.Test.Foo2", 0, "qux").Store(&response)
+	if err != nil {
+		t.Errorf("Unexpected error calling Foo: %s", err)
+	}
+
+	if response != "foo" {
+		t.Errorf(`Response was %s, expected "foo"`, response)
+	}
+
+	if export.message.serial == 0 {
+		t.Error("Expected the raw message, got an invalid one")
+	}
+
+	// Now remove export
+	connection.Export(nil, "/org/guelfey/DBus/Test", "org.guelfey.DBus.Test")
+	err = object.Call("org.guelfey.DBus.Test.Foo", 0, "qux").Store(&response)
+	if err == nil {
+		t.Error("Expected an error since the export was removed")
+	}
+}
+
+func TestExportMethodTable_NotFunc(t *testing.T) {
+	connection, err := SessionBus()
+	if err != nil {
+		t.Fatalf("Unexpected error connecting to session bus: %s", err)
+	}
+
+	name := connection.Names()[0]
+	export := &fooExport{}
+	tbl := make(map[string]interface{})
+	tbl["Foo"] = func(message Message, param string) (string, *Error) {
+		return export.Foo(message, param)
+	}
+	tbl["Foo2"] = "foobar"
+
+	connection.ExportMethodTable(tbl, "/org/guelfey/DBus/Test", "org.guelfey.DBus.Test")
+	object := connection.Object(name, "/org/guelfey/DBus/Test")
+
+	var response string
+	err = object.Call("org.guelfey.DBus.Test.Foo", 0, "qux").Store(&response)
+	if err != nil {
+		t.Errorf("Unexpected error calling Foo: %s", err)
+	}
+
+	if response != "foo" {
+		t.Errorf(`Response was %s, expected "foo"`, response)
+	}
+
+	if export.message.serial == 0 {
+		t.Error("Expected the raw message, got an invalid one")
+	}
+
+	err = object.Call("org.guelfey.DBus.Test.Foo2", 0, "qux").Store(&response)
+	if err == nil {
+		t.Errorf("Expected an error since the Foo2 was not a function")
+	}
+}
+
+func TestExportMethodTable_ReturnNotError(t *testing.T) {
+	connection, err := SessionBus()
+	if err != nil {
+		t.Fatalf("Unexpected error connecting to session bus: %s", err)
+	}
+
+	name := connection.Names()[0]
+	export := &fooExport{}
+	tbl := make(map[string]interface{})
+	tbl["Foo"] = func(message Message, param string) (string, string) {
+		out, _ := export.Foo(message, param)
+		return out, out
+	}
+
+	connection.ExportMethodTable(tbl, "/org/guelfey/DBus/Test", "org.guelfey.DBus.Test")
+	object := connection.Object(name, "/org/guelfey/DBus/Test")
+
+	var response string
+	err = object.Call("org.guelfey.DBus.Test.Foo", 0, "qux").Store(&response)
+	if err == nil {
+		t.Errorf("Expected an error since the Foo did not have a final return as *dbus.Error")
+	}
+}
