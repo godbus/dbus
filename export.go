@@ -129,6 +129,7 @@ func (conn *Conn) handleCall(msg *Message) {
 		return
 	} else if ifaceName == "org.freedesktop.DBus.Introspectable" && name == "Introspect" {
 		if _, ok := conn.handlers[path]; !ok {
+			subpath := make(map[string]struct{})
 			var xml bytes.Buffer
 			xml.WriteString("<node>")
 			for h, _ := range conn.handlers {
@@ -138,8 +139,11 @@ func (conn *Conn) handleCall(msg *Message) {
 				}
 				if strings.HasPrefix(string(h), p) {
 					node_name := strings.Split(string(h[len(p):]), "/")[0]
-					xml.WriteString("\n    <node name=\"" + node_name + "\"/>")
+					subpath[node_name] = struct{}{}
 				}
+			}
+			for s, _ := range subpath {
+				xml.WriteString("\n\t<node name=\"" + s + "\"/>")
 			}
 			xml.WriteString("\n</node>")
 			conn.sendReply(sender, serial, xml.String())
