@@ -1,6 +1,7 @@
 package dbus
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"reflect"
@@ -128,7 +129,8 @@ func (conn *Conn) handleCall(msg *Message) {
 		return
 	} else if ifaceName == "org.freedesktop.DBus.Introspectable" && name == "Introspect" {
 		if _, ok := conn.handlers[path]; !ok {
-			xml := "<node>"
+			var xml bytes.Buffer
+			xml.WriteString("<node>")
 			for h, _ := range conn.handlers {
 				p := string(path)
 				if p != "/" {
@@ -136,11 +138,11 @@ func (conn *Conn) handleCall(msg *Message) {
 				}
 				if strings.HasPrefix(string(h), p) {
 					node_name := strings.Split(string(h[len(p):]), "/")[0]
-					xml = xml + "\n    <node name=\"" + node_name + "\"/>"
+					xml.WriteString("\n    <node name=\"" + node_name + "\"/>")
 				}
 			}
-			xml += "\n</node>"
-			conn.sendReply(sender, serial, xml)
+			xml.WriteString("\n</node>")
+			conn.sendReply(sender, serial, xml.String())
 			return
 		}
 	}
