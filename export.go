@@ -1,6 +1,7 @@
 package dbus
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"reflect"
@@ -126,6 +127,28 @@ func (conn *Conn) handleCall(msg *Message) {
 			conn.sendError(errmsgUnknownMethod, sender, serial)
 		}
 		return
+	} else if ifaceName == "org.freedesktop.DBus.Introspectable" && name == "Introspect" {
+		if _, ok := conn.handlers[path]; !ok {
+			subpath := make(map[string]struct{})
+			var xml bytes.Buffer
+			xml.WriteString("<node>")
+			for h, _ := range conn.handlers {
+				p := string(path)
+				if p != "/" {
+					p += "/"
+				}
+				if strings.HasPrefix(string(h), p) {
+					node_name := strings.Split(string(h[len(p):]), "/")[0]
+					subpath[node_name] = struct{}{}
+				}
+			}
+			for s, _ := range subpath {
+				xml.WriteString("\n\t<node name=\"" + s + "\"/>")
+			}
+			xml.WriteString("\n</node>")
+			conn.sendReply(sender, serial, xml.String())
+			return
+		}
 	}
 	if len(name) == 0 {
 		conn.sendError(errmsgUnknownMethod, sender, serial)
