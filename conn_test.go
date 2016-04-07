@@ -221,3 +221,16 @@ func benchmarkServeAsync(b *testing.B, srv, cli *Conn) {
 	}
 	<-done
 }
+
+func TestGetKey(t *testing.T) {
+	keys := "host=1.2.3.4,port=5678,family=ipv4"
+	if host := getKey(keys, "host"); host != "1.2.3.4" {
+		t.Error(`Expected "1.2.3.4", got`, host)
+	}
+	if port := getKey(keys, "port"); port != "5678" {
+		t.Error(`Expected "5678", got`, port)
+	}
+	if family := getKey(keys, "family"); family != "ipv4" {
+		t.Error(`Expected "ipv4", got`, family)
+	}
+}

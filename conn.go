@@ -621,16 +621,11 @@ func dereferenceAll(vs []interface{}) []interface{} {
 
 // getKey gets a key from a the list of keys. Returns "" on error / not found...
 func getKey(s, key string) string {
-	i := strings.Index(s, key)
-	if i == -1 {
-		return ""
+	for _, keyEqualsValue := range strings.Split(s, ",") {
+		keyValue := strings.SplitN(keyEqualsValue, "=", 2)
+		if len(keyValue) == 2 && keyValue[0] == key {
+			return keyValue[1]
+		}
 	}
-	if i+len(key)+1 >= len(s) || s[i+len(key)] != '=' {
-		return ""
-	}
-	j := strings.Index(s, ",")
-	if j == -1 {
-		j = len(s)
-	}
-	return s[i+len(key)+1 : j]
+	return ""
 }
