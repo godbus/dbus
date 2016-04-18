@@ -8,6 +8,8 @@
 package dbus
 
 /*
+const int sizeofPtr = sizeof(void*);
+#define _WANT_UCRED
 #include <sys/ucred.h>
 */
 import "C"
@@ -27,25 +29,17 @@ type Ucred struct {
 	Gid uint32
 }
 
-var foo C.struct_ucred
-
 // http://golang.org/src/pkg/syscall/types_linux.go
 // http://golang.org/src/pkg/syscall/types_dragonfly.go
 // https://github.com/DragonFlyBSD/DragonFlyBSD/blob/master/sys/sys/ucred.h
 const (
-	SizeofUcred = (int)(unsafe.Sizeof(foo))
+	SizeofUcred = C.sizeof_struct_ucred
 )
 
 // http://golang.org/src/pkg/syscall/sockcmsg_unix.go
 func cmsgAlignOf(salen int) int {
-	// From http://golang.org/src/pkg/syscall/sockcmsg_unix.go
-	//salign := sizeofPtr
-	// NOTE: It seems like 64-bit Darwin and DragonFly BSD kernels
-	// still require 32-bit aligned access to network subsystem.
-	//if darwin64Bit || dragonfly64Bit {
-	//	salign = 4
-	//}
-	salign := 4
+	salign := C.sizeofPtr
+
 	return (salen + salign - 1) & ^(salign - 1)
 }
 
