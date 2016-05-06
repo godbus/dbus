@@ -1,6 +1,11 @@
 package dbus
 
-import "testing"
+import (
+	"encoding/binary"
+	"io"
+	"io/ioutil"
+	"testing"
+)
 
 func TestSessionBus(t *testing.T) {
 	_, err := SessionBus()
@@ -60,6 +65,68 @@ func TestRemoveSignal(t *testing.T) {
 		if bch != ch2 {
 			t.Errorf("remove signal: removed signal present: got '%v', want '%v'", bch, ch2)
 		}
+	}
+}
+
+type rwc struct {
+	io.Reader
+	io.Writer
+}
+
+func (rwc) Close() error { return nil }
+
+type fakeAuth struct {
+}
+
+func (fakeAuth) FirstData() (name, resp []byte, status AuthStatus) {
+	return []byte("name"), []byte("resp"), AuthOk
+}
+
+func (fakeAuth) HandleData(data []byte) (resp []byte, status AuthStatus) {
+	return nil, AuthOk
+}
+
+func TestCloseBeforeSignal(t *testing.T) {
+	reader, pipewriter := io.Pipe()
+	defer pipewriter.Close()
+	defer reader.Close()
+
+	bus, err := NewConn(rwc{Reader: reader, Writer: ioutil.Discard})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// give ch a buffer so sends won't block
+	ch := make(chan *Signal, 1)
+	bus.Signal(ch)
+
+	go func() {
+		_, err := pipewriter.Write([]byte("REJECTED name\r\nOK myuuid\r\n"))
+		if err != nil {
+			t.Errorf("error writing to pipe: %v", err)
+		}
+	}()
+
+	err = bus.Auth([]Auth{fakeAuth{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = bus.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	msg := &Message{
+		Type: TypeSignal,
+		Headers: map[HeaderField]Variant{
+			FieldInterface: MakeVariant("foo.bar"),
+			FieldMember:    MakeVariant("bar"),
+			FieldPath:      MakeVariant(ObjectPath("/baz")),
+		},
+	}
+	err = msg.EncodeTo(pipewriter, binary.LittleEndian)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
