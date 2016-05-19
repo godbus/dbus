@@ -3,7 +3,7 @@
 // https://golang.org/s/go1.4-syscall
 // http://code.google.com/p/go/source/browse/unix/sockcmsg_linux.go?repo=sys
 
-// Local implementation of the UnixCredentials system call for DragonFly BSD
+// Local implementation of the UnixCredentials system call for FreeBSD
 
 package dbus
 
@@ -22,7 +22,7 @@ import (
 )
 
 // http://golang.org/src/pkg/syscall/ztypes_linux_amd64.go
-// http://golang.org/src/pkg/syscall/ztypes_dragonfly_amd64.go
+// https://golang.org/src/syscall/ztypes_freebsd_amd64.go
 type Ucred struct {
 	Pid int32
 	Uid uint32
@@ -30,8 +30,8 @@ type Ucred struct {
 }
 
 // http://golang.org/src/pkg/syscall/types_linux.go
-// http://golang.org/src/pkg/syscall/types_dragonfly.go
-// https://github.com/DragonFlyBSD/DragonFlyBSD/blob/master/sys/sys/ucred.h
+// https://golang.org/src/syscall/types_freebsd.go
+// https://github.com/freebsd/freebsd/blob/master/sys/sys/ucred.h
 const (
 	SizeofUcred = C.sizeof_struct_ucred
 )
