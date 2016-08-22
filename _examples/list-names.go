@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/nyks06/dbus"
+	"github.com/Nyks06/dbus"
 	"os"
 )
 
