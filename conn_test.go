@@ -49,19 +49,23 @@ func TestRemoveSignal(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	signals := bus.signalHandler.(*defaultSignalHandler).signals
 	ch := make(chan *Signal)
 	ch2 := make(chan *Signal)
 	for _, ch := range []chan *Signal{ch, ch2, ch, ch2, ch2, ch} {
 		bus.Signal(ch)
 	}
-	if len(bus.signals) != 6 {
-		t.Errorf("remove signal: signals length not equal: got '%d', want '6'", len(bus.signals))
+	signals = bus.signalHandler.(*defaultSignalHandler).signals
+	if len(signals) != 6 {
+		t.Errorf("remove signal: signals length not equal: got '%d', want '6'", len(signals))
 	}
 	bus.RemoveSignal(ch)
-	if len(bus.signals) != 3 {
-		t.Errorf("remove signal: signals length not equal: got '%d', want '3'", len(bus.signals))
+	signals = bus.signalHandler.(*defaultSignalHandler).signals
+	if len(signals) != 3 {
+		t.Errorf("remove signal: signals length not equal: got '%d', want '3'", len(signals))
 	}
-	for _, bch := range bus.signals {
+	signals = bus.signalHandler.(*defaultSignalHandler).signals
+	for _, bch := range signals {
 		if bch != ch2 {
 			t.Errorf("remove signal: removed signal present: got '%v', want '%v'", bch, ch2)
 		}
