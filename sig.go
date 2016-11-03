@@ -101,6 +101,8 @@ func getSignature(t reflect.Type) string {
 			panic(InvalidTypeError{t})
 		}
 		return "a{" + getSignature(t.Key()) + getSignature(t.Elem()) + "}"
+	case reflect.Interface:
+		return "v"
 	}
 	panic(InvalidTypeError{t})
 }
