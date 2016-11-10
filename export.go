@@ -29,7 +29,7 @@ var (
 func MakeFailedError(err error) *Error {
 	return &Error{
 		"org.freedesktop.DBus.Error.Failed",
-		[]interface{}{err},
+		[]interface{}{err.Error()},
 	}
 }
 

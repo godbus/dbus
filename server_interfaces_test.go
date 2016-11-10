@@ -1,6 +1,7 @@
 package dbus
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -74,6 +75,10 @@ func (t *tester) LookupMethod(name string) (Method, bool) {
 	switch name {
 	case "Test":
 		return t, true
+	case "Error":
+		return terrfn(func(in string) error {
+			return fmt.Errorf(in)
+		}), true
 	case "Introspect":
 		return intro_fn(func() string {
 			return `<node>
@@ -115,6 +120,28 @@ func (t *tester) ArgumentValue(position int) interface{} {
 }
 
 func (t *tester) ReturnValue(position int) interface{} {
+	return ""
+}
+
+type terrfn func(in string) error
+
+func (t terrfn) Call(args ...interface{}) ([]interface{}, error) {
+	return nil, t(*args[0].(*string))
+}
+
+func (t terrfn) NumArguments() int {
+	return 1
+}
+
+func (t terrfn) NumReturns() int {
+	return 0
+}
+
+func (t terrfn) ArgumentValue(position int) interface{} {
+	return ""
+}
+
+func (t terrfn) ReturnValue(position int) interface{} {
 	return ""
 }
 
@@ -214,6 +241,26 @@ func TestHandlerCall(t *testing.T) {
 	if out != in {
 		t.Errorf("Unexpected error: got %s, expected %s", out, in)
 	}
+	tester.Close()
+}
+
+func TestHandlerCallGenericError(t *testing.T) {
+	tester, err := newTester()
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
+	conn, err := SessionBus()
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
+	obj := conn.Object(tester.Name(), "/com/github/godbus/tester")
+	var out string
+	in := "foo"
+	err = obj.Call("com.github.godbus.dbus.Tester.Error", 0, in).Store(&out)
+	if err != nil && err.(Error).Body[0].(string) != "foo" {
+		t.Errorf("Unexpected error: %s", err)
+	}
+
 	tester.Close()
 }
 
