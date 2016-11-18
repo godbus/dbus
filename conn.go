@@ -512,7 +512,8 @@ func (conn *Conn) sendError(err error, dest string, serial uint32) {
 	case *Error:
 		e = em
 	case DBusError:
-		e = em.DBusError()
+		name, body := em.DBusError()
+		e = NewError(name, body)
 	default:
 		e = MakeFailedError(err)
 	}

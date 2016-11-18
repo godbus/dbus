@@ -85,5 +85,5 @@ type SignalHandler interface {
 // "org.freedesktop.DBus.Error.Failed" error. By implementing this
 // interface as well a custom encoding may be provided.
 type DBusError interface {
-	DBusError() *Error
+	DBusError() (string, []interface{})
 }
