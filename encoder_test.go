@@ -80,6 +80,61 @@ func TestEncodeMapStringInterface(t *testing.T) {
 	}
 }
 
+type empty interface{}
+
+func TestEncodeMapStringNamedInterface(t *testing.T) {
+	val := map[string]empty{"foo": "bar"}
+	buf := new(bytes.Buffer)
+	order := binary.LittleEndian
+	enc := newEncoder(buf, binary.LittleEndian)
+	err := enc.Encode(val)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dec := newDecoder(buf, order)
+	v, err := dec.Decode(SignatureOf(val))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := map[string]empty{}
+	Store(v, &out)
+	if !reflect.DeepEqual(out, val) {
+		t.Errorf("not equal: got '%v', want '%v'",
+			out, val)
+	}
+}
+
+type fooer interface {
+	Foo()
+}
+
+type fooimpl string
+
+func (fooimpl) Foo() {}
+
+func TestEncodeMapStringNonEmptyInterface(t *testing.T) {
+	val := map[string]fooer{"foo": fooimpl("bar")}
+	buf := new(bytes.Buffer)
+	order := binary.LittleEndian
+	enc := newEncoder(buf, binary.LittleEndian)
+	err := enc.Encode(val)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dec := newDecoder(buf, order)
+	v, err := dec.Decode(SignatureOf(val))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := map[string]fooer{}
+	err = Store(v, &out)
+	if err == nil {
+		t.Fatal("Shouldn't be able to convert to non empty interfaces")
+	}
+}
+
 func TestEncodeSliceInterface(t *testing.T) {
 	val := []interface{}{"foo", "bar"}
 	buf := new(bytes.Buffer)
@@ -96,6 +151,29 @@ func TestEncodeSliceInterface(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := []interface{}{}
+	Store(v, &out)
+	if !reflect.DeepEqual(out, val) {
+		t.Errorf("not equal: got '%v', want '%v'",
+			out, val)
+	}
+}
+
+func TestEncodeSliceNamedInterface(t *testing.T) {
+	val := []empty{"foo", "bar"}
+	buf := new(bytes.Buffer)
+	order := binary.LittleEndian
+	enc := newEncoder(buf, binary.LittleEndian)
+	err := enc.Encode(val)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dec := newDecoder(buf, order)
+	v, err := dec.Decode(SignatureOf(val))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := []empty{}
 	Store(v, &out)
 	if !reflect.DeepEqual(out, val) {
 		t.Errorf("not equal: got '%v', want '%v'",
@@ -130,6 +208,125 @@ func TestEncodeNestedInterface(t *testing.T) {
 	}
 	out := map[string]interface{}{}
 	Store(v, &out)
+	if !reflect.DeepEqual(out, val) {
+		t.Errorf("not equal: got '%#v', want '%#v'",
+			out, val)
+	}
+}
+
+func TestEncodeInt(t *testing.T) {
+	val := 10
+	buf := new(bytes.Buffer)
+	order := binary.LittleEndian
+	enc := newEncoder(buf, binary.LittleEndian)
+	err := enc.Encode(val)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dec := newDecoder(buf, order)
+	v, err := dec.Decode(SignatureOf(val))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out int
+	Store(v, &out)
+	if !reflect.DeepEqual(out, val) {
+		t.Errorf("not equal: got '%v', want '%v'",
+			out, val)
+	}
+}
+
+func TestEncodeIntToNonCovertible(t *testing.T) {
+	val := 150
+	buf := new(bytes.Buffer)
+	order := binary.LittleEndian
+	enc := newEncoder(buf, binary.LittleEndian)
+	err := enc.Encode(val)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dec := newDecoder(buf, order)
+	v, err := dec.Decode(SignatureOf(val))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bool
+	err = Store(v, &out)
+	if err == nil {
+		t.Logf("%q\n", out)
+		t.Fatal("Type mismatch should have occured")
+	}
+}
+
+func TestEncodeUint(t *testing.T) {
+	val := uint(10)
+	buf := new(bytes.Buffer)
+	order := binary.LittleEndian
+	enc := newEncoder(buf, binary.LittleEndian)
+	err := enc.Encode(val)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dec := newDecoder(buf, order)
+	v, err := dec.Decode(SignatureOf(val))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out uint
+	Store(v, &out)
+	if !reflect.DeepEqual(out, val) {
+		t.Errorf("not equal: got '%v', want '%v'",
+			out, val)
+	}
+}
+
+func TestEncodeUintToNonCovertible(t *testing.T) {
+	val := uint(10)
+	buf := new(bytes.Buffer)
+	order := binary.LittleEndian
+	enc := newEncoder(buf, binary.LittleEndian)
+	err := enc.Encode(val)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dec := newDecoder(buf, order)
+	v, err := dec.Decode(SignatureOf(val))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bool
+	err = Store(v, &out)
+	if err == nil {
+		t.Fatal("Type mismatch should have occured")
+	}
+}
+
+type boolean bool
+
+func TestEncodeOfAssignableType(t *testing.T) {
+	val := boolean(true)
+	buf := new(bytes.Buffer)
+	order := binary.LittleEndian
+	enc := newEncoder(buf, binary.LittleEndian)
+	err := enc.Encode(val)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dec := newDecoder(buf, order)
+	v, err := dec.Decode(SignatureOf(val))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out boolean
+	err = Store(v, &out)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !reflect.DeepEqual(out, val) {
 		t.Errorf("not equal: got '%v', want '%v'",
 			out, val)
