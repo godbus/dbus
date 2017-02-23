@@ -81,6 +81,11 @@ func storeBase(src, dest reflect.Value) error {
 }
 
 func setDest(dest, src reflect.Value) error {
+	if !isVariant(src.Type()) && isVariant(dest.Type()) {
+		//special conversion for dbus.Variant
+		dest.Set(reflect.ValueOf(MakeVariant(src.Interface())))
+		return nil
+	}
 	if !src.Type().ConvertibleTo(dest.Type()) {
 		return errors.New(
 			"dbus.Store: type mismatch")
@@ -171,17 +176,26 @@ func getVariantValue(in reflect.Value) reflect.Value {
 func newDestValue(srcValue reflect.Value, destType reflect.Type) reflect.Value {
 	switch srcValue.Kind() {
 	case reflect.Map:
-		if !isVariant(srcValue.Type().Elem()) {
+		switch {
+		case !isVariant(srcValue.Type().Elem()):
 			return reflect.New(destType)
+		case destType.Kind() == reflect.Map:
+			return reflect.New(destType)
+		default:
+			return reflect.New(
+				reflect.MapOf(srcValue.Type().Key(), destType))
 		}
-		return reflect.New(
-			reflect.MapOf(srcValue.Type().Key(), destType))
+
 	case reflect.Slice:
-		if !isVariant(srcValue.Type().Elem()) {
+		switch {
+		case !isVariant(srcValue.Type().Elem()):
 			return reflect.New(destType)
+		case destType.Kind() == reflect.Slice:
+			return reflect.New(destType)
+		default:
+			return reflect.New(
+				reflect.SliceOf(destType))
 		}
-		return reflect.New(
-			reflect.SliceOf(destType))
 	default:
 		if !isVariant(srcValue.Type()) {
 			return reflect.New(destType)

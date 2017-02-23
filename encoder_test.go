@@ -332,3 +332,33 @@ func TestEncodeOfAssignableType(t *testing.T) {
 			out, val)
 	}
 }
+
+func TestEncodeVariant(t *testing.T) {
+	var res map[ObjectPath]map[string]map[string]Variant
+	var src = map[ObjectPath]map[string]map[string]Variant{
+		ObjectPath("/foo/bar"): {
+			"foo": {
+				"bar": MakeVariant(10),
+				"baz": MakeVariant("20"),
+			},
+		},
+	}
+	buf := new(bytes.Buffer)
+	order := binary.LittleEndian
+	enc := newEncoder(buf, binary.LittleEndian)
+	err := enc.Encode(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dec := newDecoder(buf, order)
+	v, err := dec.Decode(SignatureOf(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = Store(v, &res)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res[ObjectPath("/foo/bar")]["foo"]["baz"].Value().(string)
+}
