@@ -362,3 +362,53 @@ func TestEncodeVariant(t *testing.T) {
 	}
 	_ = res[ObjectPath("/foo/bar")]["foo"]["baz"].Value().(string)
 }
+
+func TestEncodeVariantToList(t *testing.T) {
+	var res map[string]Variant
+	var src = map[string]interface{}{
+		"foo": []interface{}{"a", "b", "c"},
+	}
+	buf := new(bytes.Buffer)
+	order := binary.LittleEndian
+	enc := newEncoder(buf, binary.LittleEndian)
+	err := enc.Encode(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dec := newDecoder(buf, order)
+	v, err := dec.Decode(SignatureOf(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = Store(v, &res)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res["foo"].Value().([]Variant)
+}
+
+func TestEncodeVariantToUint64(t *testing.T) {
+	var res map[string]Variant
+	var src = map[string]interface{}{
+		"foo": uint64(10),
+	}
+	buf := new(bytes.Buffer)
+	order := binary.LittleEndian
+	enc := newEncoder(buf, binary.LittleEndian)
+	err := enc.Encode(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dec := newDecoder(buf, order)
+	v, err := dec.Decode(SignatureOf(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = Store(v, &res)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res["foo"].Value().(uint64)
+}
