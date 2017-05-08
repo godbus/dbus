@@ -9,8 +9,6 @@ import (
 	"sync"
 )
 
-const defaultSystemBusAddress = "unix:path=/var/run/dbus/system_bus_socket"
-
 var (
 	systemBus     *Conn
 	systemBusLck  sync.Mutex
@@ -146,22 +144,14 @@ func SystemBus() (conn *Conn, err error) {
 	return
 }
 
-func getSystemBusAddress() string {
-	address := os.Getenv("DBUS_SYSTEM_BUS_ADDRESS")
-	if address != "" {
-		return address
-	}
-	return defaultSystemBusAddress
-}
-
 // SystemBusPrivate returns a new private connection to the system bus.
 func SystemBusPrivate() (*Conn, error) {
-	return Dial(getSystemBusAddress())
+	return Dial(getSystemBusPlatformAddress())
 }
 
 // SystemBusPrivateHandler returns a new private connection to the system bus, using the provided handlers.
 func SystemBusPrivateHandler(handler Handler, signalHandler SignalHandler) (*Conn, error) {
-	return DialHandler(getSystemBusAddress(), handler, signalHandler)
+	return DialHandler(getSystemBusPlatformAddress(), handler, signalHandler)
 }
 
 // Dial establishes a new private connection to the message bus specified by address.
