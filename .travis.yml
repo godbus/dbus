@@ -35,5 +35,6 @@ addons:
   apt:
     packages:
     - dbus
+    - dbus-x11
 
 before_install:
