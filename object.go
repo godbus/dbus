@@ -125,12 +125,12 @@ func (o *Object) GetProperty(p string) (Variant, error) {
 	return result, nil
 }
 
-// Destination returns the destination that calls on o are sent to.
+// Destination returns the destination that calls on (o *Object) are sent to.
 func (o *Object) Destination() string {
 	return o.dest
 }
 
-// Path returns the path that calls on o are sent to.
+// Path returns the path that calls on (o *Object") are sent to.
 func (o *Object) Path() ObjectPath {
 	return o.path
 }
