@@ -50,14 +50,19 @@ func Methods(v interface{}) []Method {
 			continue
 		}
 		mt := t.Method(i).Type
-		if mt.NumOut() == 0 ||
-			mt.Out(mt.NumOut()-1) != reflect.TypeOf(&dbus.Error{}) {
 
-			continue
+		numOut := mt.NumOut()
+
+		if numOut != 0 {
+			errorType := reflect.TypeOf((*error)(nil)).Elem()
+			if mt.Out(numOut - 1).Implements(errorType) {
+				numOut -= 1
+			}
 		}
+
 		var m Method
 		m.Name = t.Method(i).Name
-		m.Args = make([]Arg, 0, mt.NumIn()+mt.NumOut()-2)
+		m.Args = make([]Arg, 0, mt.NumIn()+numOut-1)
 		for j := 1; j < mt.NumIn(); j++ {
 			if mt.In(j) != reflect.TypeOf((*dbus.Sender)(nil)).Elem() &&
 				mt.In(j) != reflect.TypeOf((*dbus.Message)(nil)).Elem() {
@@ -65,7 +70,7 @@ func Methods(v interface{}) []Method {
 				m.Args = append(m.Args, arg)
 			}
 		}
-		for j := 0; j < mt.NumOut()-1; j++ {
+		for j := 0; j < numOut; j++ {
 			arg := Arg{"", dbus.SignatureOfType(mt.Out(j)).String(), "out"}
 			m.Args = append(m.Args, arg)
 		}

@@ -55,12 +55,9 @@ func getMethods(in interface{}, mapping map[string]string) map[string]reflect.Va
 	for i := 0; i < typ.NumMethod(); i++ {
 		methtype := typ.Method(i)
 		method := val.Method(i)
-		t := method.Type()
 		// only track valid methods must return *Error as last arg
 		// and must be exported
-		if t.NumOut() == 0 ||
-			t.Out(t.NumOut()-1) != reflect.TypeOf(&ErrMsgInvalidArg) ||
-			methtype.PkgPath != "" {
+		if methtype.PkgPath != "" {
 			continue
 		}
 		// map names while building table
@@ -306,12 +303,7 @@ func (conn *Conn) exportMethodTable(methods map[string]interface{}, path ObjectP
 		if rval.Kind() != reflect.Func {
 			continue
 		}
-		t := rval.Type()
-		// only track valid methods must return *Error as last arg
-		if t.NumOut() == 0 ||
-			t.Out(t.NumOut()-1) != reflect.TypeOf(&ErrMsgInvalidArg) {
-			continue
-		}
+
 		out[name] = rval
 	}
 	return conn.export(out, path, iface, includeSubtree)
