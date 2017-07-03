@@ -3,8 +3,8 @@
 package prop
 
 import (
-	"github.com/Nyks06/dbus"
-	"github.com/Nyks06/dbus/introspect"
+	"github.com/Pyrrvs/dbus"
+	"github.com/Pyrrvs/dbus/introspect"
 	"sync"
 )
 
