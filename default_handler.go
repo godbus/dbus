@@ -130,12 +130,15 @@ func (m exportedMethod) Call(args ...interface{}) ([]interface{}, error) {
 		errorType := reflect.TypeOf((*error)(nil)).Elem()
 
 		if t.Out(numOut - 1).Implements(errorType) {
-			err = ret[numOut-1].Interface().(error)
+			if ret[numOut-1].IsNil() {
+				err = nil
+			} else {
+				err = ret[numOut-1].Interface().(error)
+			}
 
 			numOut -= 1
 		}
 	}
-
 
 	ret = ret[:numOut]
 	out := make([]interface{}, len(ret))
@@ -143,7 +146,7 @@ func (m exportedMethod) Call(args ...interface{}) ([]interface{}, error) {
 		out[i] = val.Interface()
 	}
 
-	if err == nil || reflect.ValueOf(err).IsNil() {
+	if err == nil {
 		//concrete type to interface nil is a special case
 		return out, nil
 	}
