@@ -512,6 +512,26 @@ func (conn *Conn) Signal(ch chan<- *Signal) {
 	conn.signalsLck.Unlock()
 }
 
+// RemoveSignal unregisters a channel registered via the Signal method
+func (conn *Conn) RemoveSignal(ch chan *Signal) {
+	conn.signalsLck.Lock()
+	defer conn.signalsLck.Unlock()
+	i := -1
+	for k, v := range conn.signals {
+		if ch == v {
+			close(v)
+			i = k
+			break
+		}
+	}
+	if i == -1 {
+		return
+	}
+	// conn.signals[len(conn.signals)-1], conn.signals[i] = conn.signals[i], conn.signals[len(conn.signals)-1]
+	conn.signals[i] = conn.signals[len(conn.signals)-1]
+	conn.signals = conn.signals[:len(conn.signals)-1]
+}
+
 // SupportsUnixFDs returns whether the underlying transport supports passing of
 // unix file descriptors. If this is false, method calls containing unix file
 // descriptors will return an error and emitted signals containing them will
