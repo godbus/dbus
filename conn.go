@@ -47,9 +47,7 @@ type Conn struct {
 
 	handler Handler
 
-	out    chan *Message
-	closed bool
-	outLck sync.RWMutex
+	outHandler *outputHandler
 
 	signalHandler SignalHandler
 
@@ -187,9 +185,9 @@ func newConn(tr transport, handler Handler, signalHandler SignalHandler) (*Conn,
 	conn := new(Conn)
 	conn.transport = tr
 	conn.calls = make(map[uint32]*Call)
-	conn.out = make(chan *Message, 10)
 	conn.handler = handler
 	conn.signalHandler = signalHandler
+	conn.outHandler = &outputHandler{conn: conn}
 	conn.nextSerial = 1
 	conn.serialUsed = map[uint32]bool{0: true}
 	conn.busObj = conn.Object("org.freedesktop.DBus", "/org/freedesktop/DBus")
@@ -206,18 +204,7 @@ func (conn *Conn) BusObject() BusObject {
 // and the channels passed to Eavesdrop and Signal are closed. This method must
 // not be called on shared connections.
 func (conn *Conn) Close() error {
-	conn.outLck.Lock()
-	if conn.closed {
-		// inWorker calls Close on read error, the read error may
-		// be caused by another caller calling Close to shutdown the
-		// dbus connection, a double-close scenario we prevent here.
-		conn.outLck.Unlock()
-		return nil
-	}
-	close(conn.out)
-	conn.closed = true
-	conn.outLck.Unlock()
-
+	conn.outHandler.close()
 	if term, ok := conn.signalHandler.(Terminator); ok {
 		term.Terminate()
 	}
@@ -423,25 +410,30 @@ func (conn *Conn) Object(dest string, path ObjectPath) BusObject {
 
 // outWorker runs in an own goroutine, encoding and sending messages that are
 // sent to conn.out.
-func (conn *Conn) outWorker() {
-	for msg := range conn.out {
-		err := conn.SendMessage(msg)
-		conn.callsLck.RLock()
-		if err != nil {
-			if c := conn.calls[msg.serial]; c != nil {
-				c.Err = err
-				c.Done <- c
-			}
-			conn.serialLck.Lock()
-			delete(conn.serialUsed, msg.serial)
-			conn.serialLck.Unlock()
-		} else if msg.Type != TypeMethodCall {
-			conn.serialLck.Lock()
-			delete(conn.serialUsed, msg.serial)
-			conn.serialLck.Unlock()
+func (conn *Conn) sendMessage(msg *Message) {
+	conn.sendMessageAndIfClosed(msg, func() {})
+}
+func (conn *Conn) sendMessageAndIfClosed(msg *Message, ifClosed func()) {
+	err := conn.outHandler.sendAndIfClosed(msg, ifClosed)
+	conn.finalizeCall(msg, err)
+}
+
+func (conn *Conn) finalizeCall(msg *Message, err error) {
+	conn.callsLck.RLock()
+	if err != nil {
+		if c := conn.calls[msg.serial]; c != nil {
+			c.Err = err
+			c.Done <- c
 		}
-		conn.callsLck.RUnlock()
+		conn.serialLck.Lock()
+		delete(conn.serialUsed, msg.serial)
+		conn.serialLck.Unlock()
+	} else if msg.Type != TypeMethodCall {
+		conn.serialLck.Lock()
+		delete(conn.serialUsed, msg.serial)
+		conn.serialLck.Unlock()
 	}
+	conn.callsLck.RUnlock()
 }
 
 // Send sends the given message to the message bus. You usually don't need to
@@ -471,23 +463,15 @@ func (conn *Conn) Send(msg *Message, ch chan *Call) *Call {
 		conn.callsLck.Lock()
 		conn.calls[msg.serial] = call
 		conn.callsLck.Unlock()
-		conn.outLck.RLock()
-		if conn.closed {
+		conn.sendMessageAndIfClosed(msg, func() {
 			call.Err = ErrClosed
 			call.Done <- call
-		} else {
-			conn.out <- msg
-		}
-		conn.outLck.RUnlock()
+		})
 	} else {
-		conn.outLck.RLock()
-		if conn.closed {
+		call = &Call{Err: nil}
+		conn.sendMessageAndIfClosed(msg, func() {
 			call = &Call{Err: ErrClosed}
-		} else {
-			conn.out <- msg
-			call = &Call{Err: nil}
-		}
-		conn.outLck.RUnlock()
+		})
 	}
 	return call
 }
@@ -520,11 +504,7 @@ func (conn *Conn) sendError(err error, dest string, serial uint32) {
 	if len(e.Body) > 0 {
 		msg.Headers[FieldSignature] = MakeVariant(SignatureOf(e.Body...))
 	}
-	conn.outLck.RLock()
-	if !conn.closed {
-		conn.out <- msg
-	}
-	conn.outLck.RUnlock()
+	conn.sendMessage(msg)
 }
 
 // sendReply creates a method reply message corresponding to the parameters and
@@ -542,11 +522,7 @@ func (conn *Conn) sendReply(dest string, serial uint32, values ...interface{}) {
 	if len(values) > 0 {
 		msg.Headers[FieldSignature] = MakeVariant(SignatureOf(values...))
 	}
-	conn.outLck.RLock()
-	if !conn.closed {
-		conn.out <- msg
-	}
-	conn.outLck.RUnlock()
+	conn.sendMessage(msg)
 }
 
 func (conn *Conn) defaultSignalAction(fn func(h *defaultSignalHandler, ch chan<- *Signal), ch chan<- *Signal) {
@@ -680,4 +656,31 @@ func getKey(s, key string) string {
 		}
 	}
 	return ""
+}
+
+type outputHandler struct {
+	conn    *Conn
+	sendLck sync.Mutex
+	closed  struct {
+		isClosed bool
+		lck      sync.RWMutex
+	}
+}
+
+func (h *outputHandler) sendAndIfClosed(msg *Message, ifClosed func()) error {
+	h.closed.lck.RLock()
+	defer h.closed.lck.RUnlock()
+	if h.closed.isClosed {
+		ifClosed()
+		return nil
+	}
+	h.sendLck.Lock()
+	defer h.sendLck.Unlock()
+	return h.conn.SendMessage(msg)
+}
+
+func (h *outputHandler) close() {
+	h.closed.lck.Lock()
+	defer h.closed.lck.Unlock()
+	h.closed.isClosed = true
 }
