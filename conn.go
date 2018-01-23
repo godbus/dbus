@@ -38,9 +38,7 @@ type Conn struct {
 	names    []string
 	namesLck sync.RWMutex
 
-	serialLck  sync.Mutex
-	nextSerial uint32
-	serialUsed map[uint32]bool
+	serialGen *serialGenerator
 
 	calls    map[uint32]*Call
 	callsLck sync.RWMutex
@@ -188,8 +186,7 @@ func newConn(tr transport, handler Handler, signalHandler SignalHandler) (*Conn,
 	conn.handler = handler
 	conn.signalHandler = signalHandler
 	conn.outHandler = &outputHandler{conn: conn}
-	conn.nextSerial = 1
-	conn.serialUsed = map[uint32]bool{0: true}
+	conn.serialGen = newSerialGenerator()
 	conn.busObj = conn.Object("org.freedesktop.DBus", "/org/freedesktop/DBus")
 	return conn, nil
 }
@@ -238,15 +235,7 @@ func (conn *Conn) Eavesdrop(ch chan<- *Message) {
 
 // getSerial returns an unused serial.
 func (conn *Conn) getSerial() uint32 {
-	conn.serialLck.Lock()
-	defer conn.serialLck.Unlock()
-	n := conn.nextSerial
-	for conn.serialUsed[n] {
-		n++
-	}
-	conn.serialUsed[n] = true
-	conn.nextSerial = n + 1
-	return n
+	return conn.serialGen.getSerial()
 }
 
 // Hello sends the initial org.freedesktop.DBus.Hello call. This method must be
@@ -315,9 +304,7 @@ func (conn *Conn) inWorker() {
 						c.Body = msg.Body
 					}
 					c.Done <- c
-					conn.serialLck.Lock()
-					delete(conn.serialUsed, serial)
-					conn.serialLck.Unlock()
+					conn.serialGen.retireSerial(serial)
 					delete(conn.calls, serial)
 				}
 				conn.callsLck.Unlock()
@@ -425,13 +412,9 @@ func (conn *Conn) finalizeCall(msg *Message, err error) {
 			c.Err = err
 			c.Done <- c
 		}
-		conn.serialLck.Lock()
-		delete(conn.serialUsed, msg.serial)
-		conn.serialLck.Unlock()
+		conn.serialGen.retireSerial(msg.serial)
 	} else if msg.Type != TypeMethodCall {
-		conn.serialLck.Lock()
-		delete(conn.serialUsed, msg.serial)
-		conn.serialLck.Unlock()
+		conn.serialGen.retireSerial(msg.serial)
 	}
 	conn.callsLck.RUnlock()
 }
@@ -683,4 +666,35 @@ func (h *outputHandler) close() {
 	h.closed.lck.Lock()
 	defer h.closed.lck.Unlock()
 	h.closed.isClosed = true
+}
+
+type serialGenerator struct {
+	lck        sync.Mutex
+	nextSerial uint32
+	serialUsed map[uint32]bool
+}
+
+func newSerialGenerator() *serialGenerator {
+	return &serialGenerator{
+		serialUsed: map[uint32]bool{0: true},
+		nextSerial: 1,
+	}
+}
+
+func (gen *serialGenerator) getSerial() uint32 {
+	gen.lck.Lock()
+	defer gen.lck.Unlock()
+	n := gen.nextSerial
+	for gen.serialUsed[n] {
+		n++
+	}
+	gen.serialUsed[n] = true
+	gen.nextSerial = n + 1
+	return n
+}
+
+func (gen *serialGenerator) retireSerial(serial uint32) {
+	gen.lck.Lock()
+	defer gen.lck.Unlock()
+	delete(gen.serialUsed, serial)
 }
