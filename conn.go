@@ -35,8 +35,7 @@ type Conn struct {
 	unixFD bool
 	uuid   string
 
-	names    []string
-	namesLck sync.RWMutex
+	names *nameTracker
 
 	serialGen *serialGenerator
 
@@ -187,6 +186,7 @@ func newConn(tr transport, handler Handler, signalHandler SignalHandler) (*Conn,
 	conn.signalHandler = signalHandler
 	conn.outHandler = &outputHandler{conn: conn}
 	conn.serialGen = newSerialGenerator()
+	conn.names = newNameTracker()
 	conn.busObj = conn.Object("org.freedesktop.DBus", "/org/freedesktop/DBus")
 	return conn, nil
 }
@@ -247,10 +247,7 @@ func (conn *Conn) Hello() error {
 	if err != nil {
 		return err
 	}
-	conn.namesLck.Lock()
-	conn.names = make([]string, 1)
-	conn.names[0] = s
-	conn.namesLck.Unlock()
+	conn.names.acquireUniqueConnectionName(s)
 	return nil
 }
 
@@ -271,22 +268,9 @@ func (conn *Conn) inWorker() {
 			}
 			conn.eavesdroppedLck.Unlock()
 			dest, _ := msg.Headers[FieldDestination].value.(string)
-			found := false
-			if dest == "" {
-				found = true
-			} else {
-				conn.namesLck.RLock()
-				if len(conn.names) == 0 {
-					found = true
-				}
-				for _, v := range conn.names {
-					if dest == v {
-						found = true
-						break
-					}
-				}
-				conn.namesLck.RUnlock()
-			}
+			found := dest == "" ||
+				!conn.names.uniqueNameIsKnown() ||
+				conn.names.isKnownName(dest)
 			if !found {
 				// Eavesdropped a message, but no channel for it is registered.
 				// Ignore it.
@@ -322,14 +306,7 @@ func (conn *Conn) inWorker() {
 						if !ok {
 							panic("Unable to read the lost name")
 						}
-						conn.namesLck.Lock()
-						for i, v := range conn.names {
-							if v == name {
-								conn.names = append(conn.names[:i],
-									conn.names[i+1:]...)
-							}
-						}
-						conn.namesLck.Unlock()
+						conn.names.loseName(name)
 					} else if member == "NameAcquired" {
 						// If we acquired the name on the bus, add it to our
 						// tracking list.
@@ -337,9 +314,7 @@ func (conn *Conn) inWorker() {
 						if !ok {
 							panic("Unable to read the acquired name")
 						}
-						conn.namesLck.Lock()
-						conn.names = append(conn.names, name)
-						conn.namesLck.Unlock()
+						conn.names.acquireName(name)
 					}
 				}
 				conn.handleSignal(msg)
@@ -382,12 +357,7 @@ func (conn *Conn) handleSignal(msg *Message) {
 // connection. The slice is always at least one element long, the first element
 // being the unique name of the connection.
 func (conn *Conn) Names() []string {
-	conn.namesLck.RLock()
-	// copy the slice so it can't be modified
-	s := make([]string, len(conn.names))
-	copy(s, conn.names)
-	conn.namesLck.RUnlock()
-	return s
+	return conn.names.listKnownNames()
 }
 
 // Object returns the object identified by the given destination name and path.
@@ -697,4 +667,51 @@ func (gen *serialGenerator) retireSerial(serial uint32) {
 	gen.lck.Lock()
 	defer gen.lck.Unlock()
 	delete(gen.serialUsed, serial)
+}
+
+type nameTracker struct {
+	lck    sync.RWMutex
+	unique string
+	names  map[string]struct{}
+}
+
+func newNameTracker() *nameTracker {
+	return &nameTracker{names: map[string]struct{}{}}
+}
+func (tracker *nameTracker) acquireUniqueConnectionName(name string) {
+	tracker.lck.Lock()
+	defer tracker.lck.Unlock()
+	tracker.unique = name
+}
+func (tracker *nameTracker) acquireName(name string) {
+	tracker.lck.Lock()
+	defer tracker.lck.Unlock()
+	tracker.names[name] = struct{}{}
+}
+func (tracker *nameTracker) loseName(name string) {
+	tracker.lck.Lock()
+	defer tracker.lck.Unlock()
+	delete(tracker.names, name)
+}
+
+func (tracker *nameTracker) uniqueNameIsKnown() bool {
+	tracker.lck.RLock()
+	defer tracker.lck.RUnlock()
+	return tracker.unique != ""
+}
+func (tracker *nameTracker) isKnownName(name string) bool {
+	tracker.lck.RLock()
+	defer tracker.lck.RUnlock()
+	_, ok := tracker.names[name]
+	return ok || name == tracker.unique
+}
+func (tracker *nameTracker) listKnownNames() []string {
+	tracker.lck.RLock()
+	defer tracker.lck.RUnlock()
+	out := make([]string, 0, len(tracker.names)+1)
+	out = append(out, tracker.unique)
+	for k := range tracker.names {
+		out = append(out, k)
+	}
+	return out
 }
