@@ -39,8 +39,7 @@ type Conn struct {
 
 	serialGen *serialGenerator
 
-	calls    map[uint32]*Call
-	callsLck sync.RWMutex
+	calls *callTracker
 
 	handler Handler
 
@@ -181,7 +180,7 @@ func NewConnHandler(conn io.ReadWriteCloser, handler Handler, signalHandler Sign
 func newConn(tr transport, handler Handler, signalHandler SignalHandler) (*Conn, error) {
 	conn := new(Conn)
 	conn.transport = tr
-	conn.calls = make(map[uint32]*Call)
+	conn.calls = newCallTracker()
 	conn.handler = handler
 	conn.signalHandler = signalHandler
 	conn.outHandler = &outputHandler{conn: conn}
@@ -277,21 +276,10 @@ func (conn *Conn) inWorker() {
 				continue
 			}
 			switch msg.Type {
-			case TypeMethodReply, TypeError:
-				serial := msg.Headers[FieldReplySerial].value.(uint32)
-				conn.callsLck.Lock()
-				if c, ok := conn.calls[serial]; ok {
-					if msg.Type == TypeError {
-						name, _ := msg.Headers[FieldErrorName].value.(string)
-						c.Err = Error{name, msg.Body}
-					} else {
-						c.Body = msg.Body
-					}
-					c.Done <- c
-					conn.serialGen.retireSerial(serial)
-					delete(conn.calls, serial)
-				}
-				conn.callsLck.Unlock()
+			case TypeError:
+				conn.serialGen.retireSerial(conn.calls.handleDBusError(msg))
+			case TypeMethodReply:
+				conn.serialGen.retireSerial(conn.calls.handleReply(msg))
 			case TypeSignal:
 				iface := msg.Headers[FieldInterface].value.(string)
 				member := msg.Headers[FieldMember].value.(string)
@@ -326,12 +314,7 @@ func (conn *Conn) inWorker() {
 			// anything but to shut down all stuff and returns errors to all
 			// pending replies.
 			conn.Close()
-			conn.callsLck.RLock()
-			for _, v := range conn.calls {
-				v.Err = err
-				v.Done <- v
-			}
-			conn.callsLck.RUnlock()
+			conn.calls.finalizeAllWithError(err)
 			return
 		}
 		// invalid messages are ignored
@@ -370,23 +353,15 @@ func (conn *Conn) Object(dest string, path ObjectPath) BusObject {
 func (conn *Conn) sendMessage(msg *Message) {
 	conn.sendMessageAndIfClosed(msg, func() {})
 }
+
 func (conn *Conn) sendMessageAndIfClosed(msg *Message, ifClosed func()) {
 	err := conn.outHandler.sendAndIfClosed(msg, ifClosed)
-	conn.finalizeCall(msg, err)
-}
-
-func (conn *Conn) finalizeCall(msg *Message, err error) {
-	conn.callsLck.RLock()
+	conn.calls.handleSendError(msg, err)
 	if err != nil {
-		if c := conn.calls[msg.serial]; c != nil {
-			c.Err = err
-			c.Done <- c
-		}
 		conn.serialGen.retireSerial(msg.serial)
 	} else if msg.Type != TypeMethodCall {
 		conn.serialGen.retireSerial(msg.serial)
 	}
-	conn.callsLck.RUnlock()
 }
 
 // Send sends the given message to the message bus. You usually don't need to
@@ -413,9 +388,7 @@ func (conn *Conn) Send(msg *Message, ch chan *Call) *Call {
 		call.Method = iface + "." + member
 		call.Args = msg.Body
 		call.Done = ch
-		conn.callsLck.Lock()
-		conn.calls[msg.serial] = call
-		conn.callsLck.Unlock()
+		conn.calls.track(msg.serial, call)
 		conn.sendMessageAndIfClosed(msg, func() {
 			call.Err = ErrClosed
 			call.Done <- call
@@ -714,4 +687,83 @@ func (tracker *nameTracker) listKnownNames() []string {
 		out = append(out, k)
 	}
 	return out
+}
+
+type callTracker struct {
+	calls map[uint32]*Call
+	lck   sync.RWMutex
+}
+
+func newCallTracker() *callTracker {
+	return &callTracker{calls: map[uint32]*Call{}}
+}
+
+func (tracker *callTracker) track(sn uint32, call *Call) {
+	tracker.lck.Lock()
+	defer tracker.lck.Unlock()
+	tracker.calls[sn] = call
+}
+
+func (tracker *callTracker) handleReply(msg *Message) uint32 {
+	serial := msg.Headers[FieldReplySerial].value.(uint32)
+	tracker.lck.RLock()
+	c, ok := tracker.calls[serial]
+	tracker.lck.RUnlock()
+	if !ok {
+		return serial
+	}
+	c.Body = msg.Body
+	c.Done <- c
+	tracker.finalize(serial)
+	return serial
+}
+
+func (tracker *callTracker) handleDBusError(msg *Message) uint32 {
+	serial := msg.Headers[FieldReplySerial].value.(uint32)
+	tracker.lck.RLock()
+	c, ok := tracker.calls[serial]
+	tracker.lck.RUnlock()
+	if !ok {
+		return serial
+	}
+	name, _ := msg.Headers[FieldErrorName].value.(string)
+	c.Err = Error{name, msg.Body}
+	c.Done <- c
+	tracker.finalize(serial)
+	return serial
+}
+
+func (tracker *callTracker) handleSendError(msg *Message, err error) {
+	if err == nil {
+		return
+	}
+	tracker.lck.RLock()
+	c, ok := tracker.calls[msg.serial]
+	tracker.lck.RUnlock()
+	if !ok {
+		return
+	}
+	c.Err = err
+	c.Done <- c
+	tracker.finalize(msg.serial)
+}
+
+func (tracker *callTracker) finalize(sn uint32) {
+	tracker.lck.Lock()
+	defer tracker.lck.Unlock()
+	delete(tracker.calls, sn)
+}
+
+func (tracker *callTracker) finalizeAllWithError(err error) {
+	closedCalls := make(map[uint32]*Call)
+	tracker.lck.RLock()
+	for sn, v := range tracker.calls {
+		v.Err = err
+		v.Done <- v
+		closedCalls[sn] = v
+	}
+	tracker.lck.RUnlock()
+	for sn := range closedCalls {
+		tracker.finalize(sn)
+	}
 }
