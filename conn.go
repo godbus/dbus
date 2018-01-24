@@ -255,45 +255,48 @@ func (conn *Conn) Hello() error {
 func (conn *Conn) inWorker() {
 	for {
 		msg, err := conn.ReadMessage()
-		if err == nil {
-			conn.eavesdroppedLck.Lock()
-			if conn.eavesdropped != nil {
-				select {
-				case conn.eavesdropped <- msg:
-				default:
-				}
-				conn.eavesdroppedLck.Unlock()
-				continue
+		if err != nil {
+			if _, ok := err.(InvalidMessageError); !ok {
+				// Some read error occured (usually EOF); we can't really do
+				// anything but to shut down all stuff and returns errors to all
+				// pending replies.
+				conn.Close()
+				conn.calls.finalizeAllWithError(err)
+				return
+			}
+			// invalid messages are ignored
+			continue
+		}
+		conn.eavesdroppedLck.Lock()
+		if conn.eavesdropped != nil {
+			select {
+			case conn.eavesdropped <- msg:
+			default:
 			}
 			conn.eavesdroppedLck.Unlock()
-			dest, _ := msg.Headers[FieldDestination].value.(string)
-			found := dest == "" ||
-				!conn.names.uniqueNameIsKnown() ||
-				conn.names.isKnownName(dest)
-			if !found {
-				// Eavesdropped a message, but no channel for it is registered.
-				// Ignore it.
-				continue
-			}
-			switch msg.Type {
-			case TypeError:
-				conn.serialGen.retireSerial(conn.calls.handleDBusError(msg))
-			case TypeMethodReply:
-				conn.serialGen.retireSerial(conn.calls.handleReply(msg))
-			case TypeSignal:
-				conn.handleSignal(msg)
-			case TypeMethodCall:
-				go conn.handleCall(msg)
-			}
-		} else if _, ok := err.(InvalidMessageError); !ok {
-			// Some read error occured (usually EOF); we can't really do
-			// anything but to shut down all stuff and returns errors to all
-			// pending replies.
-			conn.Close()
-			conn.calls.finalizeAllWithError(err)
-			return
+			continue
 		}
-		// invalid messages are ignored
+		conn.eavesdroppedLck.Unlock()
+		dest, _ := msg.Headers[FieldDestination].value.(string)
+		found := dest == "" ||
+			!conn.names.uniqueNameIsKnown() ||
+			conn.names.isKnownName(dest)
+		if !found {
+			// Eavesdropped a message, but no channel for it is registered.
+			// Ignore it.
+			continue
+		}
+		switch msg.Type {
+		case TypeError:
+			conn.serialGen.retireSerial(conn.calls.handleDBusError(msg))
+		case TypeMethodReply:
+			conn.serialGen.retireSerial(conn.calls.handleReply(msg))
+		case TypeSignal:
+			conn.handleSignal(msg)
+		case TypeMethodCall:
+			go conn.handleCall(msg)
+		}
+
 	}
 }
 
