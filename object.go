@@ -83,9 +83,7 @@ func (o *Object) Go(method string, flags Flags, ch chan *Call, args ...interface
 			Args:        args,
 			Done:        ch,
 		}
-		o.conn.callsLck.Lock()
-		o.conn.calls[msg.serial] = call
-		o.conn.callsLck.Unlock()
+		o.conn.calls.track(msg.serial, call)
 		o.conn.sendMessageAndIfClosed(msg, func() {
 			call.Err = ErrClosed
 			call.Done <- call
