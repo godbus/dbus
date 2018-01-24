@@ -281,30 +281,6 @@ func (conn *Conn) inWorker() {
 			case TypeMethodReply:
 				conn.serialGen.retireSerial(conn.calls.handleReply(msg))
 			case TypeSignal:
-				iface := msg.Headers[FieldInterface].value.(string)
-				member := msg.Headers[FieldMember].value.(string)
-				// as per http://dbus.freedesktop.org/doc/dbus-specification.html ,
-				// sender is optional for signals.
-				sender, _ := msg.Headers[FieldSender].value.(string)
-				if iface == "org.freedesktop.DBus" && sender == "org.freedesktop.DBus" {
-					if member == "NameLost" {
-						// If we lost the name on the bus, remove it from our
-						// tracking list.
-						name, ok := msg.Body[0].(string)
-						if !ok {
-							panic("Unable to read the lost name")
-						}
-						conn.names.loseName(name)
-					} else if member == "NameAcquired" {
-						// If we acquired the name on the bus, add it to our
-						// tracking list.
-						name, ok := msg.Body[0].(string)
-						if !ok {
-							panic("Unable to read the acquired name")
-						}
-						conn.names.acquireName(name)
-					}
-				}
 				conn.handleSignal(msg)
 			case TypeMethodCall:
 				go conn.handleCall(msg)
@@ -327,6 +303,25 @@ func (conn *Conn) handleSignal(msg *Message) {
 	// as per http://dbus.freedesktop.org/doc/dbus-specification.html ,
 	// sender is optional for signals.
 	sender, _ := msg.Headers[FieldSender].value.(string)
+	if iface == "org.freedesktop.DBus" && sender == "org.freedesktop.DBus" {
+		if member == "NameLost" {
+			// If we lost the name on the bus, remove it from our
+			// tracking list.
+			name, ok := msg.Body[0].(string)
+			if !ok {
+				panic("Unable to read the lost name")
+			}
+			conn.names.loseName(name)
+		} else if member == "NameAcquired" {
+			// If we acquired the name on the bus, add it to our
+			// tracking list.
+			name, ok := msg.Body[0].(string)
+			if !ok {
+				panic("Unable to read the acquired name")
+			}
+			conn.names.acquireName(name)
+		}
+	}
 	signal := &Signal{
 		Sender: sender,
 		Path:   msg.Headers[FieldPath].value.(ObjectPath),
