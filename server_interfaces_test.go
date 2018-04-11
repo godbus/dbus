@@ -2,14 +2,17 @@ package dbus
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 )
 
 type tester struct {
-	conn    *Conn
-	sigs    chan *Signal
-	subSigs map[string]map[string]struct{}
+	conn *Conn
+	sigs chan *Signal
+
+	subSigsMu sync.Mutex
+	subSigs   map[string]map[string]struct{}
 }
 
 type intro struct {
@@ -147,7 +150,9 @@ func (t terrfn) ReturnValue(position int) interface{} {
 
 //SignalHandler
 func (t *tester) DeliverSignal(iface, name string, signal *Signal) {
+	t.subSigsMu.Lock()
 	intf, ok := t.subSigs[iface]
+	t.subSigsMu.Unlock()
 	if !ok {
 		return
 	}
@@ -158,12 +163,14 @@ func (t *tester) DeliverSignal(iface, name string, signal *Signal) {
 }
 
 func (t *tester) AddSignal(iface, name string) {
+	t.subSigsMu.Lock()
 	if i, ok := t.subSigs[iface]; ok {
 		i[name] = struct{}{}
 	} else {
 		t.subSigs[iface] = make(map[string]struct{})
 		t.subSigs[iface][name] = struct{}{}
 	}
+	t.subSigsMu.Unlock()
 	t.conn.BusObject().(*Object).AddMatchSignal(
 		iface, name)
 }
