@@ -10,8 +10,6 @@ import (
 	"os/exec"
 )
 
-const defaultSystemBusAddress = "unix:path=/var/run/dbus/system_bus_socket"
-
 func getSessionBusPlatformAddress() (string, error) {
 	cmd := exec.Command("dbus-launch")
 	b, err := cmd.CombinedOutput()
@@ -33,10 +31,3 @@ func getSessionBusPlatformAddress() (string, error) {
 	return addr, nil
 }
 
-func getSystemBusPlatformAddress() string {
-	address := os.Getenv("DBUS_SYSTEM_BUS_ADDRESS")
-	if address != "" {
-		return fmt.Sprintf("unix:path=%s", address)
-	}
-	return defaultSystemBusAddress
-}
