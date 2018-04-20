@@ -5,7 +5,6 @@ package dbus
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"os"
 	"os/exec"
 )
