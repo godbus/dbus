@@ -221,7 +221,9 @@ func (obj *exportedIntf) isFallbackInterface() bool {
 //signal handler. This is useful if you want to implement only
 //one of the two handlers but not both.
 func NewDefaultSignalHandler() *defaultSignalHandler {
-	return &defaultSignalHandler{}
+	return &defaultSignalHandler{
+		closeChan: make(chan struct{}),
+	}
 }
 
 func isDefaultSignalHandler(handler SignalHandler) bool {
@@ -231,8 +233,9 @@ func isDefaultSignalHandler(handler SignalHandler) bool {
 
 type defaultSignalHandler struct {
 	sync.RWMutex
-	closed  bool
-	signals []chan<- *Signal
+	closed    bool
+	signals   []chan<- *Signal
+	closeChan chan struct{}
 }
 
 func (sh *defaultSignalHandler) DeliverSignal(intf, name string, signal *Signal) {
@@ -243,7 +246,11 @@ func (sh *defaultSignalHandler) DeliverSignal(intf, name string, signal *Signal)
 			return
 		}
 		for _, ch := range sh.signals {
-			ch <- signal
+			select {
+			case ch <- signal:
+			case <-sh.closeChan:
+				return
+			}
 		}
 	}()
 }
@@ -251,12 +258,16 @@ func (sh *defaultSignalHandler) DeliverSignal(intf, name string, signal *Signal)
 func (sh *defaultSignalHandler) Init() error {
 	sh.Lock()
 	sh.signals = make([]chan<- *Signal, 0)
+	sh.closeChan = make(chan struct{})
 	sh.Unlock()
 	return nil
 }
 
 func (sh *defaultSignalHandler) Terminate() {
 	sh.Lock()
+	if !sh.closed {
+		close(sh.closeChan)
+	}
 	sh.closed = true
 	for _, ch := range sh.signals {
 		close(ch)
