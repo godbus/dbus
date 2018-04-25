@@ -1,6 +1,6 @@
 dist: precise
 language: go
-go_import_path: github.com/godbus/dbus
+go_import_path: github.com/dannin/dbus
 sudo: true
 
 go:
