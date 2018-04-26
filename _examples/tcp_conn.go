@@ -5,7 +5,7 @@ import (
 	"net"
 	"os"
 
-	"github.com/godbus/dbus"
+	"github.com/dannin/dbus"
 )
 
 // In order to enable TCP connections add the following configuration

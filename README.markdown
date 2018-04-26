@@ -17,7 +17,7 @@ D-Bus message bus system.
 This packages requires Go 1.1. If you installed it and set up your GOPATH, just run:
 
 ```
-go get github.com/godbus/dbus
+go get github.com/dannin/dbus
 ```
 
 If you want to use the subpackages, you can install them the same way.
@@ -25,8 +25,8 @@ If you want to use the subpackages, you can install them the same way.
 ### Usage
 
 The complete package documentation and some simple examples are available at
-[godoc.org](http://godoc.org/github.com/godbus/dbus). Also, the
-[_examples](https://github.com/godbus/dbus/tree/master/_examples) directory
+[godoc.org](http://godoc.org/github.com/dannin/dbus). Also, the
+[_examples](https://github.com/dannin/dbus/tree/master/_examples) directory
 gives a short overview over the basic usage. 
 
 #### Projects using godbus

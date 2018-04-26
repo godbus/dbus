@@ -2,7 +2,7 @@ package introspect
 
 import (
 	"encoding/xml"
-	"github.com/godbus/dbus"
+	"github.com/dannin/dbus"
 	"strings"
 )
 
