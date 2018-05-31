@@ -422,3 +422,42 @@ func TestHandlerSignal(t *testing.T) {
 	}
 	tester.Close()
 }
+
+type X struct {
+}
+
+func (x *X) Method1() *Error {
+	return nil
+}
+
+
+func TestRaceInExport(t *testing.T) {
+	const (
+		dbusPath      = "/org/example/godbus/test1"
+		dbusInterface = "org.example.godbus.test1"
+	)
+
+	bus, err := SessionBus()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var x X
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		err = bus.Export(&x, dbusPath, dbusInterface)
+		if err != nil {
+			t.Fatal(err)
+		}
+		wg.Done()
+	}()
+
+	go func() {
+		obj := bus.Object(bus.Names()[0], dbusPath)
+		obj.Call(dbusInterface+".Method1", 0)
+		wg.Done()
+	}()
+	wg.Wait()
+}
