@@ -161,6 +161,7 @@ func newExportedObject() *exportedObj {
 }
 
 type exportedObj struct {
+	mu         sync.RWMutex
 	interfaces map[string]*exportedIntf
 }
 
@@ -168,19 +169,27 @@ func (obj *exportedObj) LookupInterface(name string) (Interface, bool) {
 	if name == "" {
 		return obj, true
 	}
+	obj.mu.RLock()
+	defer obj.mu.RUnlock()
 	intf, exists := obj.interfaces[name]
 	return intf, exists
 }
 
 func (obj *exportedObj) AddInterface(name string, iface *exportedIntf) {
+	obj.mu.Lock()
+	defer obj.mu.Unlock()
 	obj.interfaces[name] = iface
 }
 
 func (obj *exportedObj) DeleteInterface(name string) {
+	obj.mu.Lock()
+	defer obj.mu.Unlock()
 	delete(obj.interfaces, name)
 }
 
 func (obj *exportedObj) LookupMethod(name string) (Method, bool) {
+	obj.mu.RLock()
+	defer obj.mu.RUnlock()
 	for _, intf := range obj.interfaces {
 		method, exists := intf.LookupMethod(name)
 		if exists {
