@@ -267,7 +267,7 @@ func BenchmarkServeSameConnAsync(b *testing.B) {
 	benchmarkServeAsync(b, bus, bus)
 }
 
-func benchmarkServe(b *testing.B, srv, cli *Conn) {
+func benchmarkServe(b *testing.B, srv, cli SharedConn) {
 	var r int64
 	var err error
 	dest := srv.Names()[0]
@@ -285,7 +285,7 @@ func benchmarkServe(b *testing.B, srv, cli *Conn) {
 	}
 }
 
-func benchmarkServeAsync(b *testing.B, srv, cli *Conn) {
+func benchmarkServeAsync(b *testing.B, srv, cli SharedConn) {
 	dest := srv.Names()[0]
 	srv.Export(server{}, "/org/guelfey/DBus/Test", "org.guelfey.DBus.Test")
 	obj := cli.Object(dest, "/org/guelfey/DBus/Test")

@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	systemBus     *Conn
+	systemBus     SharedConn
 	systemBusLck  sync.Mutex
-	sessionBus    *Conn
+	sessionBus    SharedConn
 	sessionBusLck sync.Mutex
 	sessionEnvLck sync.Mutex
 )
@@ -52,33 +52,50 @@ type Conn struct {
 	eavesdroppedLck sync.Mutex
 }
 
+// SharedConn limits the available methods to those that are allowed to be
+// called for shared connections, i.e. system and session bus.
+type SharedConn interface {
+	BusObject() BusObject
+	Eavesdrop(ch chan<- *Message)
+	Names() []string
+	Object(dest string, path ObjectPath) BusObject
+	Send(msg *Message, ch chan *Call) *Call
+	SendWithContext(ctx context.Context, msg *Message, ch chan *Call) *Call
+	Signal(ch chan<- *Signal)
+	RemoveSignal(ch chan<- *Signal)
+	SupportsUnixFDs() bool
+
+	Emit(path ObjectPath, name string, values ...interface{}) error
+	Export(v interface{}, path ObjectPath, iface string) error
+	ExportWithMap(v interface{}, mapping map[string]string, path ObjectPath, iface string) error
+	ExportSubtree(v interface{}, path ObjectPath, iface string) error
+	ExportSubtreeWithMap(v interface{}, mapping map[string]string, path ObjectPath, iface string) error
+	ExportMethodTable(methods map[string]interface{}, path ObjectPath, iface string) error
+	ExportSubtreeMethodTable(methods map[string]interface{}, path ObjectPath, iface string) error
+}
+
 // SessionBus returns a shared connection to the session bus, connecting to it
 // if not already done.
-func SessionBus() (conn *Conn, err error) {
+func SessionBus() (SharedConn, error) {
 	sessionBusLck.Lock()
 	defer sessionBusLck.Unlock()
 	if sessionBus != nil {
 		return sessionBus, nil
 	}
-	defer func() {
-		if conn != nil {
-			sessionBus = conn
-		}
-	}()
-	conn, err = SessionBusPrivate()
+	conn, err := SessionBusPrivate()
 	if err != nil {
-		return
+		return nil, err
 	}
 	if err = conn.Auth(nil); err != nil {
 		conn.Close()
-		conn = nil
-		return
+		return nil, err
 	}
 	if err = conn.Hello(); err != nil {
 		conn.Close()
-		conn = nil
+		return nil, err
 	}
-	return
+	sessionBus = conn
+	return conn, nil
 }
 
 func getSessionBusAddress() (string, error) {
@@ -112,31 +129,26 @@ func SessionBusPrivateHandler(handler Handler, signalHandler SignalHandler) (*Co
 
 // SystemBus returns a shared connection to the system bus, connecting to it if
 // not already done.
-func SystemBus() (conn *Conn, err error) {
+func SystemBus() (SharedConn, error) {
 	systemBusLck.Lock()
 	defer systemBusLck.Unlock()
 	if systemBus != nil {
 		return systemBus, nil
 	}
-	defer func() {
-		if conn != nil {
-			systemBus = conn
-		}
-	}()
-	conn, err = SystemBusPrivate()
+	conn, err := SystemBusPrivate()
 	if err != nil {
-		return
+		return nil, err
 	}
 	if err = conn.Auth(nil); err != nil {
 		conn.Close()
-		conn = nil
-		return
+		return nil, err
 	}
 	if err = conn.Hello(); err != nil {
 		conn.Close()
-		conn = nil
+		return nil, err
 	}
-	return
+	systemBus = conn
+	return conn, nil
 }
 
 // SystemBusPrivate returns a new private connection to the system bus.
