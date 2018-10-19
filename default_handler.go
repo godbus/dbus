@@ -248,20 +248,26 @@ type defaultSignalHandler struct {
 }
 
 func (sh *defaultSignalHandler) DeliverSignal(intf, name string, signal *Signal) {
-	go func() {
-		sh.RLock()
-		defer sh.RUnlock()
-		if sh.closed {
+	sh.RLock()
+	defer sh.RUnlock()
+	if sh.closed {
+		return
+	}
+	for _, ch := range sh.signals {
+		select {
+		case ch <- signal:
+		case <-sh.closeChan:
 			return
+		default:
+			go func() {
+				select {
+				case ch <- signal:
+				case <-sh.closeChan:
+					return
+				}
+			}()
 		}
-		for _, ch := range sh.signals {
-			select {
-			case ch <- signal:
-			case <-sh.closeChan:
-				return
-			}
-		}
-	}()
+	}
 }
 
 func (sh *defaultSignalHandler) Init() error {
