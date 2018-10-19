@@ -77,8 +77,11 @@ func SessionBus() (conn *Conn, err error) {
 }
 
 func getSessionBusAddress() (string, error) {
-	address := os.Getenv("DBUS_SESSION_BUS_ADDRESS")
-	if address != "" && address != "autolaunch:" {
+	if address := os.Getenv("DBUS_SESSION_BUS_ADDRESS"); address != "" && address != "autolaunch:" {
+		return address, nil
+
+	} else if address := tryDiscoverDbusSessionBusAddress(); address != "" {
+		os.Setenv("DBUS_SESSION_BUS_ADDRESS", address)
 		return address, nil
 	}
 	return getSessionBusPlatformAddress()
