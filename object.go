@@ -45,6 +45,16 @@ func (o *Object) AddMatchSignal(iface, member string) *Call {
 	)
 }
 
+// RemoveMatchSignal unsubscribes BusObject to signals from specified interface and
+// method (member).
+func (o *Object) RemoveMatchSignal(iface, member string) *Call {
+	return o.Call(
+		"org.freedesktop.DBus.RemoveMatch",
+		0,
+		"type='signal',interface='"+iface+"',member='"+member+"'",
+	)
+}
+
 // Go calls a method with the given arguments asynchronously. It returns a
 // Call structure representing this method call. The passed channel will
 // return the same value once the call is done. If ch is nil, a new channel
