@@ -102,12 +102,13 @@ func SessionBusPrivate() (*Conn, error) {
 }
 
 // SessionBusPrivate returns a new private connection to the session bus.
+// Deprecated: use SessionBusPrivate with options instead.
 func SessionBusPrivateHandler(handler Handler, signalHandler SignalHandler) (*Conn, error) {
 	address, err := getSessionBusAddress()
 	if err != nil {
 		return nil, err
 	}
-	return DialHandler(address, handler, signalHandler)
+	return Dial(address, WithHandler(handler), WithSignalHandler(signalHandler))
 }
 
 // SystemBus returns a shared connection to the system bus, connecting to it if
@@ -145,45 +146,76 @@ func SystemBusPrivate() (*Conn, error) {
 }
 
 // SystemBusPrivateHandler returns a new private connection to the system bus, using the provided handlers.
+// Deprecated: use SystemBusPrivate with options instead.
 func SystemBusPrivateHandler(handler Handler, signalHandler SignalHandler) (*Conn, error) {
-	return DialHandler(getSystemBusPlatformAddress(), handler, signalHandler)
+	return Dial(getSystemBusPlatformAddress(), WithHandler(handler), WithSignalHandler(signalHandler))
 }
 
 // Dial establishes a new private connection to the message bus specified by address.
-func Dial(address string) (*Conn, error) {
+func Dial(address string, opts ...ConnOption) (*Conn, error) {
 	tr, err := getTransport(address)
 	if err != nil {
 		return nil, err
 	}
-	return newConn(tr, NewDefaultHandler(), NewDefaultSignalHandler())
+	return newConn(tr, opts...)
 }
 
 // DialHandler establishes a new private connection to the message bus specified by address, using the supplied handlers.
+// Deprecated: use Dial with options instead.
 func DialHandler(address string, handler Handler, signalHandler SignalHandler) (*Conn, error) {
 	tr, err := getTransport(address)
 	if err != nil {
 		return nil, err
 	}
-	return newConn(tr, handler, signalHandler)
+	return newConn(tr, WithHandler(handler), WithSignalHandler(signalHandler))
+}
+
+// ConnOption is a connection option.
+type ConnOption func(conn *Conn) error
+
+// WithHandler overrides default handler.
+func WithHandler(handler Handler) ConnOption {
+	return func(conn *Conn) error {
+		conn.handler = handler
+		return nil
+	}
+}
+
+// WithSignalHandler overrides default signal handler.
+func WithSignalHandler(handler SignalHandler) ConnOption {
+	return func(conn *Conn) error {
+		conn.signalHandler = handler
+		return nil
+	}
 }
 
 // NewConn creates a new private *Conn from an already established connection.
-func NewConn(conn io.ReadWriteCloser) (*Conn, error) {
-	return NewConnHandler(conn, NewDefaultHandler(), NewDefaultSignalHandler())
+func NewConn(conn io.ReadWriteCloser, opts ...ConnOption) (*Conn, error) {
+	return newConn(genericTransport{conn}, opts...)
 }
 
 // NewConnHandler creates a new private *Conn from an already established connection, using the supplied handlers.
+// Deprecated: use NewConn with options instead.
 func NewConnHandler(conn io.ReadWriteCloser, handler Handler, signalHandler SignalHandler) (*Conn, error) {
-	return newConn(genericTransport{conn}, handler, signalHandler)
+	return newConn(genericTransport{conn}, WithHandler(handler), WithSignalHandler(signalHandler))
 }
 
 // newConn creates a new *Conn from a transport.
-func newConn(tr transport, handler Handler, signalHandler SignalHandler) (*Conn, error) {
+func newConn(tr transport, opts ...ConnOption) (*Conn, error) {
 	conn := new(Conn)
 	conn.transport = tr
+	for _, opt := range opts {
+		if err := opt(conn); err != nil {
+			return nil, err
+		}
+	}
 	conn.calls = newCallTracker()
-	conn.handler = handler
-	conn.signalHandler = signalHandler
+	if conn.handler == nil {
+		conn.handler = NewDefaultHandler()
+	}
+	if conn.signalHandler == nil {
+		conn.signalHandler = NewDefaultSignalHandler()
+	}
 	conn.outHandler = &outputHandler{conn: conn}
 	conn.serialGen = newSerialGenerator()
 	conn.names = newNameTracker()
