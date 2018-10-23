@@ -35,17 +35,13 @@ type Conn struct {
 	unixFD bool
 	uuid   string
 
-	names *nameTracker
-
-	serialGen *serialGenerator
-
-	calls *callTracker
-
-	handler Handler
-
-	outHandler *outputHandler
-
+	handler       Handler
 	signalHandler SignalHandler
+	serialGen     SerialGenerator
+
+	names      *nameTracker
+	calls      *callTracker
+	outHandler *outputHandler
 
 	eavesdropped    chan<- *Message
 	eavesdroppedLck sync.Mutex
@@ -89,23 +85,20 @@ func getSessionBusAddress() (string, error) {
 }
 
 // SessionBusPrivate returns a new private connection to the session bus.
-func SessionBusPrivate() (*Conn, error) {
+func SessionBusPrivate(opts ...ConnOption) (*Conn, error) {
 	address, err := getSessionBusAddress()
 	if err != nil {
 		return nil, err
 	}
 
-	return Dial(address)
+	return Dial(address, opts...)
 }
 
 // SessionBusPrivate returns a new private connection to the session bus.
+//
 // Deprecated: use SessionBusPrivate with options instead.
 func SessionBusPrivateHandler(handler Handler, signalHandler SignalHandler) (*Conn, error) {
-	address, err := getSessionBusAddress()
-	if err != nil {
-		return nil, err
-	}
-	return Dial(address, WithHandler(handler), WithSignalHandler(signalHandler))
+	return SessionBusPrivate(WithHandler(handler), WithSignalHandler(signalHandler))
 }
 
 // SystemBus returns a shared connection to the system bus, connecting to it if
@@ -138,14 +131,15 @@ func SystemBus() (conn *Conn, err error) {
 }
 
 // SystemBusPrivate returns a new private connection to the system bus.
-func SystemBusPrivate() (*Conn, error) {
-	return Dial(getSystemBusPlatformAddress())
+func SystemBusPrivate(opts ...ConnOption) (*Conn, error) {
+	return Dial(getSystemBusPlatformAddress(), opts...)
 }
 
 // SystemBusPrivateHandler returns a new private connection to the system bus, using the provided handlers.
+//
 // Deprecated: use SystemBusPrivate with options instead.
 func SystemBusPrivateHandler(handler Handler, signalHandler SignalHandler) (*Conn, error) {
-	return Dial(getSystemBusPlatformAddress(), WithHandler(handler), WithSignalHandler(signalHandler))
+	return SystemBusPrivate(WithHandler(handler), WithSignalHandler(signalHandler))
 }
 
 // Dial establishes a new private connection to the message bus specified by address.
@@ -158,19 +152,16 @@ func Dial(address string, opts ...ConnOption) (*Conn, error) {
 }
 
 // DialHandler establishes a new private connection to the message bus specified by address, using the supplied handlers.
+//
 // Deprecated: use Dial with options instead.
 func DialHandler(address string, handler Handler, signalHandler SignalHandler) (*Conn, error) {
-	tr, err := getTransport(address)
-	if err != nil {
-		return nil, err
-	}
-	return newConn(tr, WithHandler(handler), WithSignalHandler(signalHandler))
+	return Dial(address, WithSignalHandler(signalHandler))
 }
 
 // ConnOption is a connection option.
 type ConnOption func(conn *Conn) error
 
-// WithHandler overrides default handler.
+// WithHandler overrides the default handler.
 func WithHandler(handler Handler) ConnOption {
 	return func(conn *Conn) error {
 		conn.handler = handler
@@ -178,10 +169,18 @@ func WithHandler(handler Handler) ConnOption {
 	}
 }
 
-// WithSignalHandler overrides default signal handler.
+// WithSignalHandler overrides the default signal handler.
 func WithSignalHandler(handler SignalHandler) ConnOption {
 	return func(conn *Conn) error {
 		conn.signalHandler = handler
+		return nil
+	}
+}
+
+// WithSerialGenerator overrides the default signals generator.
+func WithSerialGenerator(gen SerialGenerator) ConnOption {
+	return func(conn *Conn) error {
+		conn.serialGen = gen
 		return nil
 	}
 }
@@ -192,9 +191,10 @@ func NewConn(conn io.ReadWriteCloser, opts ...ConnOption) (*Conn, error) {
 }
 
 // NewConnHandler creates a new private *Conn from an already established connection, using the supplied handlers.
+//
 // Deprecated: use NewConn with options instead.
 func NewConnHandler(conn io.ReadWriteCloser, handler Handler, signalHandler SignalHandler) (*Conn, error) {
-	return newConn(genericTransport{conn}, WithHandler(handler), WithSignalHandler(signalHandler))
+	return NewConn(genericTransport{conn}, WithHandler(handler), WithSignalHandler(signalHandler))
 }
 
 // newConn creates a new *Conn from a transport.
@@ -213,8 +213,10 @@ func newConn(tr transport, opts ...ConnOption) (*Conn, error) {
 	if conn.signalHandler == nil {
 		conn.signalHandler = NewDefaultSignalHandler()
 	}
+	if conn.serialGen == nil {
+		conn.serialGen = newSerialGenerator()
+	}
 	conn.outHandler = &outputHandler{conn: conn}
-	conn.serialGen = newSerialGenerator()
 	conn.names = newNameTracker()
 	conn.busObj = conn.Object("org.freedesktop.DBus", "/org/freedesktop/DBus")
 	return conn, nil
@@ -262,9 +264,9 @@ func (conn *Conn) Eavesdrop(ch chan<- *Message) {
 	conn.eavesdroppedLck.Unlock()
 }
 
-// getSerial returns an unused serial.
+// GetSerial returns an unused serial.
 func (conn *Conn) getSerial() uint32 {
-	return conn.serialGen.getSerial()
+	return conn.serialGen.GetSerial()
 }
 
 // Hello sends the initial org.freedesktop.DBus.Hello call. This method must be
@@ -318,9 +320,9 @@ func (conn *Conn) inWorker() {
 		}
 		switch msg.Type {
 		case TypeError:
-			conn.serialGen.retireSerial(conn.calls.handleDBusError(msg))
+			conn.serialGen.RetireSerial(conn.calls.handleDBusError(msg))
 		case TypeMethodReply:
-			conn.serialGen.retireSerial(conn.calls.handleReply(msg))
+			conn.serialGen.RetireSerial(conn.calls.handleReply(msg))
 		case TypeSignal:
 			conn.handleSignal(msg)
 		case TypeMethodCall:
@@ -386,9 +388,9 @@ func (conn *Conn) sendMessageAndIfClosed(msg *Message, ifClosed func()) {
 	err := conn.outHandler.sendAndIfClosed(msg, ifClosed)
 	conn.calls.handleSendError(msg, err)
 	if err != nil {
-		conn.serialGen.retireSerial(msg.serial)
+		conn.serialGen.RetireSerial(msg.serial)
 	} else if msg.Type != TypeMethodCall {
-		conn.serialGen.retireSerial(msg.serial)
+		conn.serialGen.RetireSerial(msg.serial)
 	}
 }
 
@@ -672,7 +674,7 @@ func newSerialGenerator() *serialGenerator {
 	}
 }
 
-func (gen *serialGenerator) getSerial() uint32 {
+func (gen *serialGenerator) GetSerial() uint32 {
 	gen.lck.Lock()
 	defer gen.lck.Unlock()
 	n := gen.nextSerial
@@ -684,7 +686,7 @@ func (gen *serialGenerator) getSerial() uint32 {
 	return n
 }
 
-func (gen *serialGenerator) retireSerial(serial uint32) {
+func (gen *serialGenerator) RetireSerial(serial uint32) {
 	gen.lck.Lock()
 	defer gen.lck.Unlock()
 	delete(gen.serialUsed, serial)

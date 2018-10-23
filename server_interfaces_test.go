@@ -3,6 +3,7 @@ package dbus
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -13,6 +14,8 @@ type tester struct {
 
 	subSigsMu sync.Mutex
 	subSigs   map[string]map[string]struct{}
+
+	serial uint32
 }
 
 type intro struct {
@@ -184,6 +187,12 @@ func (t *tester) Name() string {
 	return t.conn.Names()[0]
 }
 
+func (t *tester) GetSerial() uint32 {
+	return atomic.AddUint32(&t.serial, 1)
+}
+
+func (t *tester) RetireSerial(serial uint32) {}
+
 type intro_fn func() string
 
 func (intro intro_fn) Call(args ...interface{}) ([]interface{}, error) {
@@ -211,7 +220,11 @@ func newTester() (*tester, error) {
 		sigs:    make(chan *Signal),
 		subSigs: make(map[string]map[string]struct{}),
 	}
-	conn, err := SessionBusPrivateHandler(tester, tester)
+	conn, err := SessionBusPrivate(
+		WithHandler(tester),
+		WithSignalHandler(tester),
+		WithSerialGenerator(tester),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -429,7 +442,6 @@ type X struct {
 func (x *X) Method1() *Error {
 	return nil
 }
-
 
 func TestRaceInExport(t *testing.T) {
 	const (
