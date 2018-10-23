@@ -15,7 +15,6 @@ var (
 	systemBusLck  sync.Mutex
 	sessionBus    *Conn
 	sessionBusLck sync.Mutex
-	sessionEnvLck sync.Mutex
 )
 
 // ErrClosed is the error returned by calls on a closed connection.
@@ -82,8 +81,6 @@ func SessionBus() (conn *Conn, err error) {
 }
 
 func getSessionBusAddress() (string, error) {
-	sessionEnvLck.Lock()
-	defer sessionEnvLck.Unlock()
 	address := os.Getenv("DBUS_SESSION_BUS_ADDRESS")
 	if address != "" && address != "autolaunch:" {
 		return address, nil
