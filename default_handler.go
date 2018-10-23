@@ -21,6 +21,8 @@ func newIntrospectIntf(h *defaultHandler) *exportedIntf {
 //NewDefaultHandler returns an instance of the default
 //call handler. This is useful if you want to implement only
 //one of the two handlers but not both.
+//
+// Deprecated: this is the default value, don't use it, it will be unexported.
 func NewDefaultHandler() *defaultHandler {
 	h := &defaultHandler{
 		objects:     make(map[ObjectPath]*exportedObj),
@@ -229,6 +231,8 @@ func (obj *exportedIntf) isFallbackInterface() bool {
 //NewDefaultSignalHandler returns an instance of the default
 //signal handler. This is useful if you want to implement only
 //one of the two handlers but not both.
+//
+// Deprecated: this is the default value, don't use it, it will be unexported.
 func NewDefaultSignalHandler() *defaultSignalHandler {
 	return &defaultSignalHandler{
 		closeChan: make(chan struct{}),
