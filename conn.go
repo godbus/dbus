@@ -267,7 +267,7 @@ func (conn *Conn) Eavesdrop(ch chan<- *Message) {
 	conn.eavesdroppedLck.Unlock()
 }
 
-// GetSerial returns an unused serial.
+// getSerial returns an unused serial.
 func (conn *Conn) getSerial() uint32 {
 	return conn.serialGen.GetSerial()
 }
