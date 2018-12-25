@@ -3,9 +3,10 @@
 package prop
 
 import (
+	"sync"
+
 	"github.com/godbus/dbus"
 	"github.com/godbus/dbus/introspect"
-	"sync"
 )
 
 // EmitType controls how org.freedesktop.DBus.Properties.PropertiesChanged is
@@ -140,14 +141,30 @@ type Properties struct {
 	path dbus.ObjectPath
 }
 
-// New returns a new Properties structure that manages the given properties.
+// New falls back to Export, but it returns nil if properties export fails,
+// swallowing the error, shouldn't be used.
+//
+// Deprecated: use Export instead.
+func New(conn *dbus.Conn, path dbus.ObjectPath, props map[string]map[string]*Prop) *Properties {
+	p, err := Export(conn, path, props)
+	if err != nil {
+		return nil
+	}
+	return p
+}
+
+// Export returns a new Properties structure that manages the given properties.
 // The key for the first-level map of props is the name of the interface; the
 // second-level key is the name of the property. The returned structure will be
 // exported as org.freedesktop.DBus.Properties on path.
-func New(conn *dbus.Conn, path dbus.ObjectPath, props map[string]map[string]*Prop) *Properties {
+func Export(
+	conn *dbus.Conn, path dbus.ObjectPath, props map[string]map[string]*Prop,
+) (*Properties, error) {
 	p := &Properties{m: props, conn: conn, path: path}
-	conn.Export(p, path, "org.freedesktop.DBus.Properties")
-	return p
+	if err := conn.Export(p, path, "org.freedesktop.DBus.Properties"); err != nil {
+		return nil, err
+	}
+	return p, nil
 }
 
 // Get implements org.freedesktop.DBus.Properties.Get.
@@ -209,17 +226,17 @@ func (p *Properties) Introspection(iface string) []introspect.Property {
 
 // set sets the given property and emits PropertyChanged if appropiate. p.mut
 // must already be locked.
-func (p *Properties) set(iface, property string, v interface{}) {
+func (p *Properties) set(iface, property string, v interface{}) error {
 	prop := p.m[iface][property]
 	prop.Value = v
 	switch prop.Emit {
 	case EmitFalse:
-		// do nothing
+		return nil // do nothing
 	case EmitInvalidates:
-		p.conn.Emit(p.path, "org.freedesktop.DBus.Properties.PropertiesChanged",
+		return p.conn.Emit(p.path, "org.freedesktop.DBus.Properties.PropertiesChanged",
 			iface, map[string]dbus.Variant{}, []string{property})
 	case EmitTrue:
-		p.conn.Emit(p.path, "org.freedesktop.DBus.Properties.PropertiesChanged",
+		return p.conn.Emit(p.path, "org.freedesktop.DBus.Properties.PropertiesChanged",
 			iface, map[string]dbus.Variant{property: dbus.MakeVariant(v)},
 			[]string{})
 	default:
@@ -251,7 +268,9 @@ func (p *Properties) Set(iface, property string, newv dbus.Variant) *dbus.Error 
 			return err
 		}
 	}
-	p.set(iface, property, newv.Value())
+	if err := p.set(iface, property, newv.Value()); err != nil {
+		return dbus.MakeFailedError(err)
+	}
 	return nil
 }
 
@@ -259,6 +278,8 @@ func (p *Properties) Set(iface, property string, newv dbus.Variant) *dbus.Error 
 // the property name are invalid.
 func (p *Properties) SetMust(iface, property string, v interface{}) {
 	p.mut.Lock()
-	p.set(iface, property, v)
-	p.mut.Unlock()
+	defer p.mut.Unlock() // unlock in case of panic
+	if err := p.set(iface, property, v); err != nil {
+		panic(err)
+	}
 }
