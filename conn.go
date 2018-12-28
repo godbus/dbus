@@ -381,8 +381,6 @@ func (conn *Conn) Object(dest string, path ObjectPath) BusObject {
 	return &Object{conn, dest, path}
 }
 
-// outWorker runs in an own goroutine, encoding and sending messages that are
-// sent to conn.out.
 func (conn *Conn) sendMessage(msg *Message) {
 	conn.sendMessageAndIfClosed(msg, func() {})
 }
