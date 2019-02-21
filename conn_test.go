@@ -22,6 +22,26 @@ func TestSystemBus(t *testing.T) {
 	}
 }
 
+func ExampleSystemBusPrivate() {
+	setupPrivateSystemBus := func() (conn *Conn, err error) {
+		conn, err = SystemBusPrivate()
+		if err != nil {
+			return nil, err
+		}
+		if err = conn.Auth(nil); err != nil {
+			conn.Close()
+			conn = nil
+			return
+		}
+		if err = conn.Hello(); err != nil {
+			conn.Close()
+			conn = nil
+		}
+		return conn, nil // success
+	}
+	_, _ = setupPrivateSystemBus()
+}
+
 func TestSend(t *testing.T) {
 	bus, err := SessionBus()
 	if err != nil {
