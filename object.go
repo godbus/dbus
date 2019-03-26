@@ -147,7 +147,7 @@ func (o *Object) createCall(ctx context.Context, method string, flags Flags, ch 
 	}
 	if msg.Flags&FlagNoReplyExpected == 0 {
 		if ch == nil {
-			ch = make(chan *Call, 10)
+			ch = make(chan *Call, 1)
 		} else if cap(ch) == 0 {
 			panic("dbus: unbuffered channel passed to (*Object).Go")
 		}
