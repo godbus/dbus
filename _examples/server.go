@@ -27,6 +27,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	f := foo("Bar!")
+	conn.Export(f, "/com/github/guelfey/Demo", "com.github.guelfey.Demo")
+	conn.Export(introspect.Introspectable(intro), "/com/github/guelfey/Demo",
+		"org.freedesktop.DBus.Introspectable")
+
 	reply, err := conn.RequestName("com.github.guelfey.Demo",
 		dbus.NameFlagDoNotQueue)
 	if err != nil {
@@ -36,10 +42,6 @@ func main() {
 		fmt.Fprintln(os.Stderr, "name already taken")
 		os.Exit(1)
 	}
-	f := foo("Bar!")
-	conn.Export(f, "/com/github/guelfey/Demo", "com.github.guelfey.Demo")
-	conn.Export(introspect.Introspectable(intro), "/com/github/guelfey/Demo",
-		"org.freedesktop.DBus.Introspectable")
 	fmt.Println("Listening on com.github.guelfey.Demo / /com/github/guelfey/Demo ...")
 	select {}
 }
