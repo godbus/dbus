@@ -70,3 +70,19 @@ func TestDecodeArrayEmptyStruct(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestSigByteSize(t *testing.T) {
+	for sig, want := range map[string]int{
+		"b":       4,
+		"t":       8,
+		"(yy)":    2,
+		"(y(uu))": 9,
+		"(y(xs))": 0,
+		"s":       0,
+		"ao":      0,
+	} {
+		if have := sigByteSize(sig); have != want {
+			t.Errorf("sigByteSize(%q) = %d, want %d", sig, have, want)
+		}
+	}
+}
