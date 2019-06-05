@@ -504,6 +504,25 @@ func (conn *Conn) sendReply(dest string, serial uint32, values ...interface{}) {
 	conn.sendMessage(msg)
 }
 
+// AddMatchSignal registers the given match rule to receive broadcast
+// signals based on their contents.
+func (conn *Conn) AddMatchSignal(options ...MatchOption) error {
+	options = append([]MatchOption{withMatchType("signal")}, options...)
+	return conn.busObj.Call(
+		"org.freedesktop.DBus.AddMatch", 0,
+		formatMatchOptions(options),
+	).Store()
+}
+
+// RemoveMatchSignal removes the first rule that matches previously registered with AddMatchSignal.
+func (conn *Conn) RemoveMatchSignal(options ...MatchOption) error {
+	options = append([]MatchOption{withMatchType("signal")}, options...)
+	return conn.busObj.Call(
+		"org.freedesktop.DBus.RemoveMatch", 0,
+		formatMatchOptions(options),
+	).Store()
+}
+
 // Signal registers the given channel to be passed all received signal messages.
 //
 // Multiple of these channels can be registered at the same time.
