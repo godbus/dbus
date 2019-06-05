@@ -239,21 +239,17 @@ func NewDefaultSignalHandler() *defaultSignalHandler {
 	}
 }
 
-func isDefaultSignalHandler(handler SignalHandler) bool {
-	_, ok := handler.(*defaultSignalHandler)
-	return ok
-}
-
 type defaultSignalHandler struct {
-	sync.RWMutex
+	mu        sync.RWMutex
+	wg        sync.WaitGroup
 	closed    bool
 	signals   []chan<- *Signal
 	closeChan chan struct{}
 }
 
 func (sh *defaultSignalHandler) DeliverSignal(intf, name string, signal *Signal) {
-	sh.RLock()
-	defer sh.RUnlock()
+	sh.mu.RLock()
+	defer sh.mu.RUnlock()
 	if sh.closed {
 		return
 	}
@@ -263,51 +259,46 @@ func (sh *defaultSignalHandler) DeliverSignal(intf, name string, signal *Signal)
 		case <-sh.closeChan:
 			return
 		default:
+			sh.wg.Add(1)
 			go func(ch chan<- *Signal) {
 				select {
 				case ch <- signal:
 				case <-sh.closeChan:
-					return
 				}
+				sh.wg.Done()
 			}(ch)
 		}
 	}
 }
 
-func (sh *defaultSignalHandler) Init() error {
-	sh.Lock()
-	sh.signals = make([]chan<- *Signal, 0)
-	sh.closeChan = make(chan struct{})
-	sh.Unlock()
-	return nil
-}
-
 func (sh *defaultSignalHandler) Terminate() {
-	sh.Lock()
-	if !sh.closed {
-		close(sh.closeChan)
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
+	if sh.closed {
+		return
 	}
-	sh.closed = true
+
+	close(sh.closeChan)
+	sh.wg.Wait() // wait until all spawned goroutines return
 	for _, ch := range sh.signals {
 		close(ch)
 	}
+	sh.closed = true
 	sh.signals = nil
-	sh.Unlock()
 }
 
-func (sh *defaultSignalHandler) addSignal(ch chan<- *Signal) {
-	sh.Lock()
-	defer sh.Unlock()
+func (sh *defaultSignalHandler) AddSignal(ch chan<- *Signal) {
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
 	if sh.closed {
 		return
 	}
 	sh.signals = append(sh.signals, ch)
-
 }
 
-func (sh *defaultSignalHandler) removeSignal(ch chan<- *Signal) {
-	sh.Lock()
-	defer sh.Unlock()
+func (sh *defaultSignalHandler) RemoveSignal(ch chan<- *Signal) {
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
 	if sh.closed {
 		return
 	}
