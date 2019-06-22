@@ -103,9 +103,9 @@ func TestRemoveSignal(t *testing.T) {
 		t.Errorf("remove signal: signals length not equal: got '%d', want '3'", len(signals))
 	}
 	signals = bus.signalHandler.(*defaultSignalHandler).signals
-	for _, bch := range signals {
-		if bch != ch2 {
-			t.Errorf("remove signal: removed signal present: got '%v', want '%v'", bch, ch2)
+	for _, scd := range signals {
+		if scd.ch != ch2 {
+			t.Errorf("remove signal: removed signal present: got '%v', want '%v'", scd.ch, ch2)
 		}
 	}
 }

@@ -234,17 +234,13 @@ func (obj *exportedIntf) isFallbackInterface() bool {
 //
 // Deprecated: this is the default value, don't use it, it will be unexported.
 func NewDefaultSignalHandler() *defaultSignalHandler {
-	return &defaultSignalHandler{
-		closeChan: make(chan struct{}),
-	}
+	return &defaultSignalHandler{}
 }
 
 type defaultSignalHandler struct {
 	mu        sync.RWMutex
-	wg        sync.WaitGroup
 	closed    bool
-	signals   []chan<- *Signal
-	closeChan chan struct{}
+	signals   []*signalChannelData
 }
 
 func (sh *defaultSignalHandler) DeliverSignal(intf, name string, signal *Signal) {
@@ -253,21 +249,8 @@ func (sh *defaultSignalHandler) DeliverSignal(intf, name string, signal *Signal)
 	if sh.closed {
 		return
 	}
-	for _, ch := range sh.signals {
-		select {
-		case ch <- signal:
-		case <-sh.closeChan:
-			return
-		default:
-			sh.wg.Add(1)
-			go func(ch chan<- *Signal) {
-				select {
-				case ch <- signal:
-				case <-sh.closeChan:
-				}
-				sh.wg.Done()
-			}(ch)
-		}
+	for _, scd := range sh.signals {
+		scd.deliver(signal)
 	}
 }
 
@@ -278,10 +261,9 @@ func (sh *defaultSignalHandler) Terminate() {
 		return
 	}
 
-	close(sh.closeChan)
-	sh.wg.Wait() // wait until all spawned goroutines return
-	for _, ch := range sh.signals {
-		close(ch)
+	for _, scd := range sh.signals {
+		scd.close()
+		close(scd.ch)
 	}
 	sh.closed = true
 	sh.signals = nil
@@ -293,7 +275,10 @@ func (sh *defaultSignalHandler) AddSignal(ch chan<- *Signal) {
 	if sh.closed {
 		return
 	}
-	sh.signals = append(sh.signals, ch)
+	sh.signals = append(sh.signals, &signalChannelData{
+		ch:   ch,
+		done: make(chan struct{}),
+	})
 }
 
 func (sh *defaultSignalHandler) RemoveSignal(ch chan<- *Signal) {
@@ -303,10 +288,41 @@ func (sh *defaultSignalHandler) RemoveSignal(ch chan<- *Signal) {
 		return
 	}
 	for i := len(sh.signals) - 1; i >= 0; i-- {
-		if ch == sh.signals[i] {
+		if ch == sh.signals[i].ch {
+			sh.signals[i].close()
 			copy(sh.signals[i:], sh.signals[i+1:])
 			sh.signals[len(sh.signals)-1] = nil
 			sh.signals = sh.signals[:len(sh.signals)-1]
 		}
 	}
+}
+
+type signalChannelData struct {
+	wg   sync.WaitGroup
+	ch   chan<- *Signal
+	done chan struct{}
+}
+
+func (scd *signalChannelData) deliver(signal *Signal) {
+	select {
+	case scd.ch <- signal:
+	case <-scd.done:
+		return
+	default:
+		scd.wg.Add(1)
+		go scd.deferredDeliver(signal)
+	}
+}
+
+func (scd *signalChannelData) deferredDeliver(signal *Signal) {
+	select {
+	case scd.ch <- signal:
+	case <-scd.done:
+	}
+	scd.wg.Done()
+}
+
+func (scd *signalChannelData) close() {
+	close(scd.done)
+	scd.wg.Wait() // wait until all spawned goroutines return
 }
