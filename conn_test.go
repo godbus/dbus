@@ -172,6 +172,32 @@ func TestCloseBeforeSignal(t *testing.T) {
 	}
 }
 
+func TestCloseChannelAfterRemoveSignal(t *testing.T) {
+	bus, err := NewConn(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add an unbuffered signal channel
+	ch := make(chan *Signal)
+	bus.Signal(ch)
+
+	// Send a signal
+	msg := &Message{
+		Type: TypeSignal,
+		Headers: map[HeaderField]Variant{
+			FieldInterface: MakeVariant("foo.bar"),
+			FieldMember:    MakeVariant("bar"),
+			FieldPath:      MakeVariant(ObjectPath("/baz")),
+		},
+	}
+	bus.handleSignal(msg)
+
+	// Remove and close the signal channel
+	bus.RemoveSignal(ch)
+	close(ch)
+}
+
 func TestAddAndRemoveMatchSignal(t *testing.T) {
 	conn, err := SessionBusPrivate()
 	if err != nil {
