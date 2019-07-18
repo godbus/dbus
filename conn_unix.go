@@ -4,7 +4,6 @@ package dbus
 
 import (
 	"os"
-	"fmt"
 )
 
 const defaultSystemBusAddress = "unix:path=/var/run/dbus/system_bus_socket"
