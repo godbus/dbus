@@ -87,7 +87,7 @@ func TestProto(t *testing.T) {
 		bigEnc := newEncoder(buf, binary.BigEndian)
 		bigEnc.Encode(v.vs...)
 		marshalled := buf.Bytes()
-		if bytes.Compare(marshalled, v.bigEndian) != 0 {
+		if !bytes.Equal(marshalled, v.bigEndian) {
 			t.Errorf("test %d (marshal be): got '%v', but expected '%v'\n", i+1, marshalled,
 				v.bigEndian)
 		}
@@ -95,7 +95,7 @@ func TestProto(t *testing.T) {
 		litEnc := newEncoder(buf, binary.LittleEndian)
 		litEnc.Encode(v.vs...)
 		marshalled = buf.Bytes()
-		if bytes.Compare(marshalled, v.littleEndian) != 0 {
+		if !bytes.Equal(marshalled, v.littleEndian) {
 			t.Errorf("test %d (marshal le): got '%v', but expected '%v'\n", i+1, marshalled,
 				v.littleEndian)
 		}
