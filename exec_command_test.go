@@ -48,8 +48,8 @@ DBUS_SESSION_BUS_WINDOWID=16777217`
 	expErr := "dbus: couldn't determine address of session bus"
 
 	out, err := getSessionBusPlatformAddress()
-	if string(out) != expOut {
-		t.Errorf("Expected %q, got %q", expOut, string(out))
+	if out != expOut {
+		t.Errorf("Expected %q, got %q", expOut, out)
 	}
 	if err == nil {
 		t.Error("Excepted error, got none")
