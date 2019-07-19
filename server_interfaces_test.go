@@ -371,6 +371,9 @@ func TestHandlerIntrospect(t *testing.T) {
 	obj := conn.Object(tester.Name(), "/com/github/godbus/tester")
 	var out string
 	err = obj.Call("org.freedesktop.DBus.Introspectable.Introspect", 0).Store(&out)
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
 	expected := `<node>
     <interface name="org.freedesktop.DBus.Introspectable.Introspect">
         <method name="Introspect">
@@ -405,6 +408,9 @@ func TestHandlerIntrospectPath(t *testing.T) {
 	obj := conn.Object(tester.Name(), "/com/github/godbus")
 	var out string
 	err = obj.Call("org.freedesktop.DBus.Introspectable.Introspect", 0).Store(&out)
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
 	expected := `<node><node name="tester"></node></node>`
 	if out != expected {
 		t.Errorf("didn't get expected return value, expected %s got %s", expected, out)
