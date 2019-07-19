@@ -238,9 +238,9 @@ func NewDefaultSignalHandler() *defaultSignalHandler {
 }
 
 type defaultSignalHandler struct {
-	mu        sync.RWMutex
-	closed    bool
-	signals   []*signalChannelData
+	mu      sync.RWMutex
+	closed  bool
+	signals []*signalChannelData
 }
 
 func (sh *defaultSignalHandler) DeliverSignal(intf, name string, signal *Signal) {
