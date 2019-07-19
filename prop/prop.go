@@ -117,7 +117,7 @@ type Prop struct {
 	Emit EmitType
 
 	// If not nil, anytime this property is changed by Set, this function is
-	// called with an appropiate Change as its argument. If the returned error
+	// called with an appropriate Change as its argument. If the returned error
 	// is not nil, it is sent back to the caller of Set and the property is not
 	// changed.
 	Callback func(*Change) *dbus.Error
@@ -224,7 +224,7 @@ func (p *Properties) Introspection(iface string) []introspect.Property {
 	return s
 }
 
-// set sets the given property and emits PropertyChanged if appropiate. p.mut
+// set sets the given property and emits PropertyChanged if appropriate. p.mut
 // must already be locked.
 func (p *Properties) set(iface, property string, v interface{}) error {
 	prop := p.m[iface][property]
