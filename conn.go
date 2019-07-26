@@ -30,6 +30,9 @@ var ErrClosed = errors.New("dbus: connection closed by user")
 type Conn struct {
 	transport
 
+	ctx       context.Context
+	cancelCtx context.CancelFunc
+
 	busObj BusObject
 	unixFD bool
 	uuid   string
@@ -210,6 +213,14 @@ func WithOutgoingInterceptor(interceptor Interceptor) ConnOption {
 	}
 }
 
+// WithContext overrides  the default context for the connection.
+func WithContext(ctx context.Context) ConnOption {
+	return func(conn *Conn) error {
+		conn.ctx = ctx
+		return nil
+	}
+}
+
 // NewConn creates a new private *Conn from an already established connection.
 func NewConn(conn io.ReadWriteCloser, opts ...ConnOption) (*Conn, error) {
 	return newConn(genericTransport{conn}, opts...)
@@ -231,6 +242,10 @@ func newConn(tr transport, opts ...ConnOption) (*Conn, error) {
 			return nil, err
 		}
 	}
+	if conn.ctx == nil {
+		conn.ctx = context.Background()
+	}
+	conn.ctx, conn.cancelCtx = context.WithCancel(conn.ctx)
 	conn.calls = newCallTracker()
 	if conn.handler == nil {
 		conn.handler = NewDefaultHandler()
@@ -272,7 +287,15 @@ func (conn *Conn) Close() error {
 	}
 	conn.eavesdroppedLck.Unlock()
 
+	conn.cancelCtx()
+
 	return conn.transport.Close()
+}
+
+// Context returns the context associated with the connection.  The
+// context will be cancelled when the connection is closed.
+func (conn *Conn) Context() context.Context {
+	return conn.ctx
 }
 
 // Eavesdrop causes conn to send all incoming messages to the given channel
