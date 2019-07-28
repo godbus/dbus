@@ -1,6 +1,7 @@
 package dbus
 
 import (
+	"context"
 	"encoding/binary"
 	"io"
 	"io/ioutil"
@@ -451,5 +452,109 @@ func TestInterceptors(t *testing.T) {
 	}
 	if err = conn.Hello(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestCloseCancelsConnectionContext(t *testing.T) {
+	bus, err := SessionBusPrivate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer bus.Close()
+
+	if err = bus.Auth(nil); err != nil {
+		t.Fatal(err)
+	}
+	if err = bus.Hello(); err != nil {
+		t.Fatal(err)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The context is not done at this point
+	ctx := bus.Context()
+	select {
+	case <-ctx.Done():
+		t.Fatal("context should not be done")
+	default:
+	}
+
+	err = bus.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-ctx.Done():
+		// expected
+	case <-time.After(5 * time.Second):
+		t.Fatal("context is not done after connection closed")
+	}
+}
+
+func TestDisconnectCancelsConnectionContext(t *testing.T) {
+	reader, pipewriter := io.Pipe()
+	defer pipewriter.Close()
+	defer reader.Close()
+
+	bus, err := NewConn(rwc{Reader: reader, Writer: ioutil.Discard})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	go func() {
+		_, err := pipewriter.Write([]byte("REJECTED name\r\nOK myuuid\r\n"))
+		if err != nil {
+			t.Errorf("error writing to pipe: %v", err)
+		}
+	}()
+	err = bus.Auth([]Auth{fakeAuth{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := bus.Context()
+
+	pipewriter.Close()
+	select {
+	case <-ctx.Done():
+		// expected
+	case <-time.After(5 * time.Second):
+		t.Fatal("context is not done after connection closed")
+	}
+}
+
+func TestCancellingContextClosesConnection(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	reader, pipewriter := io.Pipe()
+	defer pipewriter.Close()
+	defer reader.Close()
+
+	bus, err := NewConn(rwc{Reader: reader, Writer: ioutil.Discard}, WithContext(ctx))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	go func() {
+		_, err := pipewriter.Write([]byte("REJECTED name\r\nOK myuuid\r\n"))
+		if err != nil {
+			t.Errorf("error writing to pipe: %v", err)
+		}
+	}()
+	err = bus.Auth([]Auth{fakeAuth{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Cancel the connection's parent context and give time for
+	// other goroutines to schedule.
+	cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	err = bus.BusObject().Call("org.freedesktop.DBus.Peer.Ping", 0).Store()
+	if err != ErrClosed {
+		t.Errorf("expected connection to be closed, but got: %v", err)
 	}
 }
