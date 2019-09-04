@@ -3,9 +3,9 @@ language: go
 go_import_path: github.com/godbus/dbus
 
 go:
-  - 1.10.x
   - 1.11.x
   - 1.12.x
+  - 1.13.x
   - tip
 
 env:
@@ -38,6 +38,7 @@ addons:
     - dbus-x11
 
 before_install:
+  - export GO111MODULE=on
 
 script:
   - go test -v -race -mod=readonly ./...     # Run all the tests with the race detector enabled
