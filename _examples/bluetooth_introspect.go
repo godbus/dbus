@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/godbus/dbus"
+	"github.com/godbus/dbus/v5"
 )
 
 func main() {

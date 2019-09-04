@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/godbus/dbus"
 	"os"
+
+	"github.com/godbus/dbus/v5"
 )
 
 func main() {

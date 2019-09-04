@@ -2,9 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/godbus/dbus"
-	"github.com/godbus/dbus/introspect"
 	"os"
+
+	"github.com/godbus/dbus/v5"
+	"github.com/godbus/dbus/v5/introspect"
 )
 
 func main() {
