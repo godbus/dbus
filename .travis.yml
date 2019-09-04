@@ -40,5 +40,5 @@ addons:
 before_install:
 
 script:
-  - go test -v -race ./...                   # Run all the tests with the race detector enabled
+  - go test -v -race -mod=readonly ./...     # Run all the tests with the race detector enabled
   - go vet ./...                             # go vet is the official Go static analyzer
