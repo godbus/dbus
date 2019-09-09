@@ -407,10 +407,6 @@ func (conn *Conn) Object(dest string, path ObjectPath) BusObject {
 	return &Object{conn, dest, path}
 }
 
-func (conn *Conn) sendMessage(msg *Message) {
-	conn.sendMessageAndIfClosed(msg, func() {})
-}
-
 func (conn *Conn) sendMessageAndIfClosed(msg *Message, ifClosed func()) {
 	if conn.outInt != nil {
 		conn.outInt(msg)
