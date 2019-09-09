@@ -38,6 +38,8 @@ type Conn struct {
 	handler       Handler
 	signalHandler SignalHandler
 	serialGen     SerialGenerator
+	inInt         Interceptor
+	outInt        Interceptor
 
 	names      *nameTracker
 	calls      *callTracker
@@ -190,6 +192,25 @@ func WithSerialGenerator(gen SerialGenerator) ConnOption {
 	}
 }
 
+// Interceptor intercepts incoming and outgoing messages.
+type Interceptor func(msg *Message)
+
+// WithIncomingInterceptor sets the given interceptor for incoming messages.
+func WithIncomingInterceptor(interceptor Interceptor) ConnOption {
+	return func(conn *Conn) error {
+		conn.inInt = interceptor
+		return nil
+	}
+}
+
+// WithOutgoingInterceptor sets the given interceptor for outgoing messages.
+func WithOutgoingInterceptor(interceptor Interceptor) ConnOption {
+	return func(conn *Conn) error {
+		conn.outInt = interceptor
+		return nil
+	}
+}
+
 // NewConn creates a new private *Conn from an already established connection.
 func NewConn(conn io.ReadWriteCloser, opts ...ConnOption) (*Conn, error) {
 	return newConn(genericTransport{conn}, opts...)
@@ -323,6 +344,10 @@ func (conn *Conn) inWorker() {
 			// Ignore it.
 			continue
 		}
+
+		if conn.inInt != nil {
+			conn.inInt(msg)
+		}
 		switch msg.Type {
 		case TypeError:
 			conn.serialGen.RetireSerial(conn.calls.handleDBusError(msg))
@@ -388,6 +413,9 @@ func (conn *Conn) sendMessage(msg *Message) {
 }
 
 func (conn *Conn) sendMessageAndIfClosed(msg *Message, ifClosed func()) {
+	if conn.outInt != nil {
+		conn.outInt(msg)
+	}
 	err := conn.outHandler.sendAndIfClosed(msg, ifClosed)
 	conn.calls.handleSendError(msg, err)
 	if err != nil {
@@ -483,7 +511,7 @@ func (conn *Conn) sendError(err error, dest string, serial uint32) {
 	if len(e.Body) > 0 {
 		msg.Headers[FieldSignature] = MakeVariant(SignatureOf(e.Body...))
 	}
-	conn.sendMessage(msg)
+	conn.sendMessageAndIfClosed(msg, nil)
 }
 
 // sendReply creates a method reply message corresponding to the parameters and
@@ -501,7 +529,7 @@ func (conn *Conn) sendReply(dest string, serial uint32, values ...interface{}) {
 	if len(values) > 0 {
 		msg.Headers[FieldSignature] = MakeVariant(SignatureOf(values...))
 	}
-	conn.sendMessage(msg)
+	conn.sendMessageAndIfClosed(msg, nil)
 }
 
 // AddMatchSignal registers the given match rule to receive broadcast
@@ -671,7 +699,9 @@ func (h *outputHandler) sendAndIfClosed(msg *Message, ifClosed func()) error {
 	h.closed.lck.RLock()
 	defer h.closed.lck.RUnlock()
 	if h.closed.isClosed {
-		ifClosed()
+		if ifClosed != nil {
+			ifClosed()
+		}
 		return nil
 	}
 	h.sendLck.Lock()

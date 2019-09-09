@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"io"
 	"io/ioutil"
+	"log"
 	"testing"
 	"time"
 )
@@ -428,5 +429,27 @@ func TestGetKey(t *testing.T) {
 	}
 	if family := getKey(keys, "family"); family != "ipv4" {
 		t.Error(`Expected "ipv4", got`, family)
+	}
+}
+
+func TestInterceptors(t *testing.T) {
+	conn, err := SessionBusPrivate(
+		WithIncomingInterceptor(func(msg *Message) {
+			log.Println("<", msg)
+		}),
+		WithOutgoingInterceptor(func(msg *Message) {
+			log.Println(">", msg)
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	if err = conn.Auth(nil); err != nil {
+		t.Fatal(err)
+	}
+	if err = conn.Hello(); err != nil {
+		t.Fatal(err)
 	}
 }
