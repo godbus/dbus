@@ -45,6 +45,7 @@ type Conn struct {
 	serialGen     SerialGenerator
 	inInt         Interceptor
 	outInt        Interceptor
+	auth          []Auth
 
 	names      *nameTracker
 	calls      *callTracker
@@ -67,19 +68,7 @@ func SessionBus() (conn *Conn, err error) {
 			sessionBus = conn
 		}
 	}()
-	conn, err = SessionBusPrivate()
-	if err != nil {
-		return
-	}
-	if err = conn.Auth(nil); err != nil {
-		conn.Close()
-		conn = nil
-		return
-	}
-	if err = conn.Hello(); err != nil {
-		conn.Close()
-		conn = nil
-	}
+	conn, err = ConnectSessionBus()
 	return
 }
 
@@ -124,20 +113,42 @@ func SystemBus() (conn *Conn, err error) {
 			systemBus = conn
 		}
 	}()
-	conn, err = SystemBusPrivate()
+	conn, err = ConnectSystemBus()
+	return
+}
+
+// ConnectSessionBus connects to the session bus.
+func ConnectSessionBus(opts ...ConnOption) (*Conn, error) {
+	address, err := getSessionBusAddress()
 	if err != nil {
-		return
+		return nil, err
 	}
-	if err = conn.Auth(nil); err != nil {
-		conn.Close()
-		conn = nil
-		return
+	return Connect(address, opts...)
+}
+
+// ConnectSystemBus connects to the system bus.
+func ConnectSystemBus(opts ...ConnOption) (*Conn, error) {
+	return Connect(getSystemBusPlatformAddress(), opts...)
+}
+
+// Connect connects to the given address.
+//
+// Returned connection is ready to use and doesn't require calling
+// Auth and Hello methods to make it usable.
+func Connect(address string, opts ...ConnOption) (*Conn, error) {
+	conn, err := Dial(address, opts...)
+	if err != nil {
+		return nil, err
+	}
+	if err = conn.Auth(conn.auth); err != nil {
+		_ = conn.Close()
+		return nil, err
 	}
 	if err = conn.Hello(); err != nil {
-		conn.Close()
-		conn = nil
+		_ = conn.Close()
+		return nil, err
 	}
-	return
+	return conn, nil
 }
 
 // SystemBusPrivate returns a new private connection to the system bus.
@@ -193,6 +204,14 @@ func WithSignalHandler(handler SignalHandler) ConnOption {
 func WithSerialGenerator(gen SerialGenerator) ConnOption {
 	return func(conn *Conn) error {
 		conn.serialGen = gen
+		return nil
+	}
+}
+
+// WithAuth sets authentication methods for the auth conversation.
+func WithAuth(methods ...Auth) ConnOption {
+	return func(conn *Conn) error {
+		conn.auth = methods
 		return nil
 	}
 }

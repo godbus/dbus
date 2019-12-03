@@ -201,18 +201,11 @@ func TestCloseChannelAfterRemoveSignal(t *testing.T) {
 }
 
 func TestAddAndRemoveMatchSignal(t *testing.T) {
-	conn, err := SessionBusPrivate()
+	conn, err := ConnectSessionBus()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer conn.Close()
-
-	if err = conn.Auth(nil); err != nil {
-		t.Fatal(err)
-	}
-	if err = conn.Hello(); err != nil {
-		t.Fatal(err)
-	}
 
 	sigc := make(chan *Signal, 1)
 	conn.Signal(sigc)
@@ -324,14 +317,8 @@ func BenchmarkServe(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	cli, err := SessionBusPrivate()
+	cli, err := ConnectSessionBus()
 	if err != nil {
-		b.Fatal(err)
-	}
-	if err = cli.Auth(nil); err != nil {
-		b.Fatal(err)
-	}
-	if err = cli.Hello(); err != nil {
 		b.Fatal(err)
 	}
 	benchmarkServe(b, srv, cli)
@@ -343,14 +330,8 @@ func BenchmarkServeAsync(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	cli, err := SessionBusPrivate()
+	cli, err := ConnectSessionBus()
 	if err != nil {
-		b.Fatal(err)
-	}
-	if err = cli.Auth(nil); err != nil {
-		b.Fatal(err)
-	}
-	if err = cli.Hello(); err != nil {
 		b.Fatal(err)
 	}
 	benchmarkServeAsync(b, srv, cli)
@@ -434,7 +415,7 @@ func TestGetKey(t *testing.T) {
 }
 
 func TestInterceptors(t *testing.T) {
-	conn, err := SessionBusPrivate(
+	conn, err := ConnectSessionBus(
 		WithIncomingInterceptor(func(msg *Message) {
 			log.Println("<", msg)
 		}),
@@ -446,31 +427,14 @@ func TestInterceptors(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.Close()
-
-	if err = conn.Auth(nil); err != nil {
-		t.Fatal(err)
-	}
-	if err = conn.Hello(); err != nil {
-		t.Fatal(err)
-	}
 }
 
 func TestCloseCancelsConnectionContext(t *testing.T) {
-	bus, err := SessionBusPrivate()
+	bus, err := ConnectSessionBus()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer bus.Close()
-
-	if err = bus.Auth(nil); err != nil {
-		t.Fatal(err)
-	}
-	if err = bus.Hello(); err != nil {
-		t.Fatal(err)
-	}
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	// The context is not done at this point
 	ctx := bus.Context()

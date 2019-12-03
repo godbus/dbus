@@ -19,10 +19,11 @@ func (o objectGoContextServer) Sleep() *Error {
 }
 
 func TestObjectGoWithContextTimeout(t *testing.T) {
-	bus, err := SessionBus()
+	bus, err := ConnectSessionBus()
 	if err != nil {
 		t.Fatalf("Unexpected error connecting to session bus: %s", err)
 	}
+	defer bus.Close()
 
 	name := bus.Names()[0]
 	bus.Export(objectGoContextServer{t, time.Second}, "/org/dannin/DBus/Test", "org.dannin.DBus.Test")
