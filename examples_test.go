@@ -3,21 +3,25 @@ package dbus
 import "fmt"
 
 func ExampleConn_Emit() {
-	conn, err := SessionBus()
+	conn, err := ConnectSystemBus()
 	if err != nil {
 		panic(err)
 	}
+	defer conn.Close()
 
-	conn.Emit("/foo/bar", "foo.bar.Baz", uint32(0xDAEDBEEF))
+	if err := conn.Emit("/foo/bar", "foo.bar.Baz", uint32(0xDAEDBEEF)); err != nil {
+		panic(err)
+	}
 }
 
 func ExampleObject_Call() {
 	var list []string
 
-	conn, err := SessionBus()
+	conn, err := ConnectSessionBus()
 	if err != nil {
 		panic(err)
 	}
+	defer conn.Close()
 
 	err = conn.BusObject().Call("org.freedesktop.DBus.ListNames", 0).Store(&list)
 	if err != nil {
@@ -29,10 +33,11 @@ func ExampleObject_Call() {
 }
 
 func ExampleObject_Go() {
-	conn, err := SessionBus()
+	conn, err := ConnectSessionBus()
 	if err != nil {
 		panic(err)
 	}
+	defer conn.Close()
 
 	ch := make(chan *Call, 10)
 	conn.BusObject().Go("org.freedesktop.DBus.ListActivatableNames", 0, ch)

@@ -219,22 +219,12 @@ func newTester() (*tester, error) {
 		sigs:    make(chan *Signal),
 		subSigs: make(map[string]map[string]struct{}),
 	}
-	conn, err := SessionBusPrivate(
+	conn, err := ConnectSessionBus(
 		WithHandler(tester),
 		WithSignalHandler(tester),
 		WithSerialGenerator(tester),
 	)
 	if err != nil {
-		return nil, err
-	}
-	err = conn.Auth(nil)
-	if err != nil {
-		conn.Close()
-		return nil, err
-	}
-	err = conn.Hello()
-	if err != nil {
-		conn.Close()
 		return nil, err
 	}
 	tester.conn = conn
