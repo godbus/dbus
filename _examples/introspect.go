@@ -9,10 +9,12 @@ import (
 )
 
 func main() {
-	conn, err := dbus.SessionBus()
+	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		panic(err)
 	}
+	defer conn.Close()
+
 	node, err := introspect.Call(conn.Object("org.freedesktop.DBus", "/org/freedesktop/DBus"))
 	if err != nil {
 		panic(err)

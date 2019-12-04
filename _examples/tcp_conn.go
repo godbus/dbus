@@ -47,12 +47,11 @@ func run(addr string) error {
 	if err != nil {
 		return err
 	}
-	conn, err := dbus.Dial("tcp:host=" + host + ",port=" + port)
+	conn, err := dbus.Connect("tcp:host="+host+",port="+port, dbus.WithAuth(dbus.AuthAnonymous()))
 	if err != nil {
 		return err
 	}
-	if err = conn.Auth([]dbus.Auth{dbus.AuthAnonymous()}); err != nil {
-		return err
-	}
-	return conn.Hello()
+	defer conn.Close()
+	fmt.Println("connected to D-Bus over TCP")
+	return nil
 }
