@@ -24,6 +24,26 @@ func TestSystemBus(t *testing.T) {
 	}
 }
 
+func TestConnectSessionBus(t *testing.T) {
+	conn, err := ConnectSessionBus()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = conn.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestConnectSystemBus(t *testing.T) {
+	conn, err := ConnectSystemBus()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = conn.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func ExampleSystemBusPrivate() {
 	setupPrivateSystemBus := func() (conn *Conn, err error) {
 		conn, err = SystemBusPrivate()
