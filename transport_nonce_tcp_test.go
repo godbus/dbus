@@ -26,14 +26,11 @@ func TestTcpNonceConnection(t *testing.T) {
 `)
 	defer process.Kill()
 
-	c, err := Dial(addr)
+	conn, err := Connect(addr, WithAuth(AuthAnonymous()))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = c.Auth([]Auth{AuthAnonymous()}); err != nil {
-		t.Fatal(err)
-	}
-	if err = c.Hello(); err != nil {
+	if err = conn.Close(); err != nil {
 		t.Fatal(err)
 	}
 }

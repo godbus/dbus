@@ -40,10 +40,11 @@ func TestObjectGoWithContextTimeout(t *testing.T) {
 }
 
 func TestObjectGoWithContext(t *testing.T) {
-	bus, err := SessionBus()
+	bus, err := ConnectSessionBus()
 	if err != nil {
 		t.Fatalf("Unexpected error connecting to session bus: %s", err)
 	}
+	defer bus.Close()
 
 	name := bus.Names()[0]
 	bus.Export(objectGoContextServer{t, time.Millisecond}, "/org/dannin/DBus/Test", "org.dannin.DBus.Test")
@@ -76,10 +77,11 @@ func fetchSignal(t *testing.T, ch chan *Signal, timeout time.Duration) *Signal {
 }
 
 func TestObjectSignalHandling(t *testing.T) {
-	bus, err := SessionBus()
+	bus, err := ConnectSessionBus()
 	if err != nil {
 		t.Fatalf("Unexpected error connecting to session bus: %s", err)
 	}
+	defer bus.Close()
 
 	name := bus.Names()[0]
 	path := ObjectPath("/org/godbus/DBus/TestSignals")

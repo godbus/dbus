@@ -44,31 +44,13 @@ func TestConnectSystemBus(t *testing.T) {
 	}
 }
 
-func ExampleSystemBusPrivate() {
-	setupPrivateSystemBus := func() (conn *Conn, err error) {
-		conn, err = SystemBusPrivate()
-		if err != nil {
-			return nil, err
-		}
-		if err = conn.Auth(nil); err != nil {
-			conn.Close()
-			conn = nil
-			return
-		}
-		if err = conn.Hello(); err != nil {
-			conn.Close()
-			conn = nil
-		}
-		return conn, nil // success
-	}
-	_, _ = setupPrivateSystemBus()
-}
-
 func TestSend(t *testing.T) {
-	bus, err := SessionBus()
+	bus, err := ConnectSessionBus()
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer bus.Close()
+
 	ch := make(chan *Call, 1)
 	msg := &Message{
 		Type:  TypeMethodCall,
@@ -88,10 +70,12 @@ func TestSend(t *testing.T) {
 }
 
 func TestFlagNoReplyExpectedSend(t *testing.T) {
-	bus, err := SessionBus()
+	bus, err := ConnectSessionBus()
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer bus.Close()
+
 	done := make(chan struct{})
 	go func() {
 		bus.BusObject().Call("org.freedesktop.DBus.ListNames", FlagNoReplyExpected)
@@ -282,10 +266,12 @@ func BenchmarkCall(b *testing.B) {
 	b.StopTimer()
 	b.ReportAllocs()
 	var s string
-	bus, err := SessionBus()
+	bus, err := ConnectSessionBus()
 	if err != nil {
 		b.Fatal(err)
 	}
+	defer bus.Close()
+
 	name := bus.Names()[0]
 	obj := bus.BusObject()
 	b.StartTimer()
@@ -303,10 +289,12 @@ func BenchmarkCall(b *testing.B) {
 func BenchmarkCallAsync(b *testing.B) {
 	b.StopTimer()
 	b.ReportAllocs()
-	bus, err := SessionBus()
+	bus, err := ConnectSessionBus()
 	if err != nil {
 		b.Fatal(err)
 	}
+	defer bus.Close()
+
 	name := bus.Names()[0]
 	obj := bus.BusObject()
 	c := make(chan *Call, 50)
@@ -333,46 +321,56 @@ func BenchmarkCallAsync(b *testing.B) {
 
 func BenchmarkServe(b *testing.B) {
 	b.StopTimer()
-	srv, err := SessionBus()
+	srv, err := ConnectSessionBus()
 	if err != nil {
 		b.Fatal(err)
 	}
+	defer srv.Close()
+
 	cli, err := ConnectSessionBus()
 	if err != nil {
 		b.Fatal(err)
 	}
+	defer cli.Close()
+
 	benchmarkServe(b, srv, cli)
 }
 
 func BenchmarkServeAsync(b *testing.B) {
 	b.StopTimer()
-	srv, err := SessionBus()
+	srv, err := ConnectSessionBus()
 	if err != nil {
 		b.Fatal(err)
 	}
+	defer srv.Close()
+
 	cli, err := ConnectSessionBus()
 	if err != nil {
 		b.Fatal(err)
 	}
+	defer cli.Close()
+
 	benchmarkServeAsync(b, srv, cli)
 }
 
 func BenchmarkServeSameConn(b *testing.B) {
 	b.StopTimer()
-	bus, err := SessionBus()
+	bus, err := ConnectSessionBus()
 	if err != nil {
 		b.Fatal(err)
 	}
+	defer bus.Close()
 
 	benchmarkServe(b, bus, bus)
 }
 
 func BenchmarkServeSameConnAsync(b *testing.B) {
 	b.StopTimer()
-	bus, err := SessionBus()
+	bus, err := ConnectSessionBus()
 	if err != nil {
 		b.Fatal(err)
 	}
+	defer bus.Close()
 
 	benchmarkServeAsync(b, bus, bus)
 }
