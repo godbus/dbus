@@ -24,10 +24,11 @@ func (f foo) Foo() (string, *dbus.Error) {
 }
 
 func main() {
-	conn, err := dbus.SessionBus()
+	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		panic(err)
 	}
+	defer conn.Close()
 
 	f := foo("Bar!")
 	conn.Export(f, "/com/github/guelfey/Demo", "com.github.guelfey.Demo")

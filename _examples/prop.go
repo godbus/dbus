@@ -17,10 +17,12 @@ func (f foo) Foo() (string, *dbus.Error) {
 }
 
 func main() {
-	conn, err := dbus.SessionBus()
+	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		panic(err)
 	}
+	defer conn.Close()
+
 	reply, err := conn.RequestName("com.github.guelfey.Demo",
 		dbus.NameFlagDoNotQueue)
 	if err != nil {
