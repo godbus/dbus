@@ -3,6 +3,7 @@ package dbus
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -197,7 +198,7 @@ func TestCloseChannelAfterRemoveSignal(t *testing.T) {
 			FieldPath:      MakeVariant(ObjectPath("/baz")),
 		},
 	}
-	bus.handleSignal(msg)
+	bus.handleSignal(Sequence(1), msg)
 
 	// Remove and close the signal channel
 	bus.RemoveSignal(ch)
@@ -254,6 +255,163 @@ func waitSignal(sigc <-chan *Signal, name string, timeout time.Duration) *Signal
 			return nil
 		}
 	}
+}
+
+const (
+	SCPPInterface         = "org.godbus.DBus.StatefulTest"
+	SCPPPath              = "/org/godbus/DBus/StatefulTest"
+	SCPPChangedSignalName = "Changed"
+	SCPPStateMethodName   = "State"
+)
+
+func TestStateCachingProxyPattern(t *testing.T) {
+	srv, err := ConnectSessionBus()
+	defer srv.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	conn, err := ConnectSessionBus(WithSignalHandler(NewSequentialSignalHandler()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	serviceName := srv.Names()[0]
+	messages := make(chan *Message)
+	srv.Eavesdrop(messages)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	defer cancel()
+
+	done := make(chan bool)
+	go func() {
+		if err := serverProcess(ctx, srv, messages, t); err != nil {
+			t.Errorf("error in server process: %v", err)
+			cancel()
+		}
+		done <- true
+	}()
+	go func() {
+		if err := clientProcess(ctx, conn, serviceName, t); err != nil {
+			t.Errorf("error in client process: %v", err)
+		}
+		// Cancel the server process.
+		cancel()
+		done <- true
+	}()
+	<-done
+	<-done
+}
+
+func clientProcess(ctx context.Context, conn *Conn, serviceName string, t *testing.T) error {
+	// Subscribe to state changes on the remote object
+	if err := conn.AddMatchSignal(
+		WithMatchInterface(SCPPInterface),
+		WithMatchMember(SCPPChangedSignalName),
+	); err != nil {
+		return err
+	}
+	channel := make(chan *Signal)
+	conn.Signal(channel)
+	t.Log("Subscribed to events")
+
+	// Simulate unfavourable OS scheduling leading to a delay between subscription
+	// and querying for the current state.
+	time.Sleep(30 * time.Millisecond)
+
+	// Call .State() on the remote object to get its current state and store in observedStates[0].
+	obj := conn.Object(serviceName, SCPPPath)
+	observedStates := make([]uint64, 1)
+	call := obj.CallWithContext(ctx, SCPPInterface+"."+SCPPStateMethodName, 0)
+	if err := call.Store(&observedStates[0]); err != nil {
+		return err
+	}
+	t.Logf("Queried current state, got %v", observedStates[0])
+
+	// Populate observedStates[1...49] based on the state change signals,
+	// ignoring signals with a sequence number less than call.ResponseSequence so that we ignore past events.
+readSignals:
+	for {
+		select {
+		case signal := <-channel:
+			if signal.Name == SCPPInterface+"."+SCPPChangedSignalName && signal.Sequence > call.ResponseSequence {
+				observedState := signal.Body[0].(uint64)
+				observedStates = append(observedStates, observedState)
+				// Observing at least 50 states gives us low probability that we received a contiguous subsequence of states 'by accident'
+				if len(observedStates) >= 50 {
+					break readSignals
+				}
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
+	// Expect that we begun observing at least a few states in. This ensures the server was already emitting events
+	// and makes it likely we simulated our race condition.
+	if observedStates[0] < 10 {
+		return fmt.Errorf("expected first state to be at least 10, got %v", observedStates[0])
+	}
+
+	t.Logf("Observed states: %v", observedStates)
+
+	// The observable states of the remote object were [1 ... (infinity)] during this test.
+	// This loop is intended to assert that our observed states are a contiguous subgrange [n ... n+99] for some n, i.e.
+	// that we received a contiguous subsequence of the states of the remote object. For each run of the test, n
+	// may be slightly different due to scheduling effects.
+	for i := 0; i < len(observedStates); i++ {
+		expectedState := observedStates[0] + uint64(i)
+		if observedStates[i] != expectedState {
+			return fmt.Errorf("expected observed state %v to be %v, got %v", i, expectedState, observedStates[i])
+		}
+	}
+	return nil
+}
+
+func serverProcess(ctx context.Context, srv *Conn, messages <-chan *Message, t *testing.T) error {
+	state := uint64(0)
+
+	ticker := time.NewTicker(time.Millisecond)
+	defer ticker.Stop()
+
+process:
+	for {
+		select {
+		case msg, ok := <-messages:
+			if !ok {
+				t.Log("Message channel closed")
+				// Message channel closed.
+				break process
+			}
+			if msg.IsValid() != nil {
+				continue process
+			}
+			name := msg.Headers[FieldMember].value.(string)
+			ifname := msg.Headers[FieldInterface].value.(string)
+			if ifname == SCPPInterface && name == SCPPStateMethodName {
+				t.Logf("Processing reply to .State(), returning state = %v", state)
+				reply := new(Message)
+				reply.Type = TypeMethodReply
+				reply.serial = srv.getSerial()
+				reply.Headers = make(map[HeaderField]Variant)
+				reply.Headers[FieldDestination] = msg.Headers[FieldSender]
+				reply.Headers[FieldReplySerial] = MakeVariant(msg.serial)
+				reply.Body = make([]interface{}, 1)
+				reply.Body[0] = state
+				reply.Headers[FieldSignature] = MakeVariant(SignatureOf(reply.Body...))
+				srv.sendMessageAndIfClosed(reply, nil)
+			}
+		case <-ticker.C:
+			state++
+			if err := srv.Emit(SCPPPath, SCPPInterface+"."+SCPPChangedSignalName, state); err != nil {
+				return err
+			}
+		case <-ctx.Done():
+			return nil
+		}
+	}
+	return nil
 }
 
 type server struct{}
