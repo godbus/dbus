@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"sync"
 	"testing"
 	"time"
 )
@@ -278,30 +279,32 @@ func TestStateCachingProxyPattern(t *testing.T) {
 	defer conn.Close()
 
 	serviceName := srv.Names()[0]
-	messages := make(chan *Message)
+	// message channel should have at least some buffering, to make sure Eavesdrop does not
+	// drop the message if nobody is currently trying to read from the channel.
+	messages := make(chan *Message, 1)
 	srv.Eavesdrop(messages)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
 
-	done := make(chan bool)
+	var wg sync.WaitGroup
+	wg.Add(2)
 	go func() {
+		defer wg.Done()
 		if err := serverProcess(ctx, srv, messages, t); err != nil {
 			t.Errorf("error in server process: %v", err)
 			cancel()
 		}
-		done <- true
 	}()
 	go func() {
+		defer wg.Done()
 		if err := clientProcess(ctx, conn, serviceName, t); err != nil {
 			t.Errorf("error in client process: %v", err)
 		}
 		// Cancel the server process.
 		cancel()
-		done <- true
 	}()
-	<-done
-	<-done
+	wg.Wait()
 }
 
 func clientProcess(ctx context.Context, conn *Conn, serviceName string, t *testing.T) error {
@@ -357,7 +360,7 @@ readSignals:
 	t.Logf("Observed states: %v", observedStates)
 
 	// The observable states of the remote object were [1 ... (infinity)] during this test.
-	// This loop is intended to assert that our observed states are a contiguous subgrange [n ... n+99] for some n, i.e.
+	// This loop is intended to assert that our observed states are a contiguous subgrange [n ... n+49] for some n, i.e.
 	// that we received a contiguous subsequence of the states of the remote object. For each run of the test, n
 	// may be slightly different due to scheduling effects.
 	for i := 0; i < len(observedStates); i++ {
@@ -372,7 +375,7 @@ readSignals:
 func serverProcess(ctx context.Context, srv *Conn, messages <-chan *Message, t *testing.T) error {
 	state := uint64(0)
 
-	ticker := time.NewTicker(time.Millisecond)
+	ticker := time.NewTicker(time.Microsecond * 100)
 	defer ticker.Stop()
 
 process:

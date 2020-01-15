@@ -95,6 +95,8 @@ func (scd *sequentialSignalChannelData) deliver(signal *Signal) {
 }
 
 func (scd *sequentialSignalChannelData) deferredDeliver() {
+	defer scd.wg.Done()
+
 	// Ensure only one goroutine is in this section at once, to
 	// make sure signals are sent over ch in the order they
 	// are in the queue.
@@ -110,7 +112,6 @@ func (scd *sequentialSignalChannelData) deferredDeliver() {
 	case scd.ch <- elem.Value.(*Signal):
 	case <-scd.done:
 	}
-	scd.wg.Done()
 }
 
 func (scd *sequentialSignalChannelData) close() {
