@@ -429,7 +429,7 @@ func clientBenchmarkProcess(ctx context.Context, conn *Conn) (int64, error) {
 	); err != nil {
 		return 0, err
 	}
-	channel := make(chan *Signal, 1000)
+	channel := make(chan *Signal)
 	conn.Signal(channel)
 
 	observedSignals := int64(0)
