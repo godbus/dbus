@@ -392,6 +392,7 @@ process:
 				break process
 			}
 			if msg.IsValid() != nil {
+				t.Log("Got invalid message, discarding.")
 				continue process
 			}
 			name := msg.Headers[FieldMember].value.(string)
@@ -408,6 +409,8 @@ process:
 				reply.Body[0] = state
 				reply.Headers[FieldSignature] = MakeVariant(SignatureOf(reply.Body...))
 				srv.sendMessageAndIfClosed(reply, nil)
+			} else {
+				t.Log("Got unsolicited message.")
 			}
 		case <-ticker.C:
 			state++
@@ -505,8 +508,30 @@ func TestServerClientThroughput(t *testing.T) {
 		cancel()
 	}()
 	wg.Wait()
-	t.Log(float64(serverThroughput), "signals_sent/sec")
-	t.Log(float64(clientThroughput), "signals_received/sec")
+	t.Logf("%v signals_sent/sec", serverThroughput)
+	t.Logf("%v signals_received/sec", clientThroughput)
+}
+
+func TestTickerPerformance(t *testing.T) {
+	count := 0
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+	defer cancel()
+
+	ticker := time.NewTicker(time.Microsecond * 100)
+	defer ticker.Stop()
+
+loop:
+	for {
+		select {
+		case <-ticker.C:
+			count++
+		case <-ctx.Done():
+			break loop
+		}
+	}
+
+	t.Errorf("100-microsecond ticker emitted %v ticks/sec", count)
 }
 
 type server struct{}
