@@ -415,6 +415,7 @@ process:
 				return err
 			}
 		case <-ctx.Done():
+			t.Logf("Context cancelled, server emitted %v signals", state)
 			return nil
 		}
 	}
