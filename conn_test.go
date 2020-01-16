@@ -513,12 +513,22 @@ func TestServerClientThroughput(t *testing.T) {
 }
 
 func TestTickerPerformance(t *testing.T) {
+	testTicker(t, time.Microsecond*100)
+	testTicker(t, time.Microsecond*200)
+	testTicker(t, time.Microsecond*500)
+	testTicker(t, time.Millisecond)
+	testTicker(t, time.Millisecond*10)
+	testTicker(t, time.Millisecond*100)
+	testTicker(t, time.Millisecond*1000)
+}
+
+func testTicker(t *testing.T, d time.Duration) {
 	count := 0
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*4)
 	defer cancel()
 
-	ticker := time.NewTicker(time.Microsecond * 100)
+	ticker := time.NewTicker(d)
 	defer ticker.Stop()
 
 loop:
@@ -531,7 +541,7 @@ loop:
 		}
 	}
 
-	t.Logf("100-microsecond ticker emitted %v ticks/sec", count)
+	t.Errorf("%v ticker emitted %v ticks/sec", d, float64(count)/4.0)
 }
 
 type server struct{}
