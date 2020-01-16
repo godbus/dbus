@@ -462,16 +462,16 @@ func serverBenchmarkProcess(ctx context.Context, srv *Conn) (int64, error) {
 	}
 }
 
-func benchmarkServerClientThroughput(b *testing.B, handler SignalHandler) {
+func TestServerClientThroughput(t *testing.T) {
 	srv, err := ConnectSessionBus()
 	defer srv.Close()
 	if err != nil {
-		b.Fatal(err)
+		t.Fatal(err)
 	}
 
 	conn, err := ConnectSessionBus(WithSignalHandler(NewSequentialSignalHandler()))
 	if err != nil {
-		b.Fatal(err)
+		t.Fatal(err)
 	}
 	defer conn.Close()
 
@@ -487,7 +487,7 @@ func benchmarkServerClientThroughput(b *testing.B, handler SignalHandler) {
 		var err error
 		serverThroughput, err = serverBenchmarkProcess(ctx, srv)
 		if err != nil {
-			b.Errorf("error in server process: %v", err)
+			t.Errorf("error in server process: %v", err)
 			// Cancel the client process.
 			cancel()
 		}
@@ -497,15 +497,15 @@ func benchmarkServerClientThroughput(b *testing.B, handler SignalHandler) {
 		var err error
 		clientThroughput, err = clientBenchmarkProcess(ctx, conn)
 		if err != nil {
-			b.Errorf("error in client process: %v", err)
+			t.Errorf("error in client process: %v", err)
 		}
 
 		// Cancel the server process.
 		cancel()
 	}()
 	wg.Wait()
-	b.ReportMetric(float64(serverThroughput), "signals_sent/sec")
-	b.ReportMetric(float64(clientThroughput), "signals_received/sec")
+	t.Log(float64(serverThroughput), "signals_sent/sec")
+	t.Log(float64(clientThroughput), "signals_received/sec")
 }
 
 type server struct{}
