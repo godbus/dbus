@@ -392,7 +392,7 @@ process:
 				break process
 			}
 			if msg.IsValid() != nil {
-				t.Log("Got invalid message, discarding.")
+				t.Log("Got invalid message, discarding")
 				continue process
 			}
 			name := msg.Headers[FieldMember].value.(string)
@@ -410,7 +410,7 @@ process:
 				reply.Headers[FieldSignature] = MakeVariant(SignatureOf(reply.Body...))
 				srv.sendMessageAndIfClosed(reply, nil)
 			} else {
-				t.Log("Got unsolicited message.")
+				t.Log("Got unsolicited message")
 			}
 		case <-ticker.C:
 			state++
@@ -531,7 +531,7 @@ loop:
 		}
 	}
 
-	t.Errorf("100-microsecond ticker emitted %v ticks/sec", count)
+	t.Logf("100-microsecond ticker emitted %v ticks/sec", count)
 }
 
 type server struct{}
