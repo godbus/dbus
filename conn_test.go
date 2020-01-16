@@ -541,7 +541,7 @@ loop:
 		}
 	}
 
-	t.Errorf("%v ticker emitted %v ticks/sec", d, float64(count)/4.0)
+	t.Logf("%v ticker emitted %v ticks/sec", d, float64(count)/4.0)
 }
 
 type server struct{}
