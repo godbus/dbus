@@ -284,7 +284,7 @@ func TestStateCachingProxyPattern(t *testing.T) {
 	messages := make(chan *Message, 1)
 	srv.Eavesdrop(messages)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
 	var wg sync.WaitGroup
@@ -334,10 +334,12 @@ func clientProcess(ctx context.Context, conn *Conn, serviceName string, t *testi
 
 	// Populate observedStates[1...49] based on the state change signals,
 	// ignoring signals with a sequence number less than call.ResponseSequence so that we ignore past events.
+	signalsProcessed := 0
 readSignals:
 	for {
 		select {
 		case signal := <-channel:
+			signalsProcessed++
 			if signal.Name == SCPPInterface+"."+SCPPChangedSignalName && signal.Sequence > call.ResponseSequence {
 				observedState := signal.Body[0].(uint64)
 				observedStates = append(observedStates, observedState)
@@ -347,9 +349,11 @@ readSignals:
 				}
 			}
 		case <-ctx.Done():
+			t.Logf("Context cancelled, %v signals processed", signalsProcessed)
 			return ctx.Err()
 		}
 	}
+	t.Logf("%v signals processed", signalsProcessed)
 
 	// Expect that we begun observing at least a few states in. This ensures the server was already emitting events
 	// and makes it likely we simulated our race condition.
@@ -415,6 +419,93 @@ process:
 		}
 	}
 	return nil
+}
+
+func clientBenchmarkProcess(ctx context.Context, conn *Conn) (int64, error) {
+	// Subscribe to state changes on the remote object
+	if err := conn.AddMatchSignal(
+		WithMatchInterface(SCPPInterface),
+		WithMatchMember(SCPPChangedSignalName),
+	); err != nil {
+		return 0, err
+	}
+	channel := make(chan *Signal, 1000)
+	conn.Signal(channel)
+
+	observedSignals := int64(0)
+	// Populate observedStates[1...49] based on the state change signals,
+	// ignoring signals with a sequence number less than call.ResponseSequence so that we ignore past events.
+	for {
+		select {
+		case signal := <-channel:
+			if signal.Name == SCPPInterface+"."+SCPPChangedSignalName {
+				observedSignals++
+			}
+		case <-ctx.Done():
+			return observedSignals, nil
+		}
+	}
+}
+
+func serverBenchmarkProcess(ctx context.Context, srv *Conn) (int64, error) {
+	count := int64(0)
+	for {
+		select {
+		case <-ctx.Done():
+			return count, nil
+		default:
+			count++
+			if err := srv.Emit(SCPPPath, SCPPInterface+"."+SCPPChangedSignalName, count); err != nil {
+				return count, err
+			}
+		}
+	}
+}
+
+func benchmarkServerClientThroughput(b *testing.B, handler SignalHandler) {
+	srv, err := ConnectSessionBus()
+	defer srv.Close()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	conn, err := ConnectSessionBus(WithSignalHandler(NewSequentialSignalHandler()))
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer conn.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+	defer cancel()
+
+	var wg sync.WaitGroup
+	var serverThroughput int64
+	var clientThroughput int64
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		var err error
+		serverThroughput, err = serverBenchmarkProcess(ctx, srv)
+		if err != nil {
+			b.Errorf("error in server process: %v", err)
+			// Cancel the client process.
+			cancel()
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		var err error
+		clientThroughput, err = clientBenchmarkProcess(ctx, conn)
+		if err != nil {
+			b.Errorf("error in client process: %v", err)
+		}
+
+		// Cancel the server process.
+		cancel()
+	}()
+	wg.Wait()
+	b.ReportMetric(float64(serverThroughput), "signals_sent/sec")
+	b.ReportMetric(float64(clientThroughput), "signals_received/sec")
 }
 
 type server struct{}
