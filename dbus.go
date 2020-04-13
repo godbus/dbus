@@ -63,6 +63,9 @@ func storeInterfaces(src, dest interface{}) error {
 
 func store(dest, src reflect.Value) error {
 	if dest.Kind() == reflect.Ptr {
+		if dest.IsNil() {
+			dest.Set(reflect.New(dest.Type().Elem()))
+		}
 		return store(dest.Elem(), src)
 	}
 	switch src.Kind() {
