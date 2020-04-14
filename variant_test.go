@@ -76,3 +76,17 @@ func TestParseVariant(t *testing.T) {
 		}
 	}
 }
+
+func TestVariantStore(t *testing.T) {
+	str := "foo bar"
+	v := MakeVariant(str)
+	var result string
+	err := v.Store(&result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != str {
+		t.Fatalf("expected %s, got %s\n", str, result)
+	}
+
+}
