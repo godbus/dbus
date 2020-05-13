@@ -151,7 +151,7 @@ func (m exportedMethod) Call(args ...interface{}) ([]interface{}, error) {
 		//concrete type to interface nil is a special case
 		return out, nil
 	}
-	return out, err.(error)
+	return out, err
 }
 
 func (m exportedMethod) NumArguments() int {
