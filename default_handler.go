@@ -147,7 +147,7 @@ func (m exportedMethod) Call(args ...interface{}) ([]interface{}, error) {
 	for i, val := range ret {
 		out[i] = val.Interface()
 	}
-	if nilErr {
+	if nilErr || err == nil {
 		//concrete type to interface nil is a special case
 		return out, nil
 	}
