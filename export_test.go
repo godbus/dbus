@@ -34,6 +34,24 @@ func (export badExport) Foo(param string) string {
 	return "bar"
 }
 
+type errorExport struct {
+	message Message
+}
+
+func (export *errorExport) Run(message Message, param string) (string, error) {
+	export.message = message
+	return "pass", nil
+}
+
+type noErrorExport struct {
+	message Message
+}
+
+func (export *noErrorExport) Run(message Message, param string) (string) {
+	export.message = message
+	return "cool"
+}
+
 // Test typical Export usage.
 func TestExport(t *testing.T) {
 	connection, err := ConnectSessionBus()
@@ -70,6 +88,64 @@ func TestExport(t *testing.T) {
 	err = object.Call("org.guelfey.DBus.Test.Double", 0, int64(2)).Store(&response)
 	if err == nil {
 		t.Error("Expected an error since the export was removed")
+	}
+}
+
+// Test that Exported handlers can use a go error type.
+func TestExport_goerror(t *testing.T) {
+	connection, err := ConnectSessionBus()
+	if err != nil {
+		t.Fatalf("Unexpected error connecting to session bus: %s", err)
+	}
+	defer connection.Close()
+
+	name := connection.Names()[0]
+
+	export := &errorExport{}
+	connection.ExportAll(export, "/org/guelfey/DBus/Test", "org.guelfey.DBus.Test")
+	object := connection.Object(name, "/org/guelfey/DBus/Test")
+
+	var response string
+	err = object.Call("org.guelfey.DBus.Test.Run", 0, "qux").Store(&response)
+	if err != nil {
+		t.Errorf("Unexpected error calling Foo: %s", err)
+	}
+
+	if response != "pass" {
+		t.Errorf(`Response was %s, expected "foo"`, response)
+	}
+
+	if export.message.serial == 0 {
+		t.Error("Expected a valid message to be given to handler")
+	}
+}
+
+// Test that Exported handlers can have no error.
+func TestExport_noerror(t *testing.T) {
+	connection, err := ConnectSessionBus()
+	if err != nil {
+		t.Fatalf("Unexpected error connecting to session bus: %s", err)
+	}
+	defer connection.Close()
+
+	name := connection.Names()[0]
+
+	export := &noErrorExport{}
+	connection.ExportAll(export, "/org/guelfey/DBus/Test", "org.guelfey.DBus.Test")
+	object := connection.Object(name, "/org/guelfey/DBus/Test")
+
+	var response string
+	err = object.Call("org.guelfey.DBus.Test.Run", 0, "qux").Store(&response)
+	if err != nil {
+		t.Errorf("Unexpected error calling Foo: %s", err)
+	}
+
+	if response != "cool" {
+		t.Errorf(`Response was %s, expected "foo"`, response)
+	}
+
+	if export.message.serial == 0 {
+		t.Error("Expected a valid message to be given to handler")
 	}
 }
 
