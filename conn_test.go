@@ -206,6 +206,69 @@ func TestCloseChannelAfterRemoveSignal(t *testing.T) {
 	close(ch)
 }
 
+func TestAddAndRemoveMatchSignalContext(t *testing.T) {
+	conn, err := ConnectSessionBus()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	sigc := make(chan *Signal, 1)
+	conn.Signal(sigc)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	// try to subscribe to a made up signal with an already canceled context
+	if err = conn.AddMatchSignalContext(
+		ctx,
+		WithMatchInterface("org.test"),
+		WithMatchMember("CtxTest"),
+	); err == nil {
+		t.Fatal("call on canceled context did not fail")
+	}
+
+	// subscribe to the signal with background context
+	if err = conn.AddMatchSignalContext(
+		context.Background(),
+		WithMatchInterface("org.test"),
+		WithMatchMember("CtxTest"),
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	// try to unsubscribe with an already canceled context
+	if err = conn.RemoveMatchSignalContext(
+		ctx,
+		WithMatchInterface("org.test"),
+		WithMatchMember("CtxTest"),
+	); err == nil {
+		t.Fatal("call on canceled context did not fail")
+	}
+
+	// check that signal is still delivered
+	if err = conn.Emit("/", "org.test.CtxTest"); err != nil {
+		t.Fatal(err)
+	}
+	if sig := waitSignal(sigc, "org.test.CtxTest", time.Second); sig == nil {
+		t.Fatal("signal receive timed out")
+	}
+
+	// unsubscribe from the signal
+	if err = conn.RemoveMatchSignalContext(
+		context.Background(),
+		WithMatchInterface("org.test"),
+		WithMatchMember("CtxTest"),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err = conn.Emit("/", "org.test.CtxTest"); err != nil {
+		t.Fatal(err)
+	}
+	if sig := waitSignal(sigc, "org.test.CtxTest", time.Second); sig != nil {
+		t.Fatalf("unsubscribed from %q signal, but received %#v", "org.test.CtxTest", sig)
+	}
+}
+
 func TestAddAndRemoveMatchSignal(t *testing.T) {
 	conn, err := ConnectSessionBus()
 	if err != nil {

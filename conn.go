@@ -586,8 +586,14 @@ func (conn *Conn) sendReply(dest string, serial uint32, values ...interface{}) {
 // AddMatchSignal registers the given match rule to receive broadcast
 // signals based on their contents.
 func (conn *Conn) AddMatchSignal(options ...MatchOption) error {
+	return conn.AddMatchSignalContext(context.Background(), options...)
+}
+
+// AddMatchSignalContext acts like AddMatchSignal but takes a context.
+func (conn *Conn) AddMatchSignalContext(ctx context.Context, options ...MatchOption) error {
 	options = append([]MatchOption{withMatchType("signal")}, options...)
-	return conn.busObj.Call(
+	return conn.busObj.CallWithContext(
+		ctx,
 		"org.freedesktop.DBus.AddMatch", 0,
 		formatMatchOptions(options),
 	).Store()
@@ -595,8 +601,14 @@ func (conn *Conn) AddMatchSignal(options ...MatchOption) error {
 
 // RemoveMatchSignal removes the first rule that matches previously registered with AddMatchSignal.
 func (conn *Conn) RemoveMatchSignal(options ...MatchOption) error {
+	return conn.RemoveMatchSignalContext(context.Background(), options...)
+}
+
+// RemoveMatchSignalContext acts like RemoveMatchSignal but takes a context.
+func (conn *Conn) RemoveMatchSignalContext(ctx context.Context, options ...MatchOption) error {
 	options = append([]MatchOption{withMatchType("signal")}, options...)
-	return conn.busObj.Call(
+	return conn.busObj.CallWithContext(
+		ctx,
 		"org.freedesktop.DBus.RemoveMatch", 0,
 		formatMatchOptions(options),
 	).Store()
