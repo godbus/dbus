@@ -175,7 +175,6 @@ func (conn *Conn) handleCall(msg *Message) {
 	if msg.Flags&FlagNoReplyExpected == 0 {
 		reply := new(Message)
 		reply.Type = TypeMethodReply
-		reply.serial = conn.getSerial()
 		reply.Headers = make(map[HeaderField]Variant)
 		if hasSender {
 			reply.Headers[FieldDestination] = msg.Headers[FieldSender]
@@ -211,7 +210,6 @@ func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) erro
 	}
 	msg := new(Message)
 	msg.Type = TypeSignal
-	msg.serial = conn.getSerial()
 	msg.Headers = make(map[HeaderField]Variant)
 	msg.Headers[FieldInterface] = MakeVariant(iface)
 	msg.Headers[FieldMember] = MakeVariant(member)
