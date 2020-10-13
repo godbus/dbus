@@ -461,7 +461,6 @@ process:
 				t.Logf("Processing reply to .State(), returning state = %v", state)
 				reply := new(Message)
 				reply.Type = TypeMethodReply
-				reply.serial = srv.getSerial()
 				reply.Headers = make(map[HeaderField]Variant)
 				reply.Headers[FieldDestination] = msg.Headers[FieldSender]
 				reply.Headers[FieldReplySerial] = MakeVariant(msg.serial)

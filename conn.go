@@ -464,6 +464,9 @@ func (conn *Conn) Object(dest string, path ObjectPath) BusObject {
 }
 
 func (conn *Conn) sendMessageAndIfClosed(msg *Message, ifClosed func()) {
+	if msg.serial == 0 {
+		msg.serial = conn.getSerial()
+	}
 	if conn.outInt != nil {
 		conn.outInt(msg)
 	}
@@ -495,16 +498,16 @@ func (conn *Conn) send(ctx context.Context, msg *Message, ch chan *Call) *Call {
 	if ctx == nil {
 		panic("nil context")
 	}
+	if ch == nil {
+		ch = make(chan *Call, 5)
+	} else if cap(ch) == 0 {
+		panic("dbus: unbuffered channel passed to (*Conn).Send")
+	}
 
 	var call *Call
 	ctx, canceler := context.WithCancel(ctx)
 	msg.serial = conn.getSerial()
 	if msg.Type == TypeMethodCall && msg.Flags&FlagNoReplyExpected == 0 {
-		if ch == nil {
-			ch = make(chan *Call, 5)
-		} else if cap(ch) == 0 {
-			panic("dbus: unbuffered channel passed to (*Conn).Send")
-		}
 		call = new(Call)
 		call.Destination, _ = msg.Headers[FieldDestination].value.(string)
 		call.Path, _ = msg.Headers[FieldPath].value.(ObjectPath)
@@ -526,7 +529,8 @@ func (conn *Conn) send(ctx context.Context, msg *Message, ch chan *Call) *Call {
 		})
 	} else {
 		canceler()
-		call = &Call{Err: nil}
+		call = &Call{Err: nil, Done: ch}
+		ch <- call
 		conn.sendMessageAndIfClosed(msg, func() {
 			call = &Call{Err: ErrClosed}
 		})
@@ -551,7 +555,6 @@ func (conn *Conn) sendError(err error, dest string, serial uint32) {
 	}
 	msg := new(Message)
 	msg.Type = TypeError
-	msg.serial = conn.getSerial()
 	msg.Headers = make(map[HeaderField]Variant)
 	if dest != "" {
 		msg.Headers[FieldDestination] = MakeVariant(dest)
@@ -570,7 +573,6 @@ func (conn *Conn) sendError(err error, dest string, serial uint32) {
 func (conn *Conn) sendReply(dest string, serial uint32, values ...interface{}) {
 	msg := new(Message)
 	msg.Type = TypeMethodReply
-	msg.serial = conn.getSerial()
 	msg.Headers = make(map[HeaderField]Variant)
 	if dest != "" {
 		msg.Headers[FieldDestination] = MakeVariant(dest)
