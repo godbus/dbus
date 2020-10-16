@@ -499,7 +499,7 @@ func (conn *Conn) send(ctx context.Context, msg *Message, ch chan *Call) *Call {
 		panic("nil context")
 	}
 	if ch == nil {
-		ch = make(chan *Call, 5)
+		ch = make(chan *Call, 1)
 	} else if cap(ch) == 0 {
 		panic("dbus: unbuffered channel passed to (*Conn).Send")
 	}
