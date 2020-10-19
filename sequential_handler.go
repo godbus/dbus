@@ -1,7 +1,6 @@
 package dbus
 
 import (
-	"container/list"
 	"sync"
 )
 
@@ -87,37 +86,29 @@ func newSequentialSignalChannelData(ch chan<- *Signal) *sequentialSignalChannelD
 }
 
 func (scd *sequentialSignalChannelData) bufferSignals() {
-	var (
-		queue list.List
-		next  *Signal
-	)
 	defer close(scd.done)
 
+	// Ensure that signals are delivered to scd.ch in the same
+	// order they are received from scd.in.
+	var queue []*Signal
 	for {
-		if next == nil {
-			if queue.Len() != 0 {
-				elem := queue.Front()
-				queue.Remove(elem)
-				next = elem.Value.(*Signal)
-			} else {
-				var ok bool
-				next, ok = <-scd.in
-				if !ok {
-					return
-				}
-			}
-		}
-		select {
-		case scd.ch <- next:
-			// Signal delivered: the next signal will be
-			// picked next iteration.
-			next = nil
-		case signal, ok := <-scd.in:
-			if ok {
-				queue.PushBack(signal)
-			} else {
+		if len(queue) == 0 {
+			signal, ok := <- scd.in
+			if !ok {
 				return
 			}
+			queue = append(queue, signal)
+		}
+		select {
+		case scd.ch <- queue[0]:
+			copy(queue, queue[1:])
+			queue[len(queue)-1] = nil
+			queue = queue[:len(queue)-1]
+		case signal, ok := <-scd.in:
+			if !ok {
+				return
+			}
+			queue = append(queue, signal)
 		}
 	}
 }
