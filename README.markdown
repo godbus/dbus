@@ -1,4 +1,4 @@
-![Build Status](https://github.com/godbus/dbus/workflows/.github/workflows/go.yml/badge.svg)
+![Build Status](https://github.com/godbus/dbus/workflows/Go/badge.svg)
 
 dbus
 ----
