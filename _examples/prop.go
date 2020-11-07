@@ -16,6 +16,11 @@ func (f foo) Foo() (string, *dbus.Error) {
 	return string(f), nil
 }
 
+type Foo struct {
+	Id    int
+	Value string
+}
+
 func main() {
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
@@ -40,6 +45,17 @@ func main() {
 				prop.EmitTrue,
 				func(c *prop.Change) *dbus.Error {
 					fmt.Println(c.Name, "changed to", c.Value)
+					return nil
+				},
+			},
+			"FooStruct": {
+				Foo{Id: 1, Value: "First"},
+				true,
+				prop.EmitTrue,
+				func(c *prop.Change) *dbus.Error {
+					var foo Foo
+					dbus.Store([]interface{}{c.Value}, &foo)
+					fmt.Println(c.Name, "changed to", foo)
 					return nil
 				},
 			},
