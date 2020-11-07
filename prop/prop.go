@@ -3,6 +3,7 @@
 package prop
 
 import (
+	"reflect"
 	"sync"
 
 	"github.com/godbus/dbus/v5"
@@ -228,7 +229,18 @@ func (p *Properties) Introspection(iface string) []introspect.Property {
 // must already be locked.
 func (p *Properties) set(iface, property string, v interface{}) error {
 	prop := p.m[iface][property]
-	prop.Value = v
+	if reflect.ValueOf(prop.Value).Kind() != reflect.Ptr {
+		prop.Value = reflect.New(reflect.TypeOf(prop.Value)).Interface()
+	}
+	err := dbus.Store([]interface{}{v}, prop.Value)
+	if err != nil {
+		return err
+	}
+	return p.emitChange(iface, property)
+}
+
+func (p *Properties) emitChange(iface, property string) error {
+	prop := p.m[iface][property]
 	switch prop.Emit {
 	case EmitFalse:
 		return nil // do nothing
@@ -237,7 +249,7 @@ func (p *Properties) set(iface, property string, v interface{}) error {
 			iface, map[string]dbus.Variant{}, []string{property})
 	case EmitTrue:
 		return p.conn.Emit(p.path, "org.freedesktop.DBus.Properties.PropertiesChanged",
-			iface, map[string]dbus.Variant{property: dbus.MakeVariant(v)},
+			iface, map[string]dbus.Variant{property: dbus.MakeVariant(prop.Value)},
 			[]string{})
 	default:
 		panic("invalid value for EmitType")
@@ -279,7 +291,9 @@ func (p *Properties) Set(iface, property string, newv dbus.Variant) *dbus.Error 
 func (p *Properties) SetMust(iface, property string, v interface{}) {
 	p.mut.Lock()
 	defer p.mut.Unlock() // unlock in case of panic
-	if err := p.set(iface, property, v); err != nil {
+	prop := p.m[iface][property]
+	prop.Value = v
+	if err := p.emitChange(iface, property); err != nil {
 		panic(err)
 	}
 }
