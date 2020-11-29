@@ -353,7 +353,7 @@ func (conn *Conn) unexport(h *defaultHandler, path ObjectPath, iface string) err
 	return nil
 }
 
-// exportWithMap is the worker function for all exports/registrations.
+// export is the worker function for all exports/registrations.
 func (conn *Conn) export(methods map[string]reflect.Value, path ObjectPath, iface string, includeSubtree bool) error {
 	h, ok := conn.handler.(*defaultHandler)
 	if !ok {
