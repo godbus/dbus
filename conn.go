@@ -361,7 +361,7 @@ func (conn *Conn) Hello() error {
 }
 
 // inWorker runs in an own goroutine, reading incoming messages from the
-// transport and dispatching them appropiately.
+// transport and dispatching them appropriately.
 func (conn *Conn) inWorker() {
 	sequenceGen := newSequenceGenerator()
 	for {
