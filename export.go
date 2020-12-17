@@ -325,19 +325,22 @@ func (conn *Conn) ExportSubtreeMethodTable(methods map[string]interface{}, path 
 }
 
 func (conn *Conn) exportMethodTable(methods map[string]interface{}, path ObjectPath, iface string, includeSubtree bool) error {
-	out := make(map[string]reflect.Value)
-	for name, method := range methods {
-		rval := reflect.ValueOf(method)
-		if rval.Kind() != reflect.Func {
-			continue
+	var out map[string]reflect.Value
+	if methods != nil {
+		out = make(map[string]reflect.Value)
+		for name, method := range methods {
+			rval := reflect.ValueOf(method)
+			if rval.Kind() != reflect.Func {
+				continue
+			}
+			t := rval.Type()
+			// only track valid methods must return *Error as last arg
+			if t.NumOut() == 0 ||
+				t.Out(t.NumOut()-1) != reflect.TypeOf(&ErrMsgInvalidArg) {
+				continue
+			}
+			out[name] = rval
 		}
-		t := rval.Type()
-		// only track valid methods must return *Error as last arg
-		if t.NumOut() == 0 ||
-			t.Out(t.NumOut()-1) != reflect.TypeOf(&ErrMsgInvalidArg) {
-			continue
-		}
-		out[name] = rval
 	}
 	return conn.export(out, path, iface, includeSubtree)
 }
