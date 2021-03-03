@@ -34,7 +34,7 @@ func main() {
 		panic(err)
 	}
 	if reply != dbus.RequestNameReplyPrimaryOwner {
-		fmt.Fprintln(os.Stderr, "name already taken")
+		_, _ = fmt.Fprintln(os.Stderr, "name already taken")
 		os.Exit(1)
 	}
 	propsSpec := map[string]map[string]*prop.Prop{
@@ -54,7 +54,10 @@ func main() {
 				prop.EmitTrue,
 				func(c *prop.Change) *dbus.Error {
 					var foo Foo
-					dbus.Store([]interface{}{c.Value}, &foo)
+					err := dbus.Store([]interface{}{c.Value}, &foo)
+					if err != nil {
+						_, _ = fmt.Fprintf(os.Stderr, "dbus.Store foo failed: %v\n", err)
+					}
 					fmt.Println(c.Name, "changed to", foo)
 					return nil
 				},
@@ -62,8 +65,16 @@ func main() {
 		},
 	}
 	f := foo("Bar")
-	conn.Export(f, "/com/github/guelfey/Demo", "com.github.guelfey.Demo")
-	props := prop.New(conn, "/com/github/guelfey/Demo", propsSpec)
+	err = conn.Export(f, "/com/github/guelfey/Demo", "com.github.guelfey.Demo")
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "export f failed: %v\n", err)
+		os.Exit(1)
+	}
+	props, err := prop.Export(conn, "/com/github/guelfey/Demo", propsSpec)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "export propsSpec failed: %v\n", err)
+		os.Exit(1)
+	}
 	n := &introspect.Node{
 		Name: "/com/github/guelfey/Demo",
 		Interfaces: []introspect.Interface{
@@ -76,12 +87,16 @@ func main() {
 			},
 		},
 	}
-	conn.Export(introspect.NewIntrospectable(n), "/com/github/guelfey/Demo",
+	err = conn.Export(introspect.NewIntrospectable(n), "/com/github/guelfey/Demo",
 		"org.freedesktop.DBus.Introspectable")
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "export introspect failed: %v\n", err)
+		os.Exit(1)
+	}
 	fmt.Println("Listening on com.github.guelfey.Demo / /com/github/guelfey/Demo ...")
 
 	c := make(chan *dbus.Signal)
 	conn.Signal(c)
-	for _ = range c {
+	for range c {
 	}
 }
