@@ -13,14 +13,33 @@ import (
 // EmitType controls how org.freedesktop.DBus.Properties.PropertiesChanged is
 // emitted for a property. If it is EmitTrue, the signal is emitted. If it is
 // EmitInvalidates, the signal is also emitted, but the new value of the property
-// is not disclosed.
+// is not disclosed. If it is EmitConst, the property never changes value during
+// the lifetime of the object it belongs to, and hence the signal is never emitted
+// for it.
 type EmitType byte
 
 const (
 	EmitFalse EmitType = iota
 	EmitTrue
 	EmitInvalidates
+	EmitConst
 )
+
+func (e EmitType) String() (str string) {
+	switch e {
+	case EmitFalse:
+		str = "false"
+	case EmitTrue:
+		str = "true"
+	case EmitInvalidates:
+		str = "invalidates"
+	case EmitConst:
+		str = "const"
+	default:
+		panic("invalid value for EmitType")
+	}
+	return
+}
 
 // ErrIfaceNotFound is the error returned to peers who try to access properties
 // on interfaces that aren't found.
@@ -220,6 +239,12 @@ func (p *Properties) Introspection(iface string) []introspect.Property {
 		} else {
 			p.Access = "read"
 		}
+		p.Annotations = []introspect.Annotation{
+			{
+				Name: "org.freedesktop.DBus.Property.EmitsChangedSignal",
+				Value: v.Emit.String(),
+			},
+		}
 		s = append(s, p)
 	}
 	return s
@@ -251,6 +276,8 @@ func (p *Properties) emitChange(iface, property string) error {
 		return p.conn.Emit(p.path, "org.freedesktop.DBus.Properties.PropertiesChanged",
 			iface, map[string]dbus.Variant{property: dbus.MakeVariant(prop.Value)},
 			[]string{})
+	case EmitConst:
+		return nil
 	default:
 		panic("invalid value for EmitType")
 	}
