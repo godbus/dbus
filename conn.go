@@ -60,7 +60,8 @@ type Conn struct {
 func SessionBus() (conn *Conn, err error) {
 	sessionBusLck.Lock()
 	defer sessionBusLck.Unlock()
-	if sessionBus != nil {
+	if sessionBus != nil &&
+		sessionBus.Connected() {
 		return sessionBus, nil
 	}
 	defer func() {
@@ -105,7 +106,8 @@ func SessionBusPrivateHandler(handler Handler, signalHandler SignalHandler) (*Co
 func SystemBus() (conn *Conn, err error) {
 	systemBusLck.Lock()
 	defer systemBusLck.Unlock()
-	if systemBus != nil {
+	if systemBus != nil &&
+		systemBus.Connected() {
 		return systemBus, nil
 	}
 	defer func() {
@@ -326,6 +328,11 @@ func (conn *Conn) Close() error {
 // context will be cancelled when the connection is closed.
 func (conn *Conn) Context() context.Context {
 	return conn.ctx
+}
+
+// Connected returns whether conn is connected
+func (conn *Conn) Connected() bool {
+	return conn.ctx.Err() == nil
 }
 
 // Eavesdrop causes conn to send all incoming messages to the given channel
