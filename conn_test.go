@@ -13,16 +13,42 @@ import (
 )
 
 func TestSessionBus(t *testing.T) {
-	_, err := SessionBus()
+	oldConn, err := SessionBus()
 	if err != nil {
 		t.Error(err)
+	}
+	if err = oldConn.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if oldConn.Connected() {
+		t.Fatal("Should be closed")
+	}
+	newConn, err := SessionBus()
+	if err != nil {
+		t.Error(err)
+	}
+	if newConn == oldConn {
+		t.Fatal("Should get a new connection")
 	}
 }
 
 func TestSystemBus(t *testing.T) {
-	_, err := SystemBus()
+	oldConn, err := SystemBus()
 	if err != nil {
 		t.Error(err)
+	}
+	if err = oldConn.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if oldConn.Connected() {
+		t.Fatal("Should be closed")
+	}
+	newConn, err := SystemBus()
+	if err != nil {
+		t.Error(err)
+	}
+	if newConn == oldConn {
+		t.Fatal("Should get a new connection")
 	}
 }
 
@@ -34,6 +60,9 @@ func TestConnectSessionBus(t *testing.T) {
 	if err = conn.Close(); err != nil {
 		t.Fatal(err)
 	}
+	if conn.Connected() {
+		t.Fatal("Should be closed")
+	}
 }
 
 func TestConnectSystemBus(t *testing.T) {
@@ -43,6 +72,9 @@ func TestConnectSystemBus(t *testing.T) {
 	}
 	if err = conn.Close(); err != nil {
 		t.Fatal(err)
+	}
+	if conn.Connected() {
+		t.Fatal("Should be closed")
 	}
 }
 
