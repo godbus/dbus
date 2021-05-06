@@ -290,7 +290,7 @@ func TestHandlerCallNonExistent(t *testing.T) {
 	in := "foo"
 	err = obj.Call("com.github.godbus.dbus.Tester.Test", 0, in).Store(&out)
 	if err != nil {
-		if err.Error() != "Object does not implement the interface" {
+		if err.Error() != "Object does not implement the interface 'com.github.godbus.dbus.Tester'" {
 			t.Errorf("Unexpected error: %s", err)
 		}
 	}
