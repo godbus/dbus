@@ -17,7 +17,7 @@ type BusObject interface {
 	RemoveMatchSignal(iface, member string, options ...MatchOption) *Call
 	GetProperty(p string) (Variant, error)
 	StoreProperty(p string, value interface{}) error
-	SetProperty(p string, v interface{}) error
+	SetProperty(p string, v Variant) error
 	Destination() string
 	Path() ObjectPath
 }
@@ -151,7 +151,7 @@ func (o *Object) StoreProperty(p string, value interface{}) error {
 
 // SetProperty calls org.freedesktop.DBus.Properties.Set on the given
 // object. The property name must be given in interface.member notation.
-func (o *Object) SetProperty(p string, v interface{}) error {
+func (o *Object) SetProperty(p string, v Variant) error {
 	idx := strings.LastIndex(p, ".")
 	if idx == -1 || idx+1 == len(p) {
 		return errors.New("dbus: invalid property " + p)
