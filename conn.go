@@ -53,6 +53,8 @@ type Conn struct {
 
 	eavesdropped    chan<- *Message
 	eavesdroppedLck sync.Mutex
+
+	messageLock sync.Mutex
 }
 
 // SessionBus returns a shared connection to the session bus, connecting to it
@@ -367,12 +369,25 @@ func (conn *Conn) Hello() error {
 	return nil
 }
 
+// Pause let the conn pause to read and handle the messages,
+// then users can read and handle the the messages by themselves
+func (conn *Conn) Pause() {
+	conn.messageLock.Lock()
+}
+
+// Resume let the conn continue to read and handle messages
+func (conn *Conn) Resume() {
+	conn.messageLock.Unlock()
+}
+
 // inWorker runs in an own goroutine, reading incoming messages from the
 // transport and dispatching them appropriately.
 func (conn *Conn) inWorker() {
 	sequenceGen := newSequenceGenerator()
 	for {
+		conn.messageLock.Lock()
 		msg, err := conn.ReadMessage()
+		conn.messageLock.Unlock()
 		if err != nil {
 			if _, ok := err.(InvalidMessageError); !ok {
 				// Some read error occurred (usually EOF); we can't really do
