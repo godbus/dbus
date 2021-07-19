@@ -19,7 +19,7 @@ type sequentialSignalHandler struct {
 	signals []*sequentialSignalChannelData
 }
 
-func (sh *sequentialSignalHandler) DeliverSignal(intf, name string, signal *Signal) {
+func (sh *sequentialSignalHandler) DeliverSignal(signal *Signal) {
 	sh.mu.RLock()
 	defer sh.mu.RUnlock()
 	if sh.closed {

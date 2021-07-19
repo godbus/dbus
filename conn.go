@@ -448,7 +448,7 @@ func (conn *Conn) handleSignal(sequence Sequence, msg *Message) {
 		Body:     msg.Body,
 		Sequence: sequence,
 	}
-	conn.signalHandler.DeliverSignal(iface, member, signal)
+	conn.signalHandler.DeliverSignal(signal)
 }
 
 // Names returns the list of all names that are currently owned by this

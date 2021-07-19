@@ -217,7 +217,7 @@ func TestSequentialHandler_RemoveAfterTerminate(t *testing.T) {
 func writeSignals(handler SignalHandler, count int) {
 	for i := 1; i <= count; i++ {
 		signal := &Signal{Sequence: Sequence(i)}
-		handler.DeliverSignal("iface", "name", signal)
+		handler.DeliverSignal(signal)
 	}
 }
 
