@@ -74,7 +74,7 @@ type ArgumentDecoder interface {
 // based approach by Handlers implementing the SignalHandler
 // interface.
 type SignalHandler interface {
-	DeliverSignal(iface, name string, signal *Signal)
+	DeliverSignal(signal *Signal)
 }
 
 // SignalRegistrar manages signal delivery channels.

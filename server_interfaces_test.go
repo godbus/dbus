@@ -2,6 +2,7 @@ package dbus
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -152,7 +153,13 @@ func (t terrfn) ReturnValue(position int) interface{} {
 }
 
 //SignalHandler
-func (t *tester) DeliverSignal(iface, name string, signal *Signal) {
+func (t *tester) DeliverSignal(signal *Signal) {
+	lastIndx := strings.LastIndex(signal.Name, ".")
+	if lastIndx == -1 {
+		return
+	}
+	iface, name := signal.Name[:lastIndx-1], signal.Name[lastIndx+1:]
+
 	t.subSigsMu.Lock()
 	intf, ok := t.subSigs[iface]
 	t.subSigsMu.Unlock()
@@ -162,6 +169,7 @@ func (t *tester) DeliverSignal(iface, name string, signal *Signal) {
 	if _, ok := intf[name]; !ok {
 		return
 	}
+
 	t.sigs <- signal
 }
 

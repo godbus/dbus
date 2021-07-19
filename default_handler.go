@@ -257,7 +257,7 @@ type defaultSignalHandler struct {
 	signals []*signalChannelData
 }
 
-func (sh *defaultSignalHandler) DeliverSignal(intf, name string, signal *Signal) {
+func (sh *defaultSignalHandler) DeliverSignal(signal *Signal) {
 	sh.mu.RLock()
 	defer sh.mu.RUnlock()
 	if sh.closed {
