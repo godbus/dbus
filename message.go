@@ -210,9 +210,9 @@ func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 // EncodeTo encodes and sends a message to the given writer. The byte order must
 // be either binary.LittleEndian or binary.BigEndian. If the message is not
 // valid or an error occurs when writing, an error is returned.
-func (msg *Message) EncodeTo(out io.Writer, order binary.ByteOrder) error {
-	if err := msg.IsValid(); err != nil {
-		return err
+func (msg *Message) EncodeTo(out io.Writer, order binary.ByteOrder) (err error) {
+	if err = msg.IsValid(); err != nil {
+		return
 	}
 	var vs [7]interface{}
 	switch order {
@@ -226,7 +226,10 @@ func (msg *Message) EncodeTo(out io.Writer, order binary.ByteOrder) error {
 	body := new(bytes.Buffer)
 	enc := newEncoder(body, order)
 	if len(msg.Body) != 0 {
-		enc.Encode(msg.Body...)
+		err = enc.Encode(msg.Body...)
+		if err != nil {
+			return
+		}
 	}
 	vs[1] = msg.Type
 	vs[2] = msg.Flags
@@ -240,7 +243,10 @@ func (msg *Message) EncodeTo(out io.Writer, order binary.ByteOrder) error {
 	vs[6] = headers
 	var buf bytes.Buffer
 	enc = newEncoder(&buf, order)
-	enc.Encode(vs[:]...)
+	err = enc.Encode(vs[:]...)
+	if err != nil {
+		return
+	}
 	enc.align(8)
 	body.WriteTo(&buf)
 	if buf.Len() > 1<<27 {

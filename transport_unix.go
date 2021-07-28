@@ -193,7 +193,9 @@ func (t *unixTransport) SendMessage(msg *Message) error {
 		msg.Headers[FieldUnixFDs] = MakeVariant(uint32(len(fds)))
 		oob := syscall.UnixRights(fds...)
 		buf := new(bytes.Buffer)
-		msg.EncodeTo(buf, nativeEndian)
+		if err := msg.EncodeTo(buf, nativeEndian); err != nil {
+			return err
+		}
 		n, oobn, err := t.UnixConn.WriteMsgUnix(buf.Bytes(), oob, nil)
 		if err != nil {
 			return err
