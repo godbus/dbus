@@ -14,13 +14,11 @@ D-Bus message bus system.
 
 ### Installation
 
-This packages requires Go 1.7. If you installed it and set up your GOPATH, just run:
+This packages requires Go 1.12 or later. It can be installed by running the command below:
 
 ```
-go get github.com/godbus/dbus
+go get github.com/godbus/dbus/v5
 ```
-
-If you want to use the subpackages, you can install them the same way.
 
 ### Usage
 
