@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"io"
 	"reflect"
+	"unicode/utf8"
 )
 
 // An encoder encodes values to the D-Bus wire format.
@@ -112,6 +113,9 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		enc.binwrite(v.Float())
 		enc.pos += 8
 	case reflect.String:
+		if !utf8.Valid([]byte(v.String())) {
+			panic(FormatError("input has a not-utf8 char in string"))
+		}
 		enc.encode(reflect.ValueOf(uint32(len(v.String()))), depth)
 		b := make([]byte, v.Len()+1)
 		copy(b, v.String())
