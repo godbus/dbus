@@ -93,6 +93,9 @@ func getSignature(t reflect.Type) string {
 				s += getSignature(t.Field(i).Type)
 			}
 		}
+		if len(s) == 0 {
+			panic("empty struct")
+		}
 		return "(" + s + ")"
 	case reflect.Array, reflect.Slice:
 		return "a" + getSignature(t.Elem())
