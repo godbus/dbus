@@ -3,9 +3,10 @@ package dbus
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
 	"testing"
+
+	"golang.org/x/sys/execabs"
 )
 
 // How to mock exec.Command for unit tests
@@ -14,10 +15,10 @@ import (
 var mockedExitStatus = 0
 var mockedStdout string
 
-func fakeExecCommand(command string, args ...string) *exec.Cmd {
+func fakeExecCommand(command string, args ...string) *execabs.Cmd {
 	cs := []string{"-test.run=TestExecCommandHelper", "--", command}
 	cs = append(cs, args...)
-	cmd := exec.Command(os.Args[0], cs...)
+	cmd := execabs.Command(os.Args[0], cs...)
 	es := strconv.Itoa(mockedExitStatus)
 	cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1",
 		"STDOUT=" + mockedStdout,
@@ -43,7 +44,7 @@ DBUS_SESSION_BUS_ADDRESS=unix:abstract=/tmp/dbus-0SO9YZUBGA,guid=ac22f2f3b9d2284
 DBUS_SESSION_BUS_PID=7620
 DBUS_SESSION_BUS_WINDOWID=16777217`
 	execCommand = fakeExecCommand
-	defer func() { execCommand = exec.Command }()
+	defer func() { execCommand = execabs.Command }()
 	expOut := ""
 	expErr := "dbus: couldn't determine address of session bus"
 

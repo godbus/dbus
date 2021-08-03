@@ -4,13 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
+
+	"golang.org/x/sys/execabs"
 )
 
 const defaultSystemBusAddress = "unix:path=/opt/local/var/run/dbus/system_bus_socket"
 
 func getSessionBusPlatformAddress() (string, error) {
-	cmd := exec.Command("launchctl", "getenv", "DBUS_LAUNCHD_SESSION_BUS_SOCKET")
+	cmd := execabs.Command("launchctl", "getenv", "DBUS_LAUNCHD_SESSION_BUS_SOCKET")
 	b, err := cmd.CombinedOutput()
 
 	if err != nil {

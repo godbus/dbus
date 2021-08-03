@@ -8,16 +8,17 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"os/user"
 	"path"
 	"strings"
+
+	"golang.org/x/sys/execabs"
 )
 
-var execCommand = exec.Command
+var execCommand = execabs.Command
 
 func getSessionBusPlatformAddress() (string, error) {
-	cmd := execCommand("dbus-launch")
+	cmd := execabs.Command("dbus-launch")
 	b, err := cmd.CombinedOutput()
 
 	if err != nil {

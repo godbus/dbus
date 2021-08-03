@@ -4,8 +4,9 @@ import (
 	"bufio"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"testing"
+
+	"golang.org/x/sys/execabs"
 )
 
 func TestTcpNonceConnection(t *testing.T) {
@@ -47,7 +48,7 @@ func startDaemon(t *testing.T, config string) (string, *os.Process) {
 		t.Fatal(err)
 	}
 
-	cmd := exec.Command("dbus-daemon", "--nofork", "--print-address", "--config-file", cfg.Name())
+	cmd := execabs.Command("dbus-daemon", "--nofork", "--print-address", "--config-file", cfg.Name())
 	cmd.Stderr = os.Stderr
 	out, err := cmd.StdoutPipe()
 	if err != nil {
