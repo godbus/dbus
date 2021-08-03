@@ -53,7 +53,7 @@ func (dec *decoder) Decode(sig Signature) (vs []interface{}, err error) {
 	vs = make([]interface{}, 0)
 	s := sig.str
 	for s != "" {
-		err, rem := validSingle(s, 0)
+		err, rem := validSingle(s, &depthCounter{})
 		if err != nil {
 			return nil, err
 		}
@@ -150,7 +150,7 @@ func (dec *decoder) decode(s string, depth int) interface{} {
 		if len(sig.str) == 0 {
 			panic(FormatError("variant signature is empty"))
 		}
-		err, rem := validSingle(sig.str, 0)
+		err, rem := validSingle(sig.str, &depthCounter{})
 		if err != nil {
 			panic(err)
 		}
@@ -219,7 +219,7 @@ func (dec *decoder) decode(s string, depth int) interface{} {
 		v := make([]interface{}, 0)
 		s = s[1 : len(s)-1]
 		for s != "" {
-			err, rem := validSingle(s, 0)
+			err, rem := validSingle(s, &depthCounter{})
 			if err != nil {
 				panic(err)
 			}
