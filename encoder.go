@@ -75,6 +75,9 @@ func (enc *encoder) Encode(vs ...interface{}) (err error) {
 // encode encodes the given value to the writer and panics on error. depth holds
 // the depth of the container nesting.
 func (enc *encoder) encode(v reflect.Value, depth int) {
+	if depth > 64 {
+		panic(FormatError("input exceeds depth limitation"))
+	}
 	enc.align(alignment(v.Type()))
 	switch v.Kind() {
 	case reflect.Uint8:
@@ -124,9 +127,6 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 	case reflect.Ptr:
 		enc.encode(v.Elem(), depth)
 	case reflect.Slice, reflect.Array:
-		if depth >= 64 {
-			panic(FormatError("input exceeds container depth limit"))
-		}
 		// Lookahead offset: 4 bytes for uint32 length (with alignment),
 		// plus alignment for elements.
 		n := enc.padding(0, 4) + 4
@@ -146,13 +146,10 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		}
 		enc.pos += length
 	case reflect.Struct:
-		if depth >= 64 && v.Type() != signatureType {
-			panic(FormatError("input exceeds container depth limit"))
-		}
 		switch t := v.Type(); t {
 		case signatureType:
 			str := v.Field(0)
-			enc.encode(reflect.ValueOf(byte(str.Len())), depth+1)
+			enc.encode(reflect.ValueOf(byte(str.Len())), depth)
 			b := make([]byte, str.Len()+1)
 			copy(b, str.String())
 			b[len(b)-1] = 0
@@ -176,9 +173,6 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 	case reflect.Map:
 		// Maps are arrays of structures, so they actually increase the depth by
 		// 2.
-		if depth >= 63 {
-			panic(FormatError("input exceeds container depth limit"))
-		}
 		if !isKeyType(v.Type().Key()) {
 			panic(InvalidTypeError{v.Type()})
 		}
