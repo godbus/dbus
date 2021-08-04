@@ -138,6 +138,11 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		for i := 0; i < v.Len(); i++ {
 			bufenc.encode(v.Index(i), depth+1)
 		}
+
+		if buf.Len() > 1<<26 {
+			panic(FormatError("input exceeds array size limitation"))
+		}
+
 		enc.encode(reflect.ValueOf(uint32(buf.Len())), depth)
 		length := buf.Len()
 		enc.align(alignment(v.Type().Elem()))
