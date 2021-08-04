@@ -46,7 +46,12 @@ func SignatureOfType(t reflect.Type) Signature {
 }
 
 // getSignature returns the signature of the given type and panics on unknown types.
-func getSignature(t reflect.Type) string {
+func getSignature(t reflect.Type) (sig string) {
+	defer func() {
+		if len(sig) > 255 {
+			panic("signature exceeds the length limitation")
+		}
+	}()
 	// handle simple types first
 	switch t.Kind() {
 	case reflect.Uint8:
