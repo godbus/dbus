@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"io"
 	"reflect"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -116,12 +117,16 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		enc.binwrite(v.Float())
 		enc.pos += 8
 	case reflect.String:
-		if !utf8.Valid([]byte(v.String())) {
+		str := v.String()
+		if !utf8.ValidString(str) {
 			panic(FormatError("input has a not-utf8 char in string"))
 		}
-		enc.encode(reflect.ValueOf(uint32(len(v.String()))), depth)
+		if strings.IndexByte(str, byte(0)) != -1 {
+			panic(FormatError("input has a null char('\\000') in string"))
+		}
+		enc.encode(reflect.ValueOf(uint32(len(str))), depth)
 		b := make([]byte, v.Len()+1)
-		copy(b, v.String())
+		copy(b, str)
 		b[len(b)-1] = 0
 		n, err := enc.out.Write(b)
 		if err != nil {
