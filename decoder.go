@@ -10,14 +10,16 @@ type decoder struct {
 	in    io.Reader
 	order binary.ByteOrder
 	pos   int
+	fds   []int
 }
 
 // newDecoder returns a new decoder that reads values from in. The input is
 // expected to be in the given byte order.
-func newDecoder(in io.Reader, order binary.ByteOrder) *decoder {
+func newDecoder(in io.Reader, order binary.ByteOrder, fds []int) *decoder {
 	dec := new(decoder)
 	dec.in = in
 	dec.order = order
+	dec.fds = fds
 	return dec
 }
 
@@ -161,7 +163,11 @@ func (dec *decoder) decode(s string, depth int) interface{} {
 		variant.value = dec.decode(sig.str, depth+1)
 		return variant
 	case 'h':
-		return UnixFDIndex(dec.decode("u", depth).(uint32))
+		idx := dec.decode("u", depth).(uint32)
+		if int(idx) < len(dec.fds) {
+			return UnixFD(dec.fds[idx])
+		}
+		return UnixFDIndex(idx)
 	case 'a':
 		if len(s) > 1 && s[1] == '{' {
 			ksig := s[2:3]

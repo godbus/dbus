@@ -84,7 +84,8 @@ var protoTests = []struct {
 func TestProto(t *testing.T) {
 	for i, v := range protoTests {
 		buf := new(bytes.Buffer)
-		bigEnc := newEncoder(buf, binary.BigEndian)
+		fds := make([]int, 0)
+		bigEnc := newEncoder(buf, binary.BigEndian, fds)
 		bigEnc.Encode(v.vs...)
 		marshalled := buf.Bytes()
 		if !bytes.Equal(marshalled, v.bigEndian) {
@@ -92,7 +93,8 @@ func TestProto(t *testing.T) {
 				v.bigEndian)
 		}
 		buf.Reset()
-		litEnc := newEncoder(buf, binary.LittleEndian)
+		fds = make([]int, 0)
+		litEnc := newEncoder(buf, binary.LittleEndian, fds)
 		litEnc.Encode(v.vs...)
 		marshalled = buf.Bytes()
 		if !bytes.Equal(marshalled, v.littleEndian) {
@@ -105,7 +107,7 @@ func TestProto(t *testing.T) {
 			unmarshalled = reflect.Append(unmarshalled,
 				reflect.New(reflect.TypeOf(v.vs[i])))
 		}
-		bigDec := newDecoder(bytes.NewReader(v.bigEndian), binary.BigEndian)
+		bigDec := newDecoder(bytes.NewReader(v.bigEndian), binary.BigEndian, make([]int, 0))
 		vs, err := bigDec.Decode(SignatureOf(v.vs...))
 		if err != nil {
 			t.Errorf("test %d (unmarshal be): %s\n", i+1, err)
@@ -114,7 +116,7 @@ func TestProto(t *testing.T) {
 		if !reflect.DeepEqual(vs, v.vs) {
 			t.Errorf("test %d (unmarshal be): got %#v, but expected %#v\n", i+1, vs, v.vs)
 		}
-		litDec := newDecoder(bytes.NewReader(v.littleEndian), binary.LittleEndian)
+		litDec := newDecoder(bytes.NewReader(v.littleEndian), binary.LittleEndian, make([]int, 0))
 		vs, err = litDec.Decode(SignatureOf(v.vs...))
 		if err != nil {
 			t.Errorf("test %d (unmarshal le): %s\n", i+1, err)
@@ -134,9 +136,10 @@ func TestProtoMap(t *testing.T) {
 	}
 	var n map[string]uint8
 	buf := new(bytes.Buffer)
-	enc := newEncoder(buf, binary.LittleEndian)
+	fds := make([]int, 0)
+	enc := newEncoder(buf, binary.LittleEndian, fds)
 	enc.Encode(m)
-	dec := newDecoder(buf, binary.LittleEndian)
+	dec := newDecoder(buf, binary.LittleEndian, enc.fds)
 	vs, err := dec.Decode(Signature{"a{sy}"})
 	if err != nil {
 		t.Fatal(err)
@@ -156,9 +159,10 @@ func TestProtoVariantStruct(t *testing.T) {
 		B int16
 	}{1, 2})
 	buf := new(bytes.Buffer)
-	enc := newEncoder(buf, binary.LittleEndian)
+	fds := make([]int, 0)
+	enc := newEncoder(buf, binary.LittleEndian, fds)
 	enc.Encode(v)
-	dec := newDecoder(buf, binary.LittleEndian)
+	dec := newDecoder(buf, binary.LittleEndian, enc.fds)
 	vs, err := dec.Decode(Signature{"v"})
 	if err != nil {
 		t.Fatal(err)
@@ -186,9 +190,10 @@ func TestProtoStructTag(t *testing.T) {
 	bar1.A = 234
 	bar2.C = 345
 	buf := new(bytes.Buffer)
-	enc := newEncoder(buf, binary.LittleEndian)
+	fds := make([]int, 0)
+	enc := newEncoder(buf, binary.LittleEndian, fds)
 	enc.Encode(bar1)
-	dec := newDecoder(buf, binary.LittleEndian)
+	dec := newDecoder(buf, binary.LittleEndian, enc.fds)
 	vs, err := dec.Decode(Signature{"(ii)"})
 	if err != nil {
 		t.Fatal(err)
@@ -248,11 +253,11 @@ func TestMessage(t *testing.T) {
 		FieldMember: MakeVariant("baz"),
 	}
 	message.Body = make([]interface{}, 0)
-	err := message.EncodeTo(buf, binary.LittleEndian)
+	_, err := message.EncodeTo(buf, binary.LittleEndian)
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = DecodeMessage(buf)
+	_, err = DecodeMessage(buf, make([]int, 0))
 	if err != nil {
 		t.Error(err)
 	}
@@ -260,7 +265,7 @@ func TestMessage(t *testing.T) {
 
 func TestProtoStructInterfaces(t *testing.T) {
 	b := []byte{42}
-	vs, err := newDecoder(bytes.NewReader(b), binary.LittleEndian).Decode(Signature{"(y)"})
+	vs, err := newDecoder(bytes.NewReader(b), binary.LittleEndian, make([]int, 0)).Decode(Signature{"(y)"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -312,7 +317,7 @@ func BenchmarkDecodeMessageSmall(b *testing.B) {
 
 	b.StopTimer()
 	buf := new(bytes.Buffer)
-	err = smallMessage.EncodeTo(buf, binary.LittleEndian)
+	_, err = smallMessage.EncodeTo(buf, binary.LittleEndian)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -320,7 +325,7 @@ func BenchmarkDecodeMessageSmall(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		rd = bytes.NewReader(decoded)
-		_, err = DecodeMessage(rd)
+		_, err = DecodeMessage(rd, make([]int, 0))
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -333,7 +338,7 @@ func BenchmarkDecodeMessageBig(b *testing.B) {
 
 	b.StopTimer()
 	buf := new(bytes.Buffer)
-	err = bigMessage.EncodeTo(buf, binary.LittleEndian)
+	_, err = bigMessage.EncodeTo(buf, binary.LittleEndian)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -341,7 +346,7 @@ func BenchmarkDecodeMessageBig(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		rd = bytes.NewReader(decoded)
-		_, err = DecodeMessage(rd)
+		_, err = DecodeMessage(rd, make([]int, 0))
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -351,7 +356,7 @@ func BenchmarkDecodeMessageBig(b *testing.B) {
 func BenchmarkEncodeMessageSmall(b *testing.B) {
 	var err error
 	for i := 0; i < b.N; i++ {
-		err = smallMessage.EncodeTo(ioutil.Discard, binary.LittleEndian)
+		_, err = smallMessage.EncodeTo(ioutil.Discard, binary.LittleEndian)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -361,7 +366,7 @@ func BenchmarkEncodeMessageSmall(b *testing.B) {
 func BenchmarkEncodeMessageBig(b *testing.B) {
 	var err error
 	for i := 0; i < b.N; i++ {
-		err = bigMessage.EncodeTo(ioutil.Discard, binary.LittleEndian)
+		_, err = bigMessage.EncodeTo(ioutil.Discard, binary.LittleEndian)
 		if err != nil {
 			b.Fatal(err)
 		}

@@ -40,10 +40,11 @@ func TestEncodeArrayOfMaps(t *testing.T) {
 	for _, order := range []binary.ByteOrder{binary.LittleEndian, binary.BigEndian} {
 		for _, tt := range tests {
 			buf := new(bytes.Buffer)
-			enc := newEncoder(buf, order)
+			fds := make([]int, 0)
+			enc := newEncoder(buf, order, fds)
 			enc.Encode(tt.vs...)
 
-			dec := newDecoder(buf, order)
+			dec := newDecoder(buf, order, enc.fds)
 			v, err := dec.Decode(SignatureOf(tt.vs...))
 			if err != nil {
 				t.Errorf("%q: decode (%v) failed: %v", tt.name, order, err)
@@ -60,14 +61,15 @@ func TestEncodeArrayOfMaps(t *testing.T) {
 func TestEncodeMapStringInterface(t *testing.T) {
 	val := map[string]interface{}{"foo": "bar"}
 	buf := new(bytes.Buffer)
+	fds := make([]int, 0)
 	order := binary.LittleEndian
-	enc := newEncoder(buf, binary.LittleEndian)
+	enc := newEncoder(buf, binary.LittleEndian, fds)
 	err := enc.Encode(val)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	dec := newDecoder(buf, order)
+	dec := newDecoder(buf, order, enc.fds)
 	v, err := dec.Decode(SignatureOf(val))
 	if err != nil {
 		t.Fatal(err)
@@ -85,14 +87,15 @@ type empty interface{}
 func TestEncodeMapStringNamedInterface(t *testing.T) {
 	val := map[string]empty{"foo": "bar"}
 	buf := new(bytes.Buffer)
+	fds := make([]int, 0)
 	order := binary.LittleEndian
-	enc := newEncoder(buf, binary.LittleEndian)
+	enc := newEncoder(buf, binary.LittleEndian, fds)
 	err := enc.Encode(val)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	dec := newDecoder(buf, order)
+	dec := newDecoder(buf, order, enc.fds)
 	v, err := dec.Decode(SignatureOf(val))
 	if err != nil {
 		t.Fatal(err)
@@ -116,14 +119,15 @@ func (fooimpl) Foo() {}
 func TestEncodeMapStringNonEmptyInterface(t *testing.T) {
 	val := map[string]fooer{"foo": fooimpl("bar")}
 	buf := new(bytes.Buffer)
+	fds := make([]int, 0)
 	order := binary.LittleEndian
-	enc := newEncoder(buf, binary.LittleEndian)
+	enc := newEncoder(buf, binary.LittleEndian, fds)
 	err := enc.Encode(val)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	dec := newDecoder(buf, order)
+	dec := newDecoder(buf, order, enc.fds)
 	v, err := dec.Decode(SignatureOf(val))
 	if err != nil {
 		t.Fatal(err)
@@ -138,14 +142,15 @@ func TestEncodeMapStringNonEmptyInterface(t *testing.T) {
 func TestEncodeSliceInterface(t *testing.T) {
 	val := []interface{}{"foo", "bar"}
 	buf := new(bytes.Buffer)
+	fds := make([]int, 0)
 	order := binary.LittleEndian
-	enc := newEncoder(buf, binary.LittleEndian)
+	enc := newEncoder(buf, binary.LittleEndian, fds)
 	err := enc.Encode(val)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	dec := newDecoder(buf, order)
+	dec := newDecoder(buf, order, enc.fds)
 	v, err := dec.Decode(SignatureOf(val))
 	if err != nil {
 		t.Fatal(err)
@@ -161,14 +166,15 @@ func TestEncodeSliceInterface(t *testing.T) {
 func TestEncodeSliceNamedInterface(t *testing.T) {
 	val := []empty{"foo", "bar"}
 	buf := new(bytes.Buffer)
+	fds := make([]int, 0)
 	order := binary.LittleEndian
-	enc := newEncoder(buf, binary.LittleEndian)
+	enc := newEncoder(buf, binary.LittleEndian, fds)
 	err := enc.Encode(val)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	dec := newDecoder(buf, order)
+	dec := newDecoder(buf, order, enc.fds)
 	v, err := dec.Decode(SignatureOf(val))
 	if err != nil {
 		t.Fatal(err)
@@ -194,14 +200,15 @@ func TestEncodeNestedInterface(t *testing.T) {
 		},
 	}
 	buf := new(bytes.Buffer)
+	fds := make([]int, 0)
 	order := binary.LittleEndian
-	enc := newEncoder(buf, binary.LittleEndian)
+	enc := newEncoder(buf, binary.LittleEndian, fds)
 	err := enc.Encode(val)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	dec := newDecoder(buf, order)
+	dec := newDecoder(buf, order, enc.fds)
 	v, err := dec.Decode(SignatureOf(val))
 	if err != nil {
 		t.Fatal(err)
@@ -217,14 +224,15 @@ func TestEncodeNestedInterface(t *testing.T) {
 func TestEncodeInt(t *testing.T) {
 	val := 10
 	buf := new(bytes.Buffer)
+	fds := make([]int, 0)
 	order := binary.LittleEndian
-	enc := newEncoder(buf, binary.LittleEndian)
+	enc := newEncoder(buf, binary.LittleEndian, fds)
 	err := enc.Encode(val)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	dec := newDecoder(buf, order)
+	dec := newDecoder(buf, order, enc.fds)
 	v, err := dec.Decode(SignatureOf(val))
 	if err != nil {
 		t.Fatal(err)
@@ -240,14 +248,15 @@ func TestEncodeInt(t *testing.T) {
 func TestEncodeIntToNonCovertible(t *testing.T) {
 	val := 150
 	buf := new(bytes.Buffer)
+	fds := make([]int, 0)
 	order := binary.LittleEndian
-	enc := newEncoder(buf, binary.LittleEndian)
+	enc := newEncoder(buf, binary.LittleEndian, fds)
 	err := enc.Encode(val)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	dec := newDecoder(buf, order)
+	dec := newDecoder(buf, order, enc.fds)
 	v, err := dec.Decode(SignatureOf(val))
 	if err != nil {
 		t.Fatal(err)
@@ -263,14 +272,15 @@ func TestEncodeIntToNonCovertible(t *testing.T) {
 func TestEncodeUint(t *testing.T) {
 	val := uint(10)
 	buf := new(bytes.Buffer)
+	fds := make([]int, 0)
 	order := binary.LittleEndian
-	enc := newEncoder(buf, binary.LittleEndian)
+	enc := newEncoder(buf, binary.LittleEndian, fds)
 	err := enc.Encode(val)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	dec := newDecoder(buf, order)
+	dec := newDecoder(buf, order, enc.fds)
 	v, err := dec.Decode(SignatureOf(val))
 	if err != nil {
 		t.Fatal(err)
@@ -286,14 +296,15 @@ func TestEncodeUint(t *testing.T) {
 func TestEncodeUintToNonCovertible(t *testing.T) {
 	val := uint(10)
 	buf := new(bytes.Buffer)
+	fds := make([]int, 0)
 	order := binary.LittleEndian
-	enc := newEncoder(buf, binary.LittleEndian)
+	enc := newEncoder(buf, binary.LittleEndian, fds)
 	err := enc.Encode(val)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	dec := newDecoder(buf, order)
+	dec := newDecoder(buf, order, enc.fds)
 	v, err := dec.Decode(SignatureOf(val))
 	if err != nil {
 		t.Fatal(err)
@@ -310,14 +321,15 @@ type boolean bool
 func TestEncodeOfAssignableType(t *testing.T) {
 	val := boolean(true)
 	buf := new(bytes.Buffer)
+	fds := make([]int, 0)
 	order := binary.LittleEndian
-	enc := newEncoder(buf, binary.LittleEndian)
+	enc := newEncoder(buf, binary.LittleEndian, fds)
 	err := enc.Encode(val)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	dec := newDecoder(buf, order)
+	dec := newDecoder(buf, order, enc.fds)
 	v, err := dec.Decode(SignatureOf(val))
 	if err != nil {
 		t.Fatal(err)
@@ -344,14 +356,15 @@ func TestEncodeVariant(t *testing.T) {
 		},
 	}
 	buf := new(bytes.Buffer)
+	fds := make([]int, 0)
 	order := binary.LittleEndian
-	enc := newEncoder(buf, binary.LittleEndian)
+	enc := newEncoder(buf, binary.LittleEndian, fds)
 	err := enc.Encode(src)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	dec := newDecoder(buf, order)
+	dec := newDecoder(buf, order, enc.fds)
 	v, err := dec.Decode(SignatureOf(src))
 	if err != nil {
 		t.Fatal(err)
@@ -369,14 +382,15 @@ func TestEncodeVariantToList(t *testing.T) {
 		"foo": []interface{}{"a", "b", "c"},
 	}
 	buf := new(bytes.Buffer)
+	fds := make([]int, 0)
 	order := binary.LittleEndian
-	enc := newEncoder(buf, binary.LittleEndian)
+	enc := newEncoder(buf, binary.LittleEndian, fds)
 	err := enc.Encode(src)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	dec := newDecoder(buf, order)
+	dec := newDecoder(buf, order, enc.fds)
 	v, err := dec.Decode(SignatureOf(src))
 	if err != nil {
 		t.Fatal(err)
@@ -394,14 +408,15 @@ func TestEncodeVariantToUint64(t *testing.T) {
 		"foo": uint64(10),
 	}
 	buf := new(bytes.Buffer)
+	fds := make([]int, 0)
 	order := binary.LittleEndian
-	enc := newEncoder(buf, binary.LittleEndian)
+	enc := newEncoder(buf, binary.LittleEndian, fds)
 	err := enc.Encode(src)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	dec := newDecoder(buf, order)
+	dec := newDecoder(buf, order, enc.fds)
 	v, err := dec.Decode(SignatureOf(src))
 	if err != nil {
 		t.Fatal(err)

@@ -37,14 +37,17 @@ func (t genericTransport) SupportsUnixFDs() bool {
 func (t genericTransport) EnableUnixFDs() {}
 
 func (t genericTransport) ReadMessage() (*Message, error) {
-	return DecodeMessage(t)
+	return DecodeMessage(t, make([]int, 0))
 }
 
 func (t genericTransport) SendMessage(msg *Message) error {
-	for _, v := range msg.Body {
-		if _, ok := v.(UnixFD); ok {
-			return errors.New("dbus: unix fd passing not enabled")
-		}
+	fds, err := msg.CountFds()
+	if err != nil {
+		return err
 	}
-	return msg.EncodeTo(t, nativeEndian)
+	if fds != 0 {
+		return errors.New("dbus: unix fd passing not enabled")
+	}
+	_, err = msg.EncodeTo(t, nativeEndian)
+	return err
 }
