@@ -8,10 +8,68 @@ import (
 const testString = `This is a test!
 This text should be read from the file that is created by this test.`
 
-type unixFDTest struct{}
+type unixFDTest struct {
+	t *testing.T
+}
 
-func (t unixFDTest) Test(fd UnixFD) (string, *Error) {
+func (t unixFDTest) Testfd(fd UnixFD) (string, *Error) {
 	var b [4096]byte
+	file := os.NewFile(uintptr(fd), "testfile")
+	defer file.Close()
+	n, err := file.Read(b[:])
+	if err != nil {
+		return "", &Error{"com.github.guelfey.test.Error", nil}
+	}
+	return string(b[:n]), nil
+}
+
+func (t unixFDTest) Testvariant(v Variant) (string, *Error) {
+	var b [4096]byte
+	fd := v.Value().(UnixFD)
+	file := os.NewFile(uintptr(fd), "testfile")
+	defer file.Close()
+	n, err := file.Read(b[:])
+	if err != nil {
+		return "", &Error{"com.github.guelfey.test.Error", nil}
+	}
+	return string(b[:n]), nil
+}
+
+type unixfdContainer struct {
+	Fd UnixFD
+}
+
+func (t unixFDTest) Teststruct(s unixfdContainer) (string, *Error) {
+	var b [4096]byte
+	file := os.NewFile(uintptr(s.Fd), "testfile")
+	defer file.Close()
+	n, err := file.Read(b[:])
+	if err != nil {
+		return "", &Error{"com.github.guelfey.test.Error", nil}
+	}
+	return string(b[:n]), nil
+}
+
+func (t unixFDTest) Testvariantstruct(vs Variant) (string, *Error) {
+	var b [4096]byte
+	s := vs.Value().([]interface{})
+	u := s[0].(UnixFD)
+	file := os.NewFile(uintptr(u), "testfile")
+	defer file.Close()
+	n, err := file.Read(b[:])
+	if err != nil {
+		return "", &Error{"com.github.guelfey.test.Error", nil}
+	}
+	return string(b[:n]), nil
+}
+
+type variantContainer struct {
+	V Variant
+}
+
+func (t unixFDTest) Teststructvariant(sv variantContainer) (string, *Error) {
+	var b [4096]byte
+	fd := sv.V.Value().(UnixFD)
 	file := os.NewFile(uintptr(fd), "testfile")
 	defer file.Close()
 	n, err := file.Read(b[:])
@@ -32,19 +90,65 @@ func TestUnixFDs(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer w.Close()
-	if _, err := w.Write([]byte(testString)); err != nil {
-		t.Fatal(err)
-	}
 	name := conn.Names()[0]
-	test := unixFDTest{}
+	test := unixFDTest{t}
 	conn.Export(test, "/com/github/guelfey/test", "com.github.guelfey.test")
 	var s string
 	obj := conn.Object(name, "/com/github/guelfey/test")
-	err = obj.Call("com.github.guelfey.test.Test", 0, UnixFD(r.Fd())).Store(&s)
+
+	if _, err := w.Write([]byte(testString)); err != nil {
+		t.Fatal(err)
+	}
+	err = obj.Call("com.github.guelfey.test.Testfd", 0, UnixFD(r.Fd())).Store(&s)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if s != testString {
 		t.Fatal("got", s, "wanted", testString)
 	}
+
+	if _, err := w.Write([]byte(testString)); err != nil {
+		t.Fatal(err)
+	}
+	err = obj.Call("com.github.guelfey.test.Testvariant", 0, MakeVariant(UnixFD(r.Fd()))).Store(&s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s != testString {
+		t.Fatal("got", s, "wanted", testString)
+	}
+
+	if _, err := w.Write([]byte(testString)); err != nil {
+		t.Fatal(err)
+	}
+	err = obj.Call("com.github.guelfey.test.Teststruct", 0, unixfdContainer{UnixFD(r.Fd())}).Store(&s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s != testString {
+		t.Fatal("got", s, "wanted", testString)
+	}
+
+	if _, err := w.Write([]byte(testString)); err != nil {
+		t.Fatal(err)
+	}
+	err = obj.Call("com.github.guelfey.test.Testvariantstruct", 0, MakeVariant(unixfdContainer{UnixFD(r.Fd())})).Store(&s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s != testString {
+		t.Fatal("got", s, "wanted", testString)
+	}
+
+	if _, err := w.Write([]byte(testString)); err != nil {
+		t.Fatal(err)
+	}
+	err = obj.Call("com.github.guelfey.test.Teststructvariant", 0, variantContainer{MakeVariant(UnixFD(r.Fd()))}).Store(&s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s != testString {
+		t.Fatal("got", s, "wanted", testString)
+	}
+
 }

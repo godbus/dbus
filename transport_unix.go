@@ -113,7 +113,7 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 	if _, err := io.ReadFull(t.rdr, headerdata[4:]); err != nil {
 		return nil, err
 	}
-	dec := newDecoder(bytes.NewBuffer(headerdata), order)
+	dec := newDecoder(bytes.NewBuffer(headerdata), order, make([]int, 0))
 	dec.pos = 12
 	vs, err := dec.Decode(Signature{"a(yv)"})
 	if err != nil {
@@ -147,7 +147,7 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 		if err != nil {
 			return nil, err
 		}
-		msg, err := DecodeMessage(bytes.NewBuffer(all))
+		msg, err := DecodeMessage(bytes.NewBuffer(all), fds)
 		if err != nil {
 			return nil, err
 		}
@@ -175,27 +175,25 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 		}
 		return msg, nil
 	}
-	return DecodeMessage(bytes.NewBuffer(all))
+	return DecodeMessage(bytes.NewBuffer(all), make([]int, 0))
 }
 
 func (t *unixTransport) SendMessage(msg *Message) error {
-	fds := make([]int, 0)
-	for i, v := range msg.Body {
-		if fd, ok := v.(UnixFD); ok {
-			msg.Body[i] = UnixFDIndex(len(fds))
-			fds = append(fds, int(fd))
-		}
+	fdcnt, err := msg.CountFds()
+	if err != nil {
+		return err
 	}
-	if len(fds) != 0 {
+	if fdcnt != 0 {
 		if !t.hasUnixFDs {
 			return errors.New("dbus: unix fd passing not enabled")
 		}
-		msg.Headers[FieldUnixFDs] = MakeVariant(uint32(len(fds)))
-		oob := syscall.UnixRights(fds...)
+		msg.Headers[FieldUnixFDs] = MakeVariant(uint32(fdcnt))
 		buf := new(bytes.Buffer)
-		if err := msg.EncodeTo(buf, nativeEndian); err != nil {
+		fds, err := msg.EncodeTo(buf, nativeEndian)
+		if err != nil {
 			return err
 		}
+		oob := syscall.UnixRights(fds...)
 		n, oobn, err := t.UnixConn.WriteMsgUnix(buf.Bytes(), oob, nil)
 		if err != nil {
 			return err
@@ -204,7 +202,7 @@ func (t *unixTransport) SendMessage(msg *Message) error {
 			return io.ErrShortWrite
 		}
 	} else {
-		if err := msg.EncodeTo(t, nativeEndian); err != nil {
+		if _, err := msg.EncodeTo(t, nativeEndian); err != nil {
 			return err
 		}
 	}
