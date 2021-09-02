@@ -206,7 +206,7 @@ func TestCloseBeforeSignal(t *testing.T) {
 			FieldPath:      MakeVariant(ObjectPath("/baz")),
 		},
 	}
-	_, err = msg.EncodeTo(pipewriter, binary.LittleEndian)
+	err = msg.EncodeTo(pipewriter, binary.LittleEndian)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -61,11 +61,11 @@ func TestDecodeArrayEmptyStruct(t *testing.T) {
 		},
 		serial: 0x00000003,
 	}
-	_, err := msg.EncodeTo(buf, binary.LittleEndian)
+	err := msg.EncodeTo(buf, binary.LittleEndian)
 	if err != nil {
 		t.Fatal(err)
 	}
-	msg, err = DecodeMessage(buf, make([]int, 0))
+	msg, err = DecodeMessage(buf)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -147,7 +147,7 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 		if err != nil {
 			return nil, err
 		}
-		msg, err := DecodeMessage(bytes.NewBuffer(all), fds)
+		msg, err := DecodeMessageWithFDs(bytes.NewBuffer(all), fds)
 		if err != nil {
 			return nil, err
 		}
@@ -175,7 +175,7 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 		}
 		return msg, nil
 	}
-	return DecodeMessage(bytes.NewBuffer(all), make([]int, 0))
+	return DecodeMessage(bytes.NewBuffer(all))
 }
 
 func (t *unixTransport) SendMessage(msg *Message) error {
@@ -189,7 +189,7 @@ func (t *unixTransport) SendMessage(msg *Message) error {
 		}
 		msg.Headers[FieldUnixFDs] = MakeVariant(uint32(fdcnt))
 		buf := new(bytes.Buffer)
-		fds, err := msg.EncodeTo(buf, nativeEndian)
+		fds, err := msg.EncodeToWithFDs(buf, nativeEndian)
 		if err != nil {
 			return err
 		}
@@ -202,7 +202,7 @@ func (t *unixTransport) SendMessage(msg *Message) error {
 			return io.ErrShortWrite
 		}
 	} else {
-		if _, err := msg.EncodeTo(t, nativeEndian); err != nil {
+		if err := msg.EncodeTo(t, nativeEndian); err != nil {
 			return err
 		}
 	}
