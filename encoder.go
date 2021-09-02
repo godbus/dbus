@@ -124,6 +124,11 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		if strings.IndexByte(str, byte(0)) != -1 {
 			panic(FormatError("input has a null char('\\000') in string"))
 		}
+		if v.Type() == objectPathType {
+			if !ObjectPath(str).IsValid() {
+				panic(FormatError("invalid object path"))
+			}
+		}
 		enc.encode(reflect.ValueOf(uint32(len(str))), depth)
 		b := make([]byte, v.Len()+1)
 		copy(b, str)
