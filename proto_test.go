@@ -253,11 +253,11 @@ func TestMessage(t *testing.T) {
 		FieldMember: MakeVariant("baz"),
 	}
 	message.Body = make([]interface{}, 0)
-	_, err := message.EncodeTo(buf, binary.LittleEndian)
+	err := message.EncodeTo(buf, binary.LittleEndian)
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = DecodeMessage(buf, make([]int, 0))
+	_, err = DecodeMessage(buf)
 	if err != nil {
 		t.Error(err)
 	}
@@ -317,7 +317,7 @@ func BenchmarkDecodeMessageSmall(b *testing.B) {
 
 	b.StopTimer()
 	buf := new(bytes.Buffer)
-	_, err = smallMessage.EncodeTo(buf, binary.LittleEndian)
+	err = smallMessage.EncodeTo(buf, binary.LittleEndian)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -325,7 +325,7 @@ func BenchmarkDecodeMessageSmall(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		rd = bytes.NewReader(decoded)
-		_, err = DecodeMessage(rd, make([]int, 0))
+		_, err = DecodeMessage(rd)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -338,7 +338,7 @@ func BenchmarkDecodeMessageBig(b *testing.B) {
 
 	b.StopTimer()
 	buf := new(bytes.Buffer)
-	_, err = bigMessage.EncodeTo(buf, binary.LittleEndian)
+	err = bigMessage.EncodeTo(buf, binary.LittleEndian)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -346,7 +346,7 @@ func BenchmarkDecodeMessageBig(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		rd = bytes.NewReader(decoded)
-		_, err = DecodeMessage(rd, make([]int, 0))
+		_, err = DecodeMessage(rd)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -356,7 +356,7 @@ func BenchmarkDecodeMessageBig(b *testing.B) {
 func BenchmarkEncodeMessageSmall(b *testing.B) {
 	var err error
 	for i := 0; i < b.N; i++ {
-		_, err = smallMessage.EncodeTo(ioutil.Discard, binary.LittleEndian)
+		err = smallMessage.EncodeTo(ioutil.Discard, binary.LittleEndian)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -366,7 +366,7 @@ func BenchmarkEncodeMessageSmall(b *testing.B) {
 func BenchmarkEncodeMessageBig(b *testing.B) {
 	var err error
 	for i := 0; i < b.N; i++ {
-		_, err = bigMessage.EncodeTo(ioutil.Discard, binary.LittleEndian)
+		err = bigMessage.EncodeTo(ioutil.Discard, binary.LittleEndian)
 		if err != nil {
 			b.Fatal(err)
 		}

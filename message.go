@@ -118,11 +118,7 @@ type header struct {
 	Variant
 }
 
-// DecodeMessage tries to decode a single message in the D-Bus wire format
-// from the given reader. The byte order is figured out from the first byte.
-// The possibly returned error can be an error of the underlying reader, an
-// InvalidMessageError or a FormatError.
-func DecodeMessage(rd io.Reader, fds []int) (msg *Message, err error) {
+func DecodeMessageWithFDs(rd io.Reader, fds []int) (msg *Message, err error) {
 	var order binary.ByteOrder
 	var hlength, length uint32
 	var typ, flags, proto byte
@@ -207,6 +203,14 @@ func DecodeMessage(rd io.Reader, fds []int) (msg *Message, err error) {
 	return
 }
 
+// DecodeMessage tries to decode a single message in the D-Bus wire format
+// from the given reader. The byte order is figured out from the first byte.
+// The possibly returned error can be an error of the underlying reader, an
+// InvalidMessageError or a FormatError.
+func DecodeMessage(rd io.Reader) (msg *Message, err error) {
+	return DecodeMessageWithFDs(rd, make([]int, 0));
+}
+
 type nullwriter struct{}
 
 func (nullwriter) Write(p []byte) (cnt int, err error) {
@@ -222,10 +226,7 @@ func (msg *Message) CountFds() (int, error) {
 	return len(enc.fds), err
 }
 
-// EncodeTo encodes and sends a message to the given writer. The byte order must
-// be either binary.LittleEndian or binary.BigEndian. If the message is not
-// valid or an error occurs when writing, an error is returned.
-func (msg *Message) EncodeTo(out io.Writer, order binary.ByteOrder) (fds []int, err error) {
+func (msg *Message) EncodeToWithFDs(out io.Writer, order binary.ByteOrder) (fds []int, err error) {
 	if err := msg.IsValid(); err != nil {
 		return make([]int, 0), err
 	}
@@ -272,6 +273,14 @@ func (msg *Message) EncodeTo(out io.Writer, order binary.ByteOrder) (fds []int, 
 		return make([]int, 0), err
 	}
 	return enc.fds, nil
+}
+
+// EncodeTo encodes and sends a message to the given writer. The byte order must
+// be either binary.LittleEndian or binary.BigEndian. If the message is not
+// valid or an error occurs when writing, an error is returned.
+func (msg *Message) EncodeTo(out io.Writer, order binary.ByteOrder) (err error) {
+	_, err = msg.EncodeToWithFDs(out, order);
+	return err;
 }
 
 // IsValid checks whether msg is a valid message and returns an
