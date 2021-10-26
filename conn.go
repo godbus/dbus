@@ -194,7 +194,7 @@ func Dial(address string, opts ...ConnOption) (*Conn, error) {
 //
 // Deprecated: use Dial with options instead.
 func DialHandler(address string, handler Handler, signalHandler SignalHandler) (*Conn, error) {
-	return Dial(address, WithSignalHandler(signalHandler))
+	return Dial(address, WithHandler(handler), WithSignalHandler(signalHandler))
 }
 
 // ConnOption is a connection option.
