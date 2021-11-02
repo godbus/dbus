@@ -143,6 +143,24 @@ type Prop struct {
 	Callback func(*Change) *dbus.Error
 }
 
+// Introspection returns the introspection data for p.
+// The "name" argument is used as the property's name in the resulting data.
+func (p *Prop) Introspection(name string) introspect.Property {
+	var result = introspect.Property{Name: name, Type: dbus.SignatureOf(p.Value).String()}
+	if p.Writable {
+		result.Access = "readwrite"
+	} else {
+		result.Access = "read"
+	}
+	result.Annotations = []introspect.Annotation{
+		{
+			Name: "org.freedesktop.DBus.Property.EmitsChangedSignal",
+			Value: p.Emit.String(),
+		},
+	}
+	return result
+}
+
 // Change represents a change of a property by a call to Set.
 type Change struct {
 	Props *Properties
@@ -232,20 +250,8 @@ func (p *Properties) Introspection(iface string) []introspect.Property {
 	defer p.mut.RUnlock()
 	m := p.m[iface]
 	s := make([]introspect.Property, 0, len(m))
-	for k, v := range m {
-		p := introspect.Property{Name: k, Type: dbus.SignatureOf(v.Value).String()}
-		if v.Writable {
-			p.Access = "readwrite"
-		} else {
-			p.Access = "read"
-		}
-		p.Annotations = []introspect.Annotation{
-			{
-				Name: "org.freedesktop.DBus.Property.EmitsChangedSignal",
-				Value: v.Emit.String(),
-			},
-		}
-		s = append(s, p)
+	for name, prop := range m {
+		s = append(s, prop.Introspection(name))
 	}
 	return s
 }
