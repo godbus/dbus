@@ -122,6 +122,9 @@ func isConvertibleTo(dest, src reflect.Type) bool {
 	case dest.Kind() == reflect.Slice:
 		return src.Kind() == reflect.Slice &&
 			isConvertibleTo(dest.Elem(), src.Elem())
+	case dest.Kind() == reflect.Ptr:
+		dest = dest.Elem()
+		fallthrough
 	case dest.Kind() == reflect.Struct:
 		return src == interfacesType
 	default:
