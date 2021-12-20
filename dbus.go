@@ -126,7 +126,7 @@ func isConvertibleTo(dest, src reflect.Type) bool {
 		dest = dest.Elem()
 		return isConvertibleTo(dest, src)
 	case dest.Kind() == reflect.Struct:
-		return src == interfacesType
+		return src == interfacesType || dest.Kind() == src.Kind()
 	default:
 		return src.ConvertibleTo(dest)
 	}
