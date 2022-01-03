@@ -798,3 +798,25 @@ func TestCancellingContextClosesConnection(t *testing.T) {
 		t.Errorf("expected connection to be closed, but got: %v", err)
 	}
 }
+
+// TestTimeoutContextClosesConnection checks that a Conn instance is closed after
+// the passed context's deadline is missed.
+// The test also checks that there's no data race between Conn creation and its
+// automatic closing.
+func TestTimeoutContextClosesConnection(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 0)
+	defer cancel()
+
+	bus, err := NewConn(rwc{}, WithContext(ctx))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// wait until the connection is actually closed
+	time.Sleep(50 * time.Millisecond)
+
+	err = bus.BusObject().Call("org.freedesktop.DBus.Peer.Ping", 0).Store()
+	if err != ErrClosed {
+		t.Errorf("expected connection to be closed, but got: %v", err)
+	}
+}
