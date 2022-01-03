@@ -284,10 +284,6 @@ func newConn(tr transport, opts ...ConnOption) (*Conn, error) {
 		conn.ctx = context.Background()
 	}
 	conn.ctx, conn.cancelCtx = context.WithCancel(conn.ctx)
-	go func() {
-		<-conn.ctx.Done()
-		conn.Close()
-	}()
 
 	conn.calls = newCallTracker()
 	if conn.handler == nil {
@@ -302,6 +298,11 @@ func newConn(tr transport, opts ...ConnOption) (*Conn, error) {
 	conn.outHandler = &outputHandler{conn: conn}
 	conn.names = newNameTracker()
 	conn.busObj = conn.Object("org.freedesktop.DBus", "/org/freedesktop/DBus")
+
+	go func() {
+		<-conn.ctx.Done()
+		conn.Close()
+	}()
 	return conn, nil
 }
 
