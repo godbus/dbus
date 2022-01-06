@@ -277,13 +277,8 @@ func storeSliceIntoInterface(dest, src reflect.Value) error {
 func storeSliceIntoSlice(dest, src reflect.Value) error {
 	if dest.IsNil() || dest.Len() < src.Len() {
 		dest.Set(reflect.MakeSlice(dest.Type(), src.Len(), src.Cap()))
-	}
-	if dest.Len() != src.Len() {
-		return fmt.Errorf(
-			"dbus.Store: type mismatch: "+
-				"slices are different lengths "+
-				"need: %d have: %d",
-			src.Len(), dest.Len())
+	} else if dest.Len() > src.Len() {
+		dest.Set(dest.Slice(0, src.Len()))
 	}
 	for i := 0; i < src.Len(); i++ {
 		err := store(dest.Index(i), getVariantValue(src.Index(i)))

@@ -97,3 +97,18 @@ func TestStoreNested(t *testing.T) {
 			dest, src)
 	}
 }
+
+func TestStoreSmallerSliceToLargerSlice(t *testing.T) {
+	src := []string{"baz"}
+	dest := []interface{}{"foo", "bar"}
+	err := Store([]interface{}{src}, &dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dest) != 1 {
+		t.Fatal("Expected dest slice to shrink")
+	}
+	if dest[0].(string) != "baz" {
+		t.Fatal("Wrong element saved in dest slice")
+	}
+}
