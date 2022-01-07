@@ -650,7 +650,9 @@ func (conn *Conn) RemoveMatchSignalContext(ctx context.Context, options ...Match
 
 // Signal registers the given channel to be passed all received signal messages.
 //
-// Multiple of these channels can be registered at the same time.
+// Multiple of these channels can be registered at the same time. The channel is
+// closed if the Conn is closed; it should not be closed by the caller before
+// RemoveSignal was called on it.
 //
 // These channels are "overwritten" by Eavesdrop; i.e., if there currently is a
 // channel for eavesdropped messages, this channel receives all signals, and
