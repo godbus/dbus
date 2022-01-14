@@ -3,6 +3,7 @@ package dbus
 import (
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 )
@@ -209,7 +210,11 @@ func (conn *Conn) handleCall(msg *Message) {
 		}
 		reply.Headers[FieldSignature] = MakeVariant(SignatureOf(reply.Body...))
 
-		conn.sendMessageAndIfClosed(reply, nil)
+		if err := reply.IsValid(); err != nil {
+			fmt.Fprintf(os.Stderr, "dbus: dropping invalid reply to %s.%s on obj %s: %s\n", ifaceName, name, path, err)
+		} else {
+			conn.sendMessageAndIfClosed(reply, nil)
+		}
 	}
 }
 
