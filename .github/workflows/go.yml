@@ -25,7 +25,7 @@ jobs:
         stable: '!contains(${{ matrix.go-version }}, "beta") && !contains(${{ matrix.go-version }}, "rc")'
         go-version: ${{ matrix.go-version }}
 
-    - name: Check out code into the Go module directory
+    - name: Checkout
       uses: actions/checkout@v2
 
     - name: Install dbus
