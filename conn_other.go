@@ -85,9 +85,6 @@ func getRuntimeDirectory() (string, error) {
 }
 
 func fileExists(filename string) bool {
-	if _, err := os.Stat(filename); !os.IsNotExist(err) {
-		return true
-	} else {
-		return false
-	}
+	_, err := os.Stat(filename)
+	return !os.IsNotExist(err)
 }
