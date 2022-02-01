@@ -108,7 +108,7 @@ func TestObjectSignalHandling(t *testing.T) {
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
-				t.Errorf("Catched panic in emitter goroutine: %v", err)
+				t.Errorf("Caught panic in emitter goroutine: %v", err)
 			}
 		}()
 

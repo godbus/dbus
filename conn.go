@@ -169,7 +169,7 @@ func Connect(address string, opts ...ConnOption) (*Conn, error) {
 
 // SystemBusPrivate returns a new private connection to the system bus.
 // Note: this connection is not ready to use. One must perform Auth and Hello
-// on the connection before it is useable.
+// on the connection before it is usable.
 func SystemBusPrivate(opts ...ConnOption) (*Conn, error) {
 	return Dial(getSystemBusPlatformAddress(), opts...)
 }
