@@ -1,4 +1,4 @@
-name: Go
+name: Test
 
 on:
   push:
@@ -8,8 +8,7 @@ on:
 
 jobs:
 
-  build:
-    name: Build
+  test:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
