@@ -167,15 +167,18 @@ func (s Signature) String() string {
 	return s.str
 }
 
+// MarshalJSON is to implement the interface json.Marshal
 func (s Signature) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s.String())
 }
 
+// UnmarshalJSON is to implement the interface json.Unmarshal
 func (s *Signature) UnmarshalJSON(bytes []byte) error {
 	s.str = string(bytes)
 	return nil
 }
 
+// GobEncode is to implement the interface Encode in gob
 func (s Signature) GobEncode() ([]byte, error) {
 	var buffer bytes.Buffer
 	encoder := gob.NewEncoder(&buffer)
@@ -185,6 +188,7 @@ func (s Signature) GobEncode() ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
+// GobDecode is to implement the interface Decode in gob
 func (s *Signature) GobDecode(bytes []byte) error {
 	s.str = string(bytes)
 	return nil

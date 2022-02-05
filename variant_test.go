@@ -1,7 +1,14 @@
 package dbus
 
-import "reflect"
-import "testing"
+import (
+	"bytes"
+	"encoding/gob"
+	"encoding/json"
+	"fmt"
+	"reflect"
+	"strings"
+	"testing"
+)
 
 var variantFormatTests = []struct {
 	v interface{}
@@ -89,4 +96,175 @@ func TestVariantStore(t *testing.T) {
 		t.Fatalf("expected %s, got %s\n", str, result)
 	}
 
+}
+
+func TestJson(t *testing.T) {
+	str := "uint64 123456789"
+	v, err := ParseVariant(str, Signature{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bytes, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(bytes) == "{}" {
+		t.Fatal("Can't marshal the variant value!")
+	}
+
+	var v1 Variant
+	err = json.Unmarshal(bytes, &v1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v1.value == nil {
+		t.Fatal("Can't unmarshal the variant value!")
+	}
+	if v1.value != v.value {
+		t.Fatalf("expected %s, got %s\n", v.value, v1.value)
+	}
+}
+
+func TestJsonSimple(t *testing.T) {
+	cases := []struct {
+		name string
+		val  interface{}
+	}{
+		{
+			name: "int",
+			val:  100,
+		},
+		{
+			name: "float",
+			val:  100.3,
+		},
+		{
+			name: "string",
+			val:  "lfbzhm",
+		},
+		{
+			name: "byte",
+			val:  'l',
+		},
+	}
+	for _, tc := range cases {
+		val := tc.val
+		v := MakeVariant(val)
+		bytes, err := json.Marshal(v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(bytes) == "{}" {
+			t.Fatal("Can't marshal the variant value!")
+		}
+
+		var v1 Variant
+		err = json.Unmarshal(bytes, &v1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if v1.value == nil {
+			t.Fatal("Can't unmarshal the variant value!")
+		}
+
+		str, _ := v1.format()
+		valstr := fmt.Sprintf("%v", val)
+		if !strings.Contains(str, valstr) {
+			t.Fatalf("expected %v, got %v\n", valstr, str)
+		}
+	}
+}
+
+func TestJsonArray(t *testing.T) {
+	arr := []string{"lfb", "zhm", "nn", "tt", "hello"}
+	v := MakeVariant(arr)
+	bytes, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(bytes) == "{}" {
+		t.Fatal("Can't marshal the variant value!")
+	}
+
+	var v1 Variant
+	err = json.Unmarshal(bytes, &v1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v1.value == nil {
+		t.Fatal("Can't unmarshal the variant value!")
+	}
+
+	var arr1 []string
+	err = v1.Store(&arr1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(arr1) != len(arr) {
+		t.Fatalf("expected %v, got %v\n", v.value, v1.value)
+	}
+}
+
+func TestJsonMap(t *testing.T) {
+	mapstr := map[string]string{
+		"lfb": "zhm",
+		"nn":  "tt",
+	}
+	v := MakeVariant(mapstr)
+	bytes, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(bytes) == "{}" {
+		t.Fatal("Can't marshal the variant value!")
+	}
+
+	var v1 Variant
+	err = json.Unmarshal(bytes, &v1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v1.value == nil {
+		t.Fatal("Can't unmarshal the variant value!")
+	}
+
+	var map1 map[string]string
+	err = v1.Store(&map1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(map1) != len(mapstr) {
+		t.Fatalf("expected %v, got %v\n", v.value, v1.value)
+	}
+}
+
+func TestGob(t *testing.T) {
+	str := "uint64 123456789"
+	v, err := ParseVariant(str, Signature{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var buffer bytes.Buffer
+	encoder := gob.NewEncoder(&buffer)
+	err = encoder.Encode(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(buffer.Bytes()) == "{}" {
+		t.Fatal("Can't marshal the variant value!")
+	}
+
+	decoder := gob.NewDecoder(&buffer)
+	var v1 Variant
+	err = decoder.Decode(&v1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v1.value == nil {
+		t.Fatal("Can't unmarshal the variant value!")
+	}
+	if v1.value != v.value {
+		t.Fatalf("expected %s, got %s\n", v.value, v1.value)
+	}
 }

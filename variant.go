@@ -151,6 +151,7 @@ func (v Variant) Store(value interface{}) error {
 	return storeInterfaces(v.value, value)
 }
 
+// toMap trans the Variant to a map
 func (v Variant) toMap() map[string]string {
 	mapstr := map[string]string{}
 	mapstr["sig"] = v.sig.String()
@@ -161,6 +162,7 @@ func (v Variant) toMap() map[string]string {
 	return mapstr
 }
 
+// parseMap parses a Variant from a map
 func (v *Variant) parseMap(mapstr map[string]string) error {
 	if sigStr, ok := mapstr["sig"]; ok {
 		sig := Signature{sigStr}
@@ -177,11 +179,13 @@ func (v *Variant) parseMap(mapstr map[string]string) error {
 	return nil
 }
 
+// MarshalJSON is to implement the interface json.Marshal
 func (v Variant) MarshalJSON() ([]byte, error) {
 	mapstr := v.toMap()
 	return json.Marshal(mapstr)
 }
 
+// UnmarshalJSON is to implement the interface json.Unmarshal
 func (v *Variant) UnmarshalJSON(bytes []byte) error {
 	var mapstr map[string]string
 	if err := json.Unmarshal(bytes, &mapstr); err != nil {
@@ -190,6 +194,7 @@ func (v *Variant) UnmarshalJSON(bytes []byte) error {
 	return v.parseMap(mapstr)
 }
 
+// GobEncode is to implement the interface Encode in gob
 func (v Variant) GobEncode() ([]byte, error) {
 	var buffer bytes.Buffer
 	encoder := gob.NewEncoder(&buffer)
@@ -203,6 +208,7 @@ func (v Variant) GobEncode() ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
+// GobDecode is to implement the interface Decode in gob
 func (v *Variant) GobDecode(jsonBytes []byte) error {
 	buffer := bytes.NewBuffer(jsonBytes)
 	decoder := gob.NewDecoder(buffer)
