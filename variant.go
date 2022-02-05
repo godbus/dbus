@@ -2,6 +2,8 @@ package dbus
 
 import (
 	"bytes"
+	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
@@ -147,4 +149,68 @@ func (v Variant) Value() interface{} {
 // mechanism as the "Store" function.
 func (v Variant) Store(value interface{}) error {
 	return storeInterfaces(v.value, value)
+}
+
+func (v Variant) toMap() map[string]string {
+	mapstr := map[string]string{}
+	mapstr["sig"] = v.sig.String()
+
+	s, _ := v.format()
+	mapstr["value"] = s
+
+	return mapstr
+}
+
+func (v *Variant) parseMap(mapstr map[string]string) error {
+	if sigStr, ok := mapstr["sig"]; ok {
+		sig := Signature{sigStr}
+
+		if vstr, ok := mapstr["value"]; ok {
+			v1, err := ParseVariant(vstr, sig)
+			if err != nil {
+				return err
+			}
+			v.sig = v1.sig
+			v.value = v1.value
+		}
+	}
+	return nil
+}
+
+func (v Variant) MarshalJSON() ([]byte, error) {
+	mapstr := v.toMap()
+	return json.Marshal(mapstr)
+}
+
+func (v *Variant) UnmarshalJSON(bytes []byte) error {
+	var mapstr map[string]string
+	if err := json.Unmarshal(bytes, &mapstr); err != nil {
+		return err
+	}
+	return v.parseMap(mapstr)
+}
+
+func (v Variant) GobEncode() ([]byte, error) {
+	var buffer bytes.Buffer
+	encoder := gob.NewEncoder(&buffer)
+
+	mapstr := v.toMap()
+
+	if err := encoder.Encode(mapstr); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
+}
+
+func (v *Variant) GobDecode(jsonBytes []byte) error {
+	buffer := bytes.NewBuffer(jsonBytes)
+	decoder := gob.NewDecoder(buffer)
+
+	var mapstr map[string]string
+	if err := decoder.Decode(&mapstr); err != nil {
+		return err
+	}
+
+	return v.parseMap(mapstr)
 }

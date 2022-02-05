@@ -1,6 +1,9 @@
 package dbus
 
 import (
+	"bytes"
+	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -162,6 +165,29 @@ func (s Signature) Single() bool {
 // String returns the signature's string representation.
 func (s Signature) String() string {
 	return s.str
+}
+
+func (s Signature) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
+}
+
+func (s *Signature) UnmarshalJSON(bytes []byte) error {
+	s.str = string(bytes)
+	return nil
+}
+
+func (s Signature) GobEncode() ([]byte, error) {
+	var buffer bytes.Buffer
+	encoder := gob.NewEncoder(&buffer)
+	if err := encoder.Encode(s.String()); err != nil {
+		return nil, err
+	}
+	return buffer.Bytes(), nil
+}
+
+func (s *Signature) GobDecode(bytes []byte) error {
+	s.str = string(bytes)
+	return nil
 }
 
 // A SignatureError indicates that a signature passed to a function or received
