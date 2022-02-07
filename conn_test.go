@@ -156,8 +156,7 @@ type rwc struct {
 
 func (rwc) Close() error { return nil }
 
-type fakeAuth struct {
-}
+type fakeAuth struct{}
 
 func (fakeAuth) FirstData() (name, resp []byte, status AuthStatus) {
 	return []byte("name"), []byte("resp"), AuthOk
@@ -660,7 +659,8 @@ func benchmarkServeAsync(b *testing.B, srv, cli *Conn) {
 		for i := 0; i < b.N; i++ {
 			v := <-c
 			if v.Err != nil {
-				b.Fatal(v.Err)
+				b.Error(v.Err)
+				return
 			}
 			i, r := v.Args[0].(int64), v.Body[0].(int64)
 			if 2*i != r {

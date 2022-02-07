@@ -56,7 +56,7 @@ func newIntro(path ObjectPath) *intro {
 	return &intro{path}
 }
 
-//Handler
+// Handler
 func (t *tester) LookupObject(path ObjectPath) (ServerObject, bool) {
 	if path == "/com/github/godbus/tester" {
 		return t, true
@@ -64,7 +64,7 @@ func (t *tester) LookupObject(path ObjectPath) (ServerObject, bool) {
 	return newIntro(path), true
 }
 
-//ServerObject
+// ServerObject
 func (t *tester) LookupInterface(name string) (Interface, bool) {
 	switch name {
 	case "com.github.godbus.dbus.Tester":
@@ -76,7 +76,7 @@ func (t *tester) LookupInterface(name string) (Interface, bool) {
 	return nil, false
 }
 
-//Interface
+// Interface
 func (t *tester) LookupMethod(name string) (Method, bool) {
 	switch name {
 	case "Test":
@@ -108,7 +108,7 @@ func (t *tester) LookupMethod(name string) (Method, bool) {
 	return nil, false
 }
 
-//Method
+// Method
 func (t *tester) Call(args ...interface{}) ([]interface{}, error) {
 	return args, nil
 }
@@ -151,7 +151,7 @@ func (t terrfn) ReturnValue(position int) interface{} {
 	return ""
 }
 
-//SignalHandler
+// SignalHandler
 func (t *tester) DeliverSignal(iface, name string, signal *Signal) {
 	t.subSigsMu.Lock()
 	intf, ok := t.subSigs[iface]
@@ -441,14 +441,13 @@ func TestHandlerSignal(t *testing.T) {
 		if sig.Body[0] != "foo" {
 			t.Errorf("Unexpected signal got %s, expected %s", sig.Body[0], "foo")
 		}
-	case <-time.After(time.Second * 10): //overly generous timeout
+	case <-time.After(time.Second * 10): // overly generous timeout
 		t.Errorf("Didn't receive a signal after 10 seconds")
 	}
 	tester.Close()
 }
 
-type X struct {
-}
+type X struct{}
 
 func (x *X) Method1() *Error {
 	return nil
@@ -473,7 +472,7 @@ func TestRaceInExport(t *testing.T) {
 	go func() {
 		err = bus.Export(&x, dbusPath, dbusInterface)
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
 		wg.Done()
 	}()
