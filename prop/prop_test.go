@@ -18,7 +18,10 @@ func comparePropValue(obj dbus.BusObject, name string, want interface{}, t *test
 		t.Fatal(err)
 	}
 	haveValue := reflect.New(reflect.TypeOf(want)).Interface()
-	dbus.Store([]interface{}{r.Value()}, haveValue)
+	err = dbus.Store([]interface{}{r.Value()}, haveValue)
+	if err != nil {
+		t.Fatal(err)
+	}
 	have := reflect.ValueOf(haveValue).Elem().Interface()
 	if !reflect.DeepEqual(have, want) {
 		t.Errorf("struct comparison failed: got '%v', want '%v'", have, want)
@@ -78,9 +81,15 @@ func TestValidateStructsAsProp(t *testing.T) {
 	yoos := make([]Foo, 2)
 	yoos[0] = Foo{Id: 3, Value: "Threes"}
 	yoos[1] = Foo{Id: 4, Value: "Fours"}
-	obj.SetProperty("org.guelfey.DBus.Test.FooStruct", dbus.MakeVariant(yoo))
-	obj.SetProperty("org.guelfey.DBus.Test.FooStructPtr", dbus.MakeVariant(yooPtr))
-	obj.SetProperty("org.guelfey.DBus.Test.SliceOfFoos", dbus.MakeVariant(yoos))
+	if err := obj.SetProperty("org.guelfey.DBus.Test.FooStruct", dbus.MakeVariant(yoo)); err != nil {
+		t.Fatal(err)
+	}
+	if err := obj.SetProperty("org.guelfey.DBus.Test.FooStructPtr", dbus.MakeVariant(yooPtr)); err != nil {
+		t.Fatal(err)
+	}
+	if err := obj.SetProperty("org.guelfey.DBus.Test.SliceOfFoos", dbus.MakeVariant(yoos)); err != nil {
+		t.Fatal(err)
+	}
 	comparePropValue(obj, "FooStruct", yoo, t)
 	comparePropValue(obj, "FooStructPtr", *yooPtr, t)
 	comparePropValue(obj, "SliceOfFoos", yoos, t)
@@ -93,9 +102,15 @@ func TestValidateStructsAsProp(t *testing.T) {
 	zoos := make([]Foo, 2)
 	zoos[0] = Foo{Id: 5, Value: "Sevens"}
 	zoos[1] = Foo{Id: 6, Value: "Sixes"}
-	obj.SetProperty("org.guelfey.DBus.Test.FooStruct", dbus.MakeVariant(zoo))
-	obj.SetProperty("org.guelfey.DBus.Test.FooStructPtr", dbus.MakeVariant(zooPtr))
-	obj.SetProperty("org.guelfey.DBus.Test.SliceOfFoos", dbus.MakeVariant(zoos))
+	if err := obj.SetProperty("org.guelfey.DBus.Test.FooStruct", dbus.MakeVariant(zoo)); err != nil {
+		t.Fatal(err)
+	}
+	if err := obj.SetProperty("org.guelfey.DBus.Test.FooStructPtr", dbus.MakeVariant(zooPtr)); err != nil {
+		t.Fatal(err)
+	}
+	if err := obj.SetProperty("org.guelfey.DBus.Test.SliceOfFoos", dbus.MakeVariant(zoos)); err != nil {
+		t.Fatal(err)
+	}
 	comparePropValue(obj, "FooStruct", zoo, t)
 	comparePropValue(obj, "FooStructPtr", *zooPtr, t)
 	comparePropValue(obj, "SliceOfFoos", zoos, t)
