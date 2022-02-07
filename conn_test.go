@@ -633,9 +633,13 @@ func BenchmarkServeSameConnAsync(b *testing.B) {
 
 func benchmarkServe(b *testing.B, srv, cli *Conn) {
 	var r int64
-	var err error
+
+	err := srv.Export(server{}, "/org/guelfey/DBus/Test", "org.guelfey.DBus.Test")
+	if err != nil {
+		b.Fatal(err)
+	}
+
 	dest := srv.Names()[0]
-	srv.Export(server{}, "/org/guelfey/DBus/Test", "org.guelfey.DBus.Test")
 	obj := cli.Object(dest, "/org/guelfey/DBus/Test")
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
@@ -651,7 +655,10 @@ func benchmarkServe(b *testing.B, srv, cli *Conn) {
 
 func benchmarkServeAsync(b *testing.B, srv, cli *Conn) {
 	dest := srv.Names()[0]
-	srv.Export(server{}, "/org/guelfey/DBus/Test", "org.guelfey.DBus.Test")
+	err := srv.Export(server{}, "/org/guelfey/DBus/Test", "org.guelfey.DBus.Test")
+	if err != nil {
+		b.Fatal(err)
+	}
 	obj := cli.Object(dest, "/org/guelfey/DBus/Test")
 	c := make(chan *Call, 50)
 	done := make(chan struct{})

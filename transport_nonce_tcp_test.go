@@ -24,7 +24,7 @@ func TestTcpNonceConnection(t *testing.T) {
 		</policy>
 </busconfig>
 `)
-	defer process.Kill()
+	defer func() { _ = process.Kill() }()
 
 	conn, err := Connect(addr, WithAuth(AuthAnonymous()))
 	if err != nil {
@@ -59,7 +59,7 @@ func startDaemon(t *testing.T, config string) (string, *os.Process) {
 	r := bufio.NewReader(out)
 	l, _, err := r.ReadLine()
 	if err != nil {
-		cmd.Process.Kill()
+		_ = cmd.Process.Kill()
 		t.Fatal(err)
 	}
 	return string(l), cmd.Process
