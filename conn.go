@@ -941,17 +941,6 @@ func (tracker *callTracker) handleSendError(msg *Message, err error) {
 	}
 }
 
-// finalize was the only func that did not strobe Done
-func (tracker *callTracker) finalize(sn uint32) {
-	tracker.lck.Lock()
-	defer tracker.lck.Unlock()
-	c, ok := tracker.calls[sn]
-	if ok {
-		delete(tracker.calls, sn)
-		c.ContextCancel()
-	}
-}
-
 func (tracker *callTracker) finalizeWithBody(sn uint32, sequence Sequence, body []interface{}) {
 	tracker.lck.Lock()
 	c, ok := tracker.calls[sn]

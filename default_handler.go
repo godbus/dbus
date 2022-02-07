@@ -215,10 +215,6 @@ func (obj *exportedObj) LookupMethod(name string) (Method, bool) {
 	return nil, false
 }
 
-func (obj *exportedObj) isFallbackInterface() bool {
-	return false
-}
-
 func newExportedIntf(methods map[string]Method, includeSubtree bool) *exportedIntf {
 	return &exportedIntf{
 		methods:        methods,

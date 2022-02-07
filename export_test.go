@@ -9,10 +9,6 @@ import (
 
 type lowerCaseExport struct{}
 
-func (export lowerCaseExport) foo() (string, *Error) {
-	return "bar", nil
-}
-
 type fooExport struct {
 	message Message
 }
