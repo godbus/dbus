@@ -361,10 +361,10 @@ const (
 
 func TestStateCachingProxyPattern(t *testing.T) {
 	srv, err := ConnectSessionBus()
-	defer srv.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer srv.Close()
 
 	conn, err := ConnectSessionBus(WithSignalHandler(NewSequentialSignalHandler()))
 	if err != nil {

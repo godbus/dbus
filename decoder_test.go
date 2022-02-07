@@ -65,7 +65,7 @@ func TestDecodeArrayEmptyStruct(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	msg, err = DecodeMessage(buf)
+	_, err = DecodeMessage(buf)
 	if err != nil {
 		t.Fatal(err)
 	}
