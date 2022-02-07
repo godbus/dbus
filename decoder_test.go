@@ -25,19 +25,19 @@ func TestDecodeArrayEmptyStruct(t *testing.T) {
 		Type:  0x02,
 		Flags: 0x00,
 		Headers: map[HeaderField]Variant{
-			0x06: Variant{
+			0x06: {
 				sig: Signature{
 					str: "s",
 				},
 				value: ":1.391",
 			},
-			0x05: Variant{
+			0x05: {
 				sig: Signature{
 					str: "u",
 				},
 				value: uint32(2),
 			},
-			0x08: Variant{
+			0x08: {
 				sig: Signature{
 					str: "g",
 				},

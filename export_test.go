@@ -47,7 +47,7 @@ type noErrorExport struct {
 	message Message
 }
 
-func (export *noErrorExport) Run(message Message, param string) (string) {
+func (export *noErrorExport) Run(message Message, param string) string {
 	export.message = message
 	return "cool"
 }
