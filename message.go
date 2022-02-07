@@ -267,10 +267,10 @@ func (msg *Message) EncodeToWithFDs(out io.Writer, order binary.ByteOrder) (fds 
 	enc.align(8)
 	body.WriteTo(&buf)
 	if buf.Len() > 1<<27 {
-		return make([]int, 0), InvalidMessageError("message is too long")
+		return nil, InvalidMessageError("message is too long")
 	}
 	if _, err := buf.WriteTo(out); err != nil {
-		return make([]int, 0), err
+		return nil, err
 	}
 	return enc.fds, nil
 }
