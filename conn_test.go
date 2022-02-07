@@ -127,13 +127,12 @@ func TestRemoveSignal(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	signals := bus.signalHandler.(*defaultSignalHandler).signals
 	ch := make(chan *Signal)
 	ch2 := make(chan *Signal)
 	for _, ch := range []chan *Signal{ch, ch2, ch, ch2, ch2, ch} {
 		bus.Signal(ch)
 	}
-	signals = bus.signalHandler.(*defaultSignalHandler).signals
+	signals := bus.signalHandler.(*defaultSignalHandler).signals
 	if len(signals) != 6 {
 		t.Errorf("remove signal: signals length not equal: got '%d', want '6'", len(signals))
 	}
