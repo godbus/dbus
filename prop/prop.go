@@ -126,7 +126,9 @@ const IntrospectDataString = `
 // Prop represents a single property. It is used for creating a Properties
 // value.
 type Prop struct {
-	// Initial value. Must be a DBus-representable type.
+	// Initial value. Must be a DBus-representable type. This is not modified
+	// after Properties has been initialized; use Get or GetMust to access the
+	// value.
 	Value interface{}
 
 	// If true, the value can be modified by calls to Set.
@@ -154,7 +156,7 @@ func (p *Prop) Introspection(name string) introspect.Property {
 	}
 	result.Annotations = []introspect.Annotation{
 		{
-			Name: "org.freedesktop.DBus.Property.EmitsChangedSignal",
+			Name:  "org.freedesktop.DBus.Property.EmitsChangedSignal",
 			Value: p.Emit.String(),
 		},
 	}
@@ -173,7 +175,7 @@ type Change struct {
 // using the org.freedesktop.DBus.Properties interface. It is safe for
 // concurrent use by multiple goroutines.
 type Properties struct {
-	m    map[string]map[string]*Prop
+	m    Map
 	mut  sync.RWMutex
 	conn *dbus.Conn
 	path dbus.ObjectPath
@@ -183,7 +185,7 @@ type Properties struct {
 // swallowing the error, shouldn't be used.
 //
 // Deprecated: use Export instead.
-func New(conn *dbus.Conn, path dbus.ObjectPath, props map[string]map[string]*Prop) *Properties {
+func New(conn *dbus.Conn, path dbus.ObjectPath, props Map) *Properties {
 	p, err := Export(conn, path, props)
 	if err != nil {
 		return nil
@@ -196,13 +198,31 @@ func New(conn *dbus.Conn, path dbus.ObjectPath, props map[string]map[string]*Pro
 // second-level key is the name of the property. The returned structure will be
 // exported as org.freedesktop.DBus.Properties on path.
 func Export(
-	conn *dbus.Conn, path dbus.ObjectPath, props map[string]map[string]*Prop,
+	conn *dbus.Conn, path dbus.ObjectPath, props Map,
 ) (*Properties, error) {
-	p := &Properties{m: props, conn: conn, path: path}
+	p := &Properties{m: copyProps(props), conn: conn, path: path}
 	if err := conn.Export(p, path, "org.freedesktop.DBus.Properties"); err != nil {
 		return nil, err
 	}
 	return p, nil
+}
+
+// Map is a helper type for supplying the configuration of properties to be handled.
+type Map = map[string]map[string]*Prop
+
+func copyProps(in Map) Map {
+	out := make(Map, len(in))
+	for intf, props := range in {
+		out[intf] = make(map[string]*Prop)
+		for name, prop := range props {
+			out[intf][name] = new(Prop)
+			*out[intf][name] = *prop
+			val := reflect.New(reflect.TypeOf(prop.Value))
+			val.Elem().Set(reflect.ValueOf(prop.Value))
+			out[intf][name].Value = val.Interface()
+		}
+	}
+	return out
 }
 
 // Get implements org.freedesktop.DBus.Properties.Get.
@@ -217,7 +237,7 @@ func (p *Properties) Get(iface, property string) (dbus.Variant, *dbus.Error) {
 	if !ok {
 		return dbus.Variant{}, ErrPropNotFound
 	}
-	return dbus.MakeVariant(prop.Value), nil
+	return dbus.MakeVariant(reflect.ValueOf(prop.Value).Elem().Interface()), nil
 }
 
 // GetAll implements org.freedesktop.DBus.Properties.GetAll.
@@ -230,7 +250,7 @@ func (p *Properties) GetAll(iface string) (map[string]dbus.Variant, *dbus.Error)
 	}
 	rm := make(map[string]dbus.Variant, len(m))
 	for k, v := range m {
-		rm[k] = dbus.MakeVariant(v.Value)
+		rm[k] = dbus.MakeVariant(reflect.ValueOf(v.Value).Elem().Interface())
 	}
 	return rm, nil
 }
@@ -240,7 +260,7 @@ func (p *Properties) GetAll(iface string) (map[string]dbus.Variant, *dbus.Error)
 func (p *Properties) GetMust(iface, property string) interface{} {
 	p.mut.RLock()
 	defer p.mut.RUnlock()
-	return p.m[iface][property].Value
+	return reflect.ValueOf(p.m[iface][property].Value).Elem().Interface()
 }
 
 // Introspection returns the introspection data that represents the properties
@@ -260,9 +280,6 @@ func (p *Properties) Introspection(iface string) []introspect.Property {
 // must already be locked.
 func (p *Properties) set(iface, property string, v interface{}) error {
 	prop := p.m[iface][property]
-	if reflect.ValueOf(prop.Value).Kind() != reflect.Ptr {
-		prop.Value = reflect.New(reflect.TypeOf(prop.Value)).Interface()
-	}
 	err := dbus.Store([]interface{}{v}, prop.Value)
 	if err != nil {
 		return err
@@ -324,9 +341,8 @@ func (p *Properties) Set(iface, property string, newv dbus.Variant) *dbus.Error 
 func (p *Properties) SetMust(iface, property string, v interface{}) {
 	p.mut.Lock()
 	defer p.mut.Unlock() // unlock in case of panic
-	prop := p.m[iface][property]
-	prop.Value = v
-	if err := p.emitChange(iface, property); err != nil {
+	err := p.set(iface, property, v)
+	if err != nil {
 		panic(err)
 	}
 }
