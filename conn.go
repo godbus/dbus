@@ -768,7 +768,12 @@ func getKey(s, key string) string {
 	for _, keyEqualsValue := range strings.Split(s, ",") {
 		keyValue := strings.SplitN(keyEqualsValue, "=", 2)
 		if len(keyValue) == 2 && keyValue[0] == key {
-			return keyValue[1]
+			val, err := UnescapeBusAddressValue(keyValue[1])
+			if err != nil {
+				// No way to return an error.
+				return ""
+			}
+			return val
 		}
 	}
 	return ""
