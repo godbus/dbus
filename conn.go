@@ -551,6 +551,11 @@ func (conn *Conn) send(ctx context.Context, msg *Message, ch chan *Call) *Call {
 		call.ctx = ctx
 		call.ctxCanceler = canceler
 		conn.calls.track(msg.serial, call)
+		if ctx.Err() != nil {
+			// short path: don't even send the message if context already cancelled
+			conn.calls.handleSendError(msg, ctx.Err())
+			return call
+		}
 		go func() {
 			<-ctx.Done()
 			conn.calls.handleSendError(msg, ctx.Err())
