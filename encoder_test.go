@@ -265,7 +265,7 @@ func TestEncodeIntToNonCovertible(t *testing.T) {
 	err = Store(v, &out)
 	if err == nil {
 		t.Logf("%t\n", out)
-		t.Fatal("Type mismatch should have occured")
+		t.Fatal("Type mismatch should have occurred")
 	}
 }
 
@@ -312,7 +312,7 @@ func TestEncodeUintToNonCovertible(t *testing.T) {
 	var out bool
 	err = Store(v, &out)
 	if err == nil {
-		t.Fatal("Type mismatch should have occured")
+		t.Fatal("Type mismatch should have occurred")
 	}
 }
 

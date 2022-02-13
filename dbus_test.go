@@ -29,7 +29,7 @@ func Test_VariantOfSlicePtr(t *testing.T) {
 	value := []TestStruct{{1, "1"}}
 	dest := []*TestStruct{}
 
-	parm := &Message{
+	param := &Message{
 		Type:  TypeMethodCall,
 		Flags: FlagNoAutoStart,
 		Headers: map[HeaderField]Variant{
@@ -39,9 +39,9 @@ func Test_VariantOfSlicePtr(t *testing.T) {
 		},
 		Body: []interface{}{value},
 	}
-	parm.Headers[FieldSignature] = MakeVariant(SignatureOf(parm.Body...))
+	param.Headers[FieldSignature] = MakeVariant(SignatureOf(param.Body...))
 	buf := new(bytes.Buffer)
-	err := parm.EncodeTo(buf, nativeEndian)
+	err := param.EncodeTo(buf, nativeEndian)
 	if err != nil {
 		t.Fatal(err)
 	}

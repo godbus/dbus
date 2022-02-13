@@ -35,3 +35,13 @@ jobs:
 
     - name: Test
       run: go test ${{ matrix.race }} -v ./...
+
+  codespell:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v2
+    - name: install deps
+      # Version of codespell bundled with Ubuntu is way old, so use pip.
+      run: pip install codespell
+    - name: run codespell
+      run: codespell

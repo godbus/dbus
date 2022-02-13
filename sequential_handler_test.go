@@ -232,7 +232,7 @@ func readSignals(t *testing.T, channel <-chan *Signal, count int) error {
 				return fmt.Errorf("Received signal out of order. Expected %v, got %v", i, signal.Sequence)
 			}
 		case <-ctx.Done():
-			return errors.New("Timeout occured before all messages received")
+			return errors.New("Timeout occurred before all messages received")
 		}
 	}
 	return nil
