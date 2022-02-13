@@ -100,3 +100,47 @@ func TestValidateStructsAsProp(t *testing.T) {
 	comparePropValue(obj, "FooStructPtr", *zooPtr, t)
 	comparePropValue(obj, "SliceOfFoos", zoos, t)
 }
+
+func TestInt32(t *testing.T) {
+	srv, err := dbus.SessionBus()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+
+	cli, err := dbus.SessionBus()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cli.Close()
+
+	propsSpec := map[string]map[string]*Prop{
+		"org.guelfey.DBus.Test": {
+			"int32": {
+				int32(100),
+				true,
+				EmitTrue,
+				nil,
+			},
+		},
+	}
+	props := New(srv, "/org/guelfey/DBus/Test", propsSpec)
+
+	obj := cli.Object(srv.Names()[0], "/org/guelfey/DBus/Test")
+
+	comparePropValue(obj, "int32", int32(100), t)
+	r := props.GetMust("org.guelfey.DBus.Test", "int32")
+	if r != int32(100) {
+		t.Errorf("expected r to be int32(100), but was %#v", r)
+	}
+
+	if err := props.Set("org.guelfey.DBus.Test", "int32", dbus.MakeVariant(int32(101))); err != nil {
+		t.Fatalf("failed to set prop int32 to 101")
+	}
+
+	comparePropValue(obj, "int32", int32(101), t)
+	r = props.GetMust("org.guelfey.DBus.Test", "int32")
+	if r != int32(101) {
+		t.Errorf("expected r to be int32(101), but was %#v", r)
+	}
+}
