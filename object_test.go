@@ -85,7 +85,7 @@ func TestObjectSignalHandling(t *testing.T) {
 
 	name := bus.Names()[0]
 	path := ObjectPath("/org/godbus/DBus/TestSignals")
-	otherPath := ObjectPath("/org/other-godbus/DBus/TestSignals")
+	otherPath := ObjectPath("/org/other/godbus/DBus/TestSignals")
 	iface := "org.godbus.DBus.TestSignals"
 	otherIface := "org.godbus.DBus.OtherTestSignals"
 	err = bus.Export(nopServer{}, path, iface)
@@ -112,18 +112,25 @@ func TestObjectSignalHandling(t *testing.T) {
 			}
 		}()
 
+		emit := func(path ObjectPath, name string, values ...interface{}) {
+			t.Helper()
+			if err := bus.Emit(path, name, values...); err != nil {
+				t.Error("Emit:", err)
+			}
+		}
+
 		// desired signals
-		bus.Emit(path, iface+".Heartbeat", uint32(1))
-		bus.Emit(path, iface+".Heartbeat", uint32(2))
+		emit(path, iface+".Heartbeat", uint32(1))
+		emit(path, iface+".Heartbeat", uint32(2))
 		// undesired signals
-		bus.Emit(otherPath, iface+".Heartbeat", uint32(3))
-		bus.Emit(otherPath, otherIface+".Heartbeat", uint32(4))
-		bus.Emit(path, iface+".Updated", false)
+		emit(otherPath, iface+".Heartbeat", uint32(3))
+		emit(otherPath, otherIface+".Heartbeat", uint32(4))
+		emit(path, iface+".Updated", false)
 		// sentinel
-		bus.Emit(path, iface+".Heartbeat", uint32(5))
+		emit(path, iface+".Heartbeat", uint32(5))
 
 		time.Sleep(100 * time.Millisecond)
-		bus.Emit(path, iface+".Heartbeat", uint32(6))
+		emit(path, iface+".Heartbeat", uint32(6))
 	}()
 
 	checkSignal := func(sig *Signal, value uint32) {
