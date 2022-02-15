@@ -66,16 +66,6 @@ func (_ nopServer) Nop() *Error {
 	return nil
 }
 
-func fetchSignal(t *testing.T, ch chan *Signal, timeout time.Duration) *Signal {
-	select {
-	case sig := <-ch:
-		return sig
-	case <-time.After(timeout):
-		t.Fatalf("Failed to fetch signal in specified timeout %s", timeout)
-	}
-	return nil
-}
-
 func TestObjectSignalHandling(t *testing.T) {
 	bus, err := ConnectSessionBus()
 	if err != nil {
@@ -133,7 +123,19 @@ func TestObjectSignalHandling(t *testing.T) {
 		emit(path, iface+".Heartbeat", uint32(6))
 	}()
 
-	checkSignal := func(sig *Signal, value uint32) {
+	checkSignal := func(ch chan *Signal, value uint32) {
+		t.Helper()
+
+		const timeout = 50 * time.Millisecond
+		var sig *Signal
+
+		select {
+		case sig = <-ch:
+			// do nothing
+		case <-time.After(timeout):
+			t.Fatalf("Failed to fetch signal in specified timeout %s", timeout)
+		}
+
 		if sig.Path != path {
 			t.Errorf("signal.Path mismatch: %s != %s", path, sig.Path)
 		}
@@ -153,9 +155,9 @@ func TestObjectSignalHandling(t *testing.T) {
 		}
 	}
 
-	checkSignal(fetchSignal(t, ch, 50*time.Millisecond), 1)
-	checkSignal(fetchSignal(t, ch, 50*time.Millisecond), 2)
-	checkSignal(fetchSignal(t, ch, 50*time.Millisecond), 5)
+	checkSignal(ch, 1)
+	checkSignal(ch, 2)
+	checkSignal(ch, 5)
 
 	obj.RemoveMatchSignal(iface, "Heartbeat", WithMatchObjectPath(obj.Path()))
 	select {
