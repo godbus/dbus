@@ -7,17 +7,8 @@
 
 package dbus
 
-/*
-const int sizeofPtr = sizeof(void*);
-#define _WANT_UCRED
-#include <sys/types.h>
-#include <sys/ucred.h>
-*/
-import "C"
-
 import (
 	"io"
-	"os"
 	"syscall"
 	"unsafe"
 )
@@ -30,36 +21,44 @@ type Ucred struct {
 	Gid uint32
 }
 
-// http://golang.org/src/pkg/syscall/types_linux.go
-// https://golang.org/src/syscall/types_freebsd.go
-// https://github.com/freebsd/freebsd/blob/master/sys/sys/ucred.h
+// https://github.com/freebsd/freebsd-src/blob/822d379b1f474b3d9e3a82a7ce7dad96990b55b0/sys/sys/socket.h#L490-L511
+// https://github.com/freebsd/freebsd-src/blob/822d379b1f474b3d9e3a82a7ce7dad96990b55b0/sys/sys/_types.h#L118-L150
 const (
-	SizeofUcred = C.sizeof_struct_ucred
+	cmGroupMax     = 16
+	SizeofCmsgcred = 4 /*pid_t	cmcred_pid */ +
+		4 /*uid_t	cmcred_uid */ +
+		4 /*uid_t	cmcred_euid */ +
+		4 /*gid_t	cmcred_gid */ +
+		4 /*short	cmcred_ngroups */ +
+		4*cmGroupMax /*gid_t	cmcred_groups[CMGROUP_MAX] */
 )
 
-// http://golang.org/src/pkg/syscall/sockcmsg_unix.go
-func cmsgAlignOf(salen int) int {
-	salign := C.sizeofPtr
-
-	return (salen + salign - 1) & ^(salign - 1)
-}
-
-// http://golang.org/src/pkg/syscall/sockcmsg_unix.go
-func cmsgData(h *syscall.Cmsghdr) unsafe.Pointer {
-	return unsafe.Pointer(uintptr(unsafe.Pointer(h)) + uintptr(cmsgAlignOf(syscall.SizeofCmsghdr)))
-}
-
-// http://golang.org/src/pkg/syscall/sockcmsg_linux.go
-// UnixCredentials encodes credentials into a socket control message
+// UnixCredentials returns a socket control message
 // for sending to another process. This can be used for
 // authentication.
-func UnixCredentials(ucred *Ucred) []byte {
-	b := make([]byte, syscall.CmsgSpace(SizeofUcred))
+func UnixCredentials() []byte {
+	// https://www.freebsd.org/cgi/man.cgi?query=unix&sektion=4#CONTROL%09MESSAGES
+	// Credentials of the sending process can be transmitted explicitly using a
+	// control message of type SCM_CREDS with a data portion of type struct
+	// cmsgcred, defined in <sys/socket.h> as follows:
+	//
+	// struct cmsgcred {
+	//   pid_t cmcred_pid;      /* PID of sending process */
+	//   uid_t cmcred_uid;      /* real UID of sending process */
+	//   uid_t cmcred_euid;      /* effective UID of sending process */
+	//   gid_t cmcred_gid;      /* real GID of sending process */
+	//   short cmcred_ngroups;      /* number of groups */
+	//   gid_t cmcred_groups[CMGROUP_MAX];     /* groups */
+	// };
+	//
+	// The sender should pass a zeroed buffer which will be filled in by the
+	// system.
+
+	b := make([]byte, syscall.CmsgSpace(SizeofCmsgcred))
 	h := (*syscall.Cmsghdr)(unsafe.Pointer(&b[0]))
 	h.Level = syscall.SOL_SOCKET
 	h.Type = syscall.SCM_CREDS
-	h.SetLen(syscall.CmsgLen(SizeofUcred))
-	*((*Ucred)(cmsgData(h))) = *ucred
+	h.SetLen(syscall.CmsgLen(SizeofCmsgcred))
 	return b
 }
 
@@ -79,8 +78,7 @@ func ParseUnixCredentials(m *syscall.SocketControlMessage) (*Ucred, error) {
 }
 
 func (t *unixTransport) SendNullByte() error {
-	ucred := &Ucred{Pid: int32(os.Getpid()), Uid: uint32(os.Getuid()), Gid: uint32(os.Getgid())}
-	b := UnixCredentials(ucred)
+	b := UnixCredentials()
 	_, oobn, err := t.UnixConn.WriteMsgUnix([]byte{0}, b, nil)
 	if err != nil {
 		return err
