@@ -2,8 +2,6 @@ package dbus
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"testing"
 	"time"
 )
@@ -20,9 +18,7 @@ func TestSequentialHandlerNoDrop(t *testing.T) {
 
 	writeSignals(handler, 1000)
 
-	if err := readSignals(t, channel, 1000); err != nil {
-		t.Error(err)
-	}
+	readSignals(t, channel)
 }
 
 // Verifies that signals are written to the destination channel in the
@@ -39,9 +35,7 @@ func TestSequentialHandlerSequential(t *testing.T) {
 
 	// Concurrently read and write signals
 	go func() {
-		if err := readSignals(t, channel, 1000); err != nil {
-			t.Error(err)
-		}
+		readSignals(t, channel)
 		close(done)
 	}()
 	writeSignals(handler, 1000)
@@ -63,9 +57,7 @@ func TestSequentialHandlerMultipleChannel(t *testing.T) {
 
 	writeSignals(handler, 1000)
 
-	if err := readSignals(t, channelTwo, 1000); err != nil {
-		t.Error(err)
-	}
+	readSignals(t, channelTwo)
 }
 
 // Test that removing one channel results in no more messages being
@@ -119,14 +111,10 @@ func TestSequentialHandler_RemoveOneChannelOfMany(t *testing.T) {
 	}
 
 	// Check that closing channel two does not close channel one.
-	if err := readSignals(t, channelOne, 1000); err != nil {
-		t.Error(err)
-	}
+	readSignals(t, channelOne)
 
 	// Check that closing channel two does not close channel three.
-	if err := readSignals(t, channelThree, 1000); err != nil {
-		t.Error(err)
-	}
+	readSignals(t, channelThree)
 }
 
 // Test that Terminate() closes all channels that were attached at the time.
@@ -221,21 +209,22 @@ func writeSignals(handler SignalHandler, count int) {
 	}
 }
 
-func readSignals(t *testing.T, channel <-chan *Signal, count int) error {
+func readSignals(t *testing.T, channel <-chan *Signal) {
 	// Overly generous timeout
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	for i := 1; i <= count; i++ {
+	for i := 1; i <= 1000; i++ {
 		select {
 		case signal := <-channel:
 			if signal.Sequence != Sequence(i) {
-				return fmt.Errorf("Received signal out of order. Expected %v, got %v", i, signal.Sequence)
+				t.Errorf("Received signal out of order. Expected %v, got %v", i, signal.Sequence)
+				return
 			}
 		case <-ctx.Done():
-			return errors.New("Timeout occurred before all messages received")
+			t.Error("Timeout occurred before all messages received")
+			return
 		}
 	}
-	return nil
 }
 
 func countSignals(channel <-chan *Signal) (count int, closed bool) {
