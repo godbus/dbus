@@ -279,7 +279,7 @@ func TestAddAndRemoveMatchSignalContext(t *testing.T) {
 	if err = conn.Emit("/", "org.test.CtxTest"); err != nil {
 		t.Fatal(err)
 	}
-	if sig := waitSignal(sigc, "org.test.CtxTest", time.Second); sig == nil {
+	if sig := waitSignal(sigc, "org.test.CtxTest"); sig == nil {
 		t.Fatal("signal receive timed out")
 	}
 
@@ -294,7 +294,7 @@ func TestAddAndRemoveMatchSignalContext(t *testing.T) {
 	if err = conn.Emit("/", "org.test.CtxTest"); err != nil {
 		t.Fatal(err)
 	}
-	if sig := waitSignal(sigc, "org.test.CtxTest", time.Second); sig != nil {
+	if sig := waitSignal(sigc, "org.test.CtxTest"); sig != nil {
 		t.Fatalf("unsubscribed from %q signal, but received %#v", "org.test.CtxTest", sig)
 	}
 }
@@ -319,7 +319,7 @@ func TestAddAndRemoveMatchSignal(t *testing.T) {
 	if err = conn.Emit("/", "org.test.Test"); err != nil {
 		t.Fatal(err)
 	}
-	if sig := waitSignal(sigc, "org.test.Test", time.Second); sig == nil {
+	if sig := waitSignal(sigc, "org.test.Test"); sig == nil {
 		t.Fatal("signal receive timed out")
 	}
 
@@ -333,19 +333,19 @@ func TestAddAndRemoveMatchSignal(t *testing.T) {
 	if err = conn.Emit("/", "org.test.Test"); err != nil {
 		t.Fatal(err)
 	}
-	if sig := waitSignal(sigc, "org.test.Test", time.Second); sig != nil {
+	if sig := waitSignal(sigc, "org.test.Test"); sig != nil {
 		t.Fatalf("unsubscribed from %q signal, but received %#v", "org.test.Test", sig)
 	}
 }
 
-func waitSignal(sigc <-chan *Signal, name string, timeout time.Duration) *Signal {
+func waitSignal(sigc <-chan *Signal, name string) *Signal {
 	for {
 		select {
 		case sig := <-sigc:
 			if sig.Name == name {
 				return sig
 			}
-		case <-time.After(timeout):
+		case <-time.After(time.Second):
 			return nil
 		}
 	}
