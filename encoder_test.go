@@ -42,7 +42,9 @@ func TestEncodeArrayOfMaps(t *testing.T) {
 			buf := new(bytes.Buffer)
 			fds := make([]int, 0)
 			enc := newEncoder(buf, order, fds)
-			enc.Encode(tt.vs...)
+			if err := enc.Encode(tt.vs...); err != nil {
+				t.Fatal(err)
+			}
 
 			dec := newDecoder(buf, order, enc.fds)
 			v, err := dec.Decode(SignatureOf(tt.vs...))
@@ -75,7 +77,9 @@ func TestEncodeMapStringInterface(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := map[string]interface{}{}
-	Store(v, &out)
+	if err := Store(v, &out); err != nil {
+		t.Fatal(err)
+	}
 	if !reflect.DeepEqual(out, val) {
 		t.Errorf("not equal: got '%v', want '%v'",
 			out, val)
@@ -101,7 +105,9 @@ func TestEncodeMapStringNamedInterface(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := map[string]empty{}
-	Store(v, &out)
+	if err := Store(v, &out); err != nil {
+		t.Fatal(err)
+	}
 	if !reflect.DeepEqual(out, val) {
 		t.Errorf("not equal: got '%v', want '%v'",
 			out, val)
@@ -156,7 +162,9 @@ func TestEncodeSliceInterface(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := []interface{}{}
-	Store(v, &out)
+	if err := Store(v, &out); err != nil {
+		t.Fatal(err)
+	}
 	if !reflect.DeepEqual(out, val) {
 		t.Errorf("not equal: got '%v', want '%v'",
 			out, val)
@@ -180,7 +188,9 @@ func TestEncodeSliceNamedInterface(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := []empty{}
-	Store(v, &out)
+	if err := Store(v, &out); err != nil {
+		t.Fatal(err)
+	}
 	if !reflect.DeepEqual(out, val) {
 		t.Errorf("not equal: got '%v', want '%v'",
 			out, val)
@@ -189,7 +199,8 @@ func TestEncodeSliceNamedInterface(t *testing.T) {
 
 func TestEncodeNestedInterface(t *testing.T) {
 	val := map[string]interface{}{
-		"foo": []interface{}{"1", "2", "3", "5",
+		"foo": []interface{}{
+			"1", "2", "3", "5",
 			map[string]interface{}{
 				"bar": "baz",
 			},
@@ -214,7 +225,9 @@ func TestEncodeNestedInterface(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := map[string]interface{}{}
-	Store(v, &out)
+	if err := Store(v, &out); err != nil {
+		t.Fatal(err)
+	}
 	if !reflect.DeepEqual(out, val) {
 		t.Errorf("not equal: got '%#v', want '%#v'",
 			out, val)
@@ -238,7 +251,9 @@ func TestEncodeInt(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out int
-	Store(v, &out)
+	if err := Store(v, &out); err != nil {
+		t.Fatal(err)
+	}
 	if !reflect.DeepEqual(out, val) {
 		t.Errorf("not equal: got '%v', want '%v'",
 			out, val)
@@ -286,7 +301,9 @@ func TestEncodeUint(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out uint
-	Store(v, &out)
+	if err := Store(v, &out); err != nil {
+		t.Fatal(err)
+	}
 	if !reflect.DeepEqual(out, val) {
 		t.Errorf("not equal: got '%v', want '%v'",
 			out, val)
@@ -347,7 +364,7 @@ func TestEncodeOfAssignableType(t *testing.T) {
 
 func TestEncodeVariant(t *testing.T) {
 	var res map[ObjectPath]map[string]map[string]Variant
-	var src = map[ObjectPath]map[string]map[string]Variant{
+	src := map[ObjectPath]map[string]map[string]Variant{
 		ObjectPath("/foo/bar"): {
 			"foo": {
 				"bar": MakeVariant(10),
@@ -378,7 +395,7 @@ func TestEncodeVariant(t *testing.T) {
 
 func TestEncodeVariantToList(t *testing.T) {
 	var res map[string]Variant
-	var src = map[string]interface{}{
+	src := map[string]interface{}{
 		"foo": []interface{}{"a", "b", "c"},
 	}
 	buf := new(bytes.Buffer)
@@ -404,7 +421,7 @@ func TestEncodeVariantToList(t *testing.T) {
 
 func TestEncodeVariantToUint64(t *testing.T) {
 	var res map[string]Variant
-	var src = map[string]interface{}{
+	src := map[string]interface{}{
 		"foo": uint64(10),
 	}
 	buf := new(bytes.Buffer)

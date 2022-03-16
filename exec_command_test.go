@@ -1,7 +1,6 @@
 package dbus
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
@@ -30,7 +29,7 @@ func TestExecCommandHelper(t *testing.T) {
 		return
 	}
 
-	fmt.Fprintf(os.Stdout, os.Getenv("STDOUT"))
+	t.Log(os.Getenv("STDOUT"))
 	i, _ := strconv.Atoi(os.Getenv("EXIT_STATUS"))
 	os.Exit(i)
 }

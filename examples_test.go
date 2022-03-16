@@ -41,15 +41,12 @@ func ExampleObject_Go() {
 
 	ch := make(chan *Call, 10)
 	conn.BusObject().Go("org.freedesktop.DBus.ListActivatableNames", 0, ch)
-	select {
-	case call := <-ch:
-		if call.Err != nil {
-			panic(err)
-		}
-		list := call.Body[0].([]string)
-		for _, v := range list {
-			fmt.Println(v)
-		}
-		// put some other cases here
+	call := <-ch
+	if call.Err != nil {
+		panic(err)
+	}
+	list := call.Body[0].([]string)
+	for _, v := range list {
+		fmt.Println(v)
 	}
 }

@@ -92,7 +92,11 @@ func TestUnixFDs(t *testing.T) {
 	defer w.Close()
 	name := conn.Names()[0]
 	test := unixFDTest{t}
-	conn.Export(test, "/com/github/guelfey/test", "com.github.guelfey.test")
+	err = conn.Export(test, "/com/github/guelfey/test", "com.github.guelfey.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	var s string
 	obj := conn.Object(name, "/com/github/guelfey/test")
 
@@ -150,5 +154,4 @@ func TestUnixFDs(t *testing.T) {
 	if s != testString {
 		t.Fatal("got", s, "wanted", testString)
 	}
-
 }

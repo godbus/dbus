@@ -127,13 +127,12 @@ func TestRemoveSignal(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	signals := bus.signalHandler.(*defaultSignalHandler).signals
 	ch := make(chan *Signal)
 	ch2 := make(chan *Signal)
 	for _, ch := range []chan *Signal{ch, ch2, ch, ch2, ch2, ch} {
 		bus.Signal(ch)
 	}
-	signals = bus.signalHandler.(*defaultSignalHandler).signals
+	signals := bus.signalHandler.(*defaultSignalHandler).signals
 	if len(signals) != 6 {
 		t.Errorf("remove signal: signals length not equal: got '%d', want '6'", len(signals))
 	}
@@ -157,8 +156,7 @@ type rwc struct {
 
 func (rwc) Close() error { return nil }
 
-type fakeAuth struct {
-}
+type fakeAuth struct{}
 
 func (fakeAuth) FirstData() (name, resp []byte, status AuthStatus) {
 	return []byte("name"), []byte("resp"), AuthOk
@@ -362,10 +360,10 @@ const (
 
 func TestStateCachingProxyPattern(t *testing.T) {
 	srv, err := ConnectSessionBus()
-	defer srv.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer srv.Close()
 
 	conn, err := ConnectSessionBus(WithSignalHandler(NewSequentialSignalHandler()))
 	if err != nil {
@@ -635,9 +633,13 @@ func BenchmarkServeSameConnAsync(b *testing.B) {
 
 func benchmarkServe(b *testing.B, srv, cli *Conn) {
 	var r int64
-	var err error
+
+	err := srv.Export(server{}, "/org/guelfey/DBus/Test", "org.guelfey.DBus.Test")
+	if err != nil {
+		b.Fatal(err)
+	}
+
 	dest := srv.Names()[0]
-	srv.Export(server{}, "/org/guelfey/DBus/Test", "org.guelfey.DBus.Test")
 	obj := cli.Object(dest, "/org/guelfey/DBus/Test")
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
@@ -653,7 +655,10 @@ func benchmarkServe(b *testing.B, srv, cli *Conn) {
 
 func benchmarkServeAsync(b *testing.B, srv, cli *Conn) {
 	dest := srv.Names()[0]
-	srv.Export(server{}, "/org/guelfey/DBus/Test", "org.guelfey.DBus.Test")
+	err := srv.Export(server{}, "/org/guelfey/DBus/Test", "org.guelfey.DBus.Test")
+	if err != nil {
+		b.Fatal(err)
+	}
 	obj := cli.Object(dest, "/org/guelfey/DBus/Test")
 	c := make(chan *Call, 50)
 	done := make(chan struct{})
@@ -661,7 +666,8 @@ func benchmarkServeAsync(b *testing.B, srv, cli *Conn) {
 		for i := 0; i < b.N; i++ {
 			v := <-c
 			if v.Err != nil {
-				b.Fatal(v.Err)
+				b.Error(v.Err)
+				return
 			}
 			i, r := v.Args[0].(int64), v.Body[0].(int64)
 			if 2*i != r {
