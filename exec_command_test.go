@@ -10,17 +10,21 @@ import (
 // How to mock exec.Command for unit tests
 // https://stackoverflow.com/q/45789101/10513533
 
-var mockedExitStatus = 0
-var mockedStdout string
+var (
+	mockedExitStatus = 0
+	mockedStdout     string
+)
 
 func fakeExecCommand(command string, args ...string) *exec.Cmd {
 	cs := []string{"-test.run=TestExecCommandHelper", "--", command}
 	cs = append(cs, args...)
 	cmd := exec.Command(os.Args[0], cs...)
 	es := strconv.Itoa(mockedExitStatus)
-	cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1",
+	cmd.Env = []string{
+		"GO_WANT_HELPER_PROCESS=1",
 		"STDOUT=" + mockedStdout,
-		"EXIT_STATUS=" + es}
+		"EXIT_STATUS=" + es,
+	}
 	return cmd
 }
 

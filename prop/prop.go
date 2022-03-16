@@ -148,7 +148,7 @@ type Prop struct {
 // Introspection returns the introspection data for p.
 // The "name" argument is used as the property's name in the resulting data.
 func (p *Prop) Introspection(name string) introspect.Property {
-	var result = introspect.Property{Name: name, Type: dbus.SignatureOf(p.Value).String()}
+	result := introspect.Property{Name: name, Type: dbus.SignatureOf(p.Value).String()}
 	if p.Writable {
 		result.Access = "readwrite"
 	} else {

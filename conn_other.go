@@ -20,7 +20,6 @@ var execCommand = exec.Command
 func getSessionBusPlatformAddress() (string, error) {
 	cmd := execCommand("dbus-launch")
 	b, err := cmd.CombinedOutput()
-
 	if err != nil {
 		return "", err
 	}

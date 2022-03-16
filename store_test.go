@@ -77,7 +77,8 @@ func TestStoreSliceVariantToSliceInterfaceMulti(t *testing.T) {
 
 func TestStoreNested(t *testing.T) {
 	src := map[string]interface{}{
-		"foo": []interface{}{"1", "2", "3", "5",
+		"foo": []interface{}{
+			"1", "2", "3", "5",
 			map[string]interface{}{
 				"bar": "baz",
 			},
