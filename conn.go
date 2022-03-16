@@ -629,7 +629,7 @@ func (conn *Conn) AddMatchSignal(options ...MatchOption) error {
 
 // AddMatchSignalContext acts like AddMatchSignal but takes a context.
 func (conn *Conn) AddMatchSignalContext(ctx context.Context, options ...MatchOption) error {
-	options = append([]MatchOption{withMatchType("signal")}, options...)
+	options = append([]MatchOption{withMatchTypeSignal()}, options...)
 	return conn.busObj.CallWithContext(
 		ctx,
 		"org.freedesktop.DBus.AddMatch", 0,
@@ -644,7 +644,7 @@ func (conn *Conn) RemoveMatchSignal(options ...MatchOption) error {
 
 // RemoveMatchSignalContext acts like RemoveMatchSignal but takes a context.
 func (conn *Conn) RemoveMatchSignalContext(ctx context.Context, options ...MatchOption) error {
-	options = append([]MatchOption{withMatchType("signal")}, options...)
+	options = append([]MatchOption{withMatchTypeSignal()}, options...)
 	return conn.busObj.CallWithContext(
 		ctx,
 		"org.freedesktop.DBus.RemoveMatch", 0,

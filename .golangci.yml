@@ -4,3 +4,4 @@ linters:
   enable:
     - gofumpt
     - unconvert
+    - unparam

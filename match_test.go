@@ -4,7 +4,7 @@ import "testing"
 
 func TestFormatMatchOptions(t *testing.T) {
 	opts := []MatchOption{
-		withMatchType("signal"),
+		withMatchTypeSignal(),
 		WithMatchSender("org.bluez"),
 		WithMatchInterface("org.freedesktop.DBus.Properties"),
 		WithMatchMember("PropertiesChanged"),
