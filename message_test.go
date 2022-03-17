@@ -3,7 +3,7 @@ package dbus
 import "testing"
 
 func TestMessage_validateHeader(t *testing.T) {
-	var tcs = []struct {
+	tcs := []struct {
 		msg Message
 		err error
 	}{
@@ -85,7 +85,6 @@ func TestMessage_validateHeader(t *testing.T) {
 			err: InvalidMessageError("invalid error name"),
 		},
 		{
-
 			msg: Message{
 				Type: TypeError,
 				Headers: map[HeaderField]Variant{
