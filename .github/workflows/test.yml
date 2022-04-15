@@ -14,7 +14,8 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v2
         with:
-          go-version: 1.x # Latest stable version.
+          # currently broken on Go 1.18, see https://github.com/golangci/golangci-lint/issues/2374
+          go-version: 1.17
       - uses: golangci/golangci-lint-action@v3
         with:
           version: v1.44
@@ -24,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.16.x, 1.17.x, 1.18.0-beta1]
+        go-version: [1.16.x, 1.17.x, 1.18.x]
         race: ["-race", ""]
 
     steps:
