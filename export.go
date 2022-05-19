@@ -59,6 +59,9 @@ func MakeFailedError(err error) *Error {
 // sender.
 type Sender string
 
+// Destination is a type which can be used to specify a receiver for signals.
+type Destination string
+
 func computeMethodName(name string, mapping map[string]string) string {
 	newname, ok := mapping[name]
 	if ok {
@@ -218,6 +221,23 @@ func (conn *Conn) handleCall(msg *Message) {
 	}
 }
 
+func (conn *Conn) EmitwithDestination(path ObjectPath, name string, dest Destination, values ...interface{}) error {
+	i := strings.LastIndex(name, ".")
+	if i == -1 {
+		return errors.New("dbus: invalid method name")
+	}
+	iface := name[:i]
+	member := name[i+1:]
+
+	headers := make(map[HeaderField]Variant)
+	headers[FieldInterface] = MakeVariant(iface)
+	headers[FieldMember] = MakeVariant(member)
+	headers[FieldPath] = MakeVariant(path)
+	headers[FieldDestination] = MakeVariant(dest)
+
+	return conn.emitWithHeaders(headers, values...)
+}
+
 // Emit emits the given signal on the message bus. The name parameter must be
 // formatted as "interface.member", e.g., "org.freedesktop.DBus.NameLost".
 func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) error {
@@ -227,12 +247,21 @@ func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) erro
 	}
 	iface := name[:i]
 	member := name[i+1:]
+
+	headers := make(map[HeaderField]Variant)
+	headers[FieldInterface] = MakeVariant(iface)
+	headers[FieldMember] = MakeVariant(member)
+	headers[FieldPath] = MakeVariant(path)
+
+	return conn.emitWithHeaders(headers, values...)
+}
+
+func (conn *Conn) emitWithHeaders(headers map[HeaderField]Variant, values ...interface{}) error {
+
 	msg := new(Message)
 	msg.Type = TypeSignal
-	msg.Headers = make(map[HeaderField]Variant)
-	msg.Headers[FieldInterface] = MakeVariant(iface)
-	msg.Headers[FieldMember] = MakeVariant(member)
-	msg.Headers[FieldPath] = MakeVariant(path)
+	msg.Headers = headers
+
 	msg.Body = values
 	if len(values) > 0 {
 		msg.Headers[FieldSignature] = MakeVariant(SignatureOf(values...))
