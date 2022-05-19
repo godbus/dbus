@@ -221,7 +221,7 @@ func (conn *Conn) handleCall(msg *Message) {
 	}
 }
 
-func (conn *Conn) EmitwithDestination(path ObjectPath, name string, dest Destination, values ...interface{}) error {
+func (conn *Conn) EmitWithDestination(path ObjectPath, name string, dest Destination, values ...interface{}) error {
 	i := strings.LastIndex(name, ".")
 	if i == -1 {
 		return errors.New("dbus: invalid method name")
@@ -233,7 +233,7 @@ func (conn *Conn) EmitwithDestination(path ObjectPath, name string, dest Destina
 	headers[FieldInterface] = MakeVariant(iface)
 	headers[FieldMember] = MakeVariant(member)
 	headers[FieldPath] = MakeVariant(path)
-	headers[FieldDestination] = MakeVariant(dest)
+	headers[FieldDestination] = MakeVariant(string(dest))
 
 	return conn.emitWithHeaders(headers, values...)
 }
