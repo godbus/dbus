@@ -190,7 +190,7 @@ func (conn *Conn) handleCall(msg *Message) {
 		return
 	}
 
-	ret, err := m.Call(args...)
+	ret, err := m.Call(Sender(sender), args...)
 	if err != nil {
 		conn.sendError(err, sender, serial)
 		return

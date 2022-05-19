@@ -38,7 +38,7 @@ type Interface interface {
 // A Method represents the exposed methods on D-Bus.
 type Method interface {
 	// Call requires that all arguments are decoded before being passed to it.
-	Call(args ...interface{}) ([]interface{}, error)
+	Call(sender Sender, args ...interface{}) ([]interface{}, error)
 	NumArguments() int
 	NumReturns() int
 	// ArgumentValue returns a representative value for the argument at position
