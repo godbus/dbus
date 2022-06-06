@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"
@@ -14,6 +15,9 @@ const intro = `
 		<method name="Foo">
 			<arg direction="out" type="s"/>
 		</method>
+		<method name="Sleep">
+			<arg direction="in" type="u"/>
+		</method>
 	</interface>` + introspect.IntrospectDataString + `</node> `
 
 type foo string
@@ -21,6 +25,12 @@ type foo string
 func (f foo) Foo() (string, *dbus.Error) {
 	fmt.Println(f)
 	return string(f), nil
+}
+
+func (f foo) Sleep(seconds uint) *dbus.Error {
+	fmt.Println("Sleeping", seconds, "second(s)")
+	time.Sleep(time.Duration(seconds) * time.Second)
+	return nil
 }
 
 func main() {
