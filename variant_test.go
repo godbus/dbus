@@ -5,10 +5,16 @@ import (
 	"testing"
 )
 
+type Testing struct {
+	First  string
+	Second uint64
+}
+
 var variantFormatTests = []struct {
 	v interface{}
 	s string
 }{
+	{[]Testing{{First: "testing", Second: 123}}, "@a(st) [(\"testing\", 123,)]"},
 	{int32(1), `1`},
 	{"foo", `"foo"`},
 	{ObjectPath("/org/foo"), `@o "/org/foo"`},
