@@ -3,8 +3,10 @@ package dbus
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"reflect"
+	"runtime/debug"
 	"strings"
 )
 
@@ -150,7 +152,12 @@ func (conn *Conn) handleCall(msg *Message) {
 	ifaceName, _ := msg.Headers[FieldInterface].value.(string)
 	sender, hasSender := msg.Headers[FieldSender].value.(string)
 	serial := msg.serial
-
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println(string(debug.Stack()))
+			conn.sendError(fmt.Errorf("handleCall panic:%s", r), sender, serial)
+		}
+	}()
 	if len(name) == 0 {
 		conn.sendError(ErrMsgUnknownMethod, sender, serial)
 	}
