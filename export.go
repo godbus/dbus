@@ -27,6 +27,10 @@ var (
 		"org.freedesktop.DBus.Error.UnknownInterface",
 		[]interface{}{"Object does not implement the interface"},
 	}
+	ErrMsgServerErrInterface = Error{
+		"org.freedesktop.DBus.Error.ServerErrInterface",
+		[]interface{}{"Server Err method"},
+	}
 )
 
 func MakeNoObjectError(path ObjectPath) Error {
@@ -154,8 +158,8 @@ func (conn *Conn) handleCall(msg *Message) {
 	serial := msg.serial
 	defer func() {
 		if r := recover(); r != nil {
-			log.Println(string(debug.Stack()))
-			conn.sendError(fmt.Errorf("handleCall panic:%s", r), sender, serial)
+			log.Printf("err:%v,stack:%s", r, string(debug.Stack()))
+			conn.sendError(ErrMsgServerErrInterface, sender, serial)
 		}
 	}()
 	if len(name) == 0 {
