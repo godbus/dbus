@@ -331,7 +331,7 @@ func (o ObjectPath) IsValid() bool {
 }
 
 // A UnixFD is a Unix file descriptor sent over the wire. See the package-level
-// documentation for more information about Unix file descriptor passsing.
+// documentation for more information about Unix file descriptor passing.
 type UnixFD int32
 
 // A UnixFDIndex is the representation of a Unix file descriptor in a message.
