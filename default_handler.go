@@ -38,12 +38,16 @@ type defaultHandler struct {
 	defaultIntf map[string]*exportedIntf
 }
 
-func (h *defaultHandler) PathExists(path ObjectPath) bool {
-	_, ok := h.objects[path]
-	return ok
+func (h *defaultHandler) PathExists(path ObjectPath) (*exportedObj, bool) {
+	h.RLock()
+	defer h.RUnlock()
+	obj, ok := h.objects[path]
+	return obj, ok
 }
 
 func (h *defaultHandler) introspectPath(path ObjectPath) string {
+	h.RLock()
+	defer h.RUnlock()
 	subpath := make(map[string]struct{})
 	var xml bytes.Buffer
 	xml.WriteString("<node>")
