@@ -55,4 +55,4 @@ jobs:
       # Version of codespell bundled with Ubuntu is way old, so use pip.
       run: pip install codespell
     - name: run codespell
-      run: codespell
+      run: codespell -S .git
