@@ -38,7 +38,7 @@ type defaultHandler struct {
 	defaultIntf map[string]*exportedIntf
 }
 
-func (h *defaultHandler) PathExists(path ObjectPath) (*exportedObj, bool) {
+func (h *defaultHandler) GetExportedObject(path ObjectPath) (*exportedObj, bool) {
 	h.RLock()
 	defer h.RUnlock()
 	obj, ok := h.objects[path]

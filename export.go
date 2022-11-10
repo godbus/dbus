@@ -366,7 +366,7 @@ func (conn *Conn) exportMethodTable(methods map[string]interface{}, path ObjectP
 }
 
 func (conn *Conn) unexport(h *defaultHandler, path ObjectPath, iface string) error {
-	if obj, ok := h.PathExists(path); ok {
+	if obj, ok := h.GetExportedObject(path); ok {
 		obj.DeleteInterface(iface)
 		if len(obj.interfaces) == 0 {
 			h.DeleteObject(path)
@@ -395,7 +395,7 @@ func (conn *Conn) export(methods map[string]reflect.Value, path ObjectPath, ifac
 
 	// If this is the first handler for this path, make a new map to hold all
 	// handlers for this path.
-	if _, ok := h.PathExists(path); !ok {
+	if _, ok := h.GetExportedObject(path); !ok {
 		h.AddObject(path, newExportedObject())
 	}
 
@@ -405,7 +405,7 @@ func (conn *Conn) export(methods map[string]reflect.Value, path ObjectPath, ifac
 	}
 
 	// Finally, save this handler
-	if obj, ok := h.PathExists(path); ok {
+	if obj, ok := h.GetExportedObject(path); ok {
 		obj.AddInterface(iface, newExportedIntf(exportedMethods, includeSubtree))
 	} else {
 		return fmt.Errorf(`dbus: Object removed while export: "%s"`, path)
