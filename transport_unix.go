@@ -16,6 +16,14 @@ type oobReader struct {
 	conn *net.UnixConn
 	oob  []byte
 	buf  [4096]byte
+
+	// The following fields are used to reduce memory allocs.
+	headers []header
+	b       []byte
+	r       *bytes.Reader
+	blength uint32
+	hlength uint32
+	proto   byte
 }
 
 func (o *oobReader) Read(b []byte) (n int, err error) {
@@ -71,28 +79,32 @@ func (t *unixTransport) EnableUnixFDs() {
 }
 
 func (t *unixTransport) ReadMessage() (*Message, error) {
-	var (
-		blen, hlen uint32
-		csheader   [16]byte
-		headers    []header
-		order      binary.ByteOrder
-		unixfds    uint32
-	)
 	// To be sure that all bytes of out-of-band data are read, we use a special
 	// reader that uses ReadUnix on the underlying connection instead of Read
 	// and gathers the out-of-band data in a buffer.
 	if t.rdr == nil {
-		t.rdr = &oobReader{conn: t.UnixConn}
+		t.rdr = &oobReader{
+			conn: t.UnixConn,
+			// This buffer is used to decode headers and the body.
+			// 16 bytes is enough to read the part of the header that has a constant size.
+			b: make([]byte, 16),
+			// The reader helps to read from the buffer several times.
+			r: &bytes.Reader{},
+		}
 	} else {
-		t.rdr.oob = nil
+		t.rdr.oob = t.rdr.oob[:0]
+		t.rdr.headers = t.rdr.headers[:0]
 	}
 
-	// read the first 16 bytes (the part of the header that has a constant size),
-	// from which we can figure out the length of the rest of the message
-	if _, err := io.ReadFull(t.rdr, csheader[:]); err != nil {
+	var (
+		b = t.rdr.b[:1]
+		r = t.rdr.r
+	)
+	if _, err := t.rdr.Read(b); err != nil {
 		return nil, err
 	}
-	switch csheader[0] {
+	var order binary.ByteOrder
+	switch b[0] {
 	case 'l':
 		order = binary.LittleEndian
 	case 'B':
@@ -100,45 +112,69 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 	default:
 		return nil, InvalidMessageError("invalid byte order")
 	}
-	// csheader[4:8] -> length of message body, csheader[12:16] -> length of
-	// header fields (without alignment)
-	if err := binary.Read(bytes.NewBuffer(csheader[4:8]), order, &blen); err != nil {
+
+	// [4:8] is a length of message body,
+	// [12:16] is a length of header fields (without alignment)
+	dec := newDecoder(t.rdr, order, nil)
+	dec.pos = 1
+	vs, err := dec.Decode(Signature{"yyyuu"})
+	if err != nil {
 		return nil, err
 	}
-	if err := binary.Read(bytes.NewBuffer(csheader[12:]), order, &hlen); err != nil {
+	msg := &Message{}
+	if err = Store(vs, &msg.Type, &msg.Flags, &t.rdr.proto, &t.rdr.blength, &msg.serial); err != nil {
 		return nil, err
-	}
-	if hlen%8 != 0 {
-		hlen += 8 - (hlen % 8)
 	}
 
-	// decode headers and look for unix fds
-	headerdata := make([]byte, hlen+4)
-	copy(headerdata, csheader[12:])
-	if _, err := io.ReadFull(t.rdr, headerdata[4:]); err != nil {
+	// Get the header length.
+	b = t.rdr.b[:4]
+	if _, err = io.ReadFull(t.rdr, b); err != nil {
 		return nil, err
 	}
-	dec := newDecoder(bytes.NewBuffer(headerdata), order, make([]int, 0))
+	r.Reset(b)
+	if err = binary.Read(r, order, &t.rdr.hlength); err != nil {
+		return nil, err
+	}
+	if t.rdr.hlength+t.rdr.blength+16 > 1<<27 {
+		return nil, InvalidMessageError("message is too long")
+	}
+
+	// Decode headers and look for unix fds.
+	if _, err = r.Seek(0, io.SeekStart); err != nil {
+		return nil, err
+	}
+	dec = newDecoder(io.MultiReader(r, t.rdr), order, nil)
 	dec.pos = 12
-	vs, err := dec.Decode(Signature{"a(yv)"})
+	vs, err = dec.Decode(Signature{"a(yv)"})
 	if err != nil {
 		return nil, err
 	}
-	err = Store(vs, &headers)
-	if err != nil {
+	if err = Store(vs, &t.rdr.headers); err != nil {
 		return nil, err
 	}
-	for _, v := range headers {
+	var unixfds uint32
+	for _, v := range t.rdr.headers {
 		if v.Field == byte(FieldUnixFDs) {
 			unixfds, _ = v.Variant.value.(uint32)
 		}
 	}
-	all := make([]byte, 16+hlen+blen)
-	copy(all, csheader[:])
-	copy(all[16:], headerdata[4:])
-	if _, err := io.ReadFull(t.rdr, all[16+hlen:]); err != nil {
+
+	msg.Headers = make(map[HeaderField]Variant)
+	for _, v := range t.rdr.headers {
+		msg.Headers[HeaderField(v.Field)] = v.Variant
+	}
+
+	dec.align(8)
+	// Grow the buffer to accomodate for message body.
+	if int(t.rdr.blength) > cap(t.rdr.b) {
+		t.rdr.b = make([]byte, t.rdr.blength)
+	}
+	b = t.rdr.b[:t.rdr.blength]
+	if _, err = io.ReadFull(t.rdr, b); err != nil {
 		return nil, err
 	}
+	r.Reset(b)
+
 	if unixfds != 0 {
 		if !t.hasUnixFDs {
 			return nil, errors.New("dbus: got unix fds on unsupported transport")
@@ -155,8 +191,7 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 		if err != nil {
 			return nil, err
 		}
-		msg, err := DecodeMessageWithFDs(bytes.NewBuffer(all), fds)
-		if err != nil {
+		if err = DecodeMessageBody(msg, r, order, fds); err != nil {
 			return nil, err
 		}
 		// substitute the values in the message body (which are indices for the
@@ -181,7 +216,11 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 		}
 		return msg, nil
 	}
-	return DecodeMessage(bytes.NewBuffer(all))
+
+	if err = DecodeMessageBody(msg, r, order, nil); err != nil {
+		return nil, err
+	}
+	return msg, nil
 }
 
 func (t *unixTransport) SendMessage(msg *Message) error {
