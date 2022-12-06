@@ -21,6 +21,7 @@ type oobReader struct {
 	headers []header
 	b       []byte
 	r       *bytes.Reader
+	dec     *decoder
 	blength uint32
 	hlength uint32
 	proto   byte
@@ -89,7 +90,8 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 			// 16 bytes is enough to read the part of the header that has a constant size.
 			b: make([]byte, 16),
 			// The reader helps to read from the buffer several times.
-			r: &bytes.Reader{},
+			r:   &bytes.Reader{},
+			dec: &decoder{},
 		}
 	} else {
 		t.rdr.oob = t.rdr.oob[:0]
@@ -115,7 +117,8 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 
 	// [4:8] is a length of message body,
 	// [12:16] is a length of header fields (without alignment)
-	dec := newDecoder(t.rdr, order, nil)
+	dec := t.rdr.dec
+	dec.reset(t.rdr, order, nil)
 	dec.pos = 1
 	vs, err := dec.Decode(Signature{"yyyuu"})
 	if err != nil {
@@ -143,7 +146,7 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 	if _, err = r.Seek(0, io.SeekStart); err != nil {
 		return nil, err
 	}
-	dec = newDecoder(io.MultiReader(r, t.rdr), order, nil)
+	dec.reset(io.MultiReader(r, t.rdr), order, nil)
 	dec.pos = 12
 	vs, err = dec.Decode(Signature{"a(yv)"})
 	if err != nil {
@@ -191,7 +194,8 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err = DecodeMessageBody(msg, r, order, fds); err != nil {
+		dec.reset(r, order, fds)
+		if err = DecodeMessageBody(msg, dec); err != nil {
 			return nil, err
 		}
 		// substitute the values in the message body (which are indices for the
@@ -217,7 +221,8 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 		return msg, nil
 	}
 
-	if err = DecodeMessageBody(msg, r, order, nil); err != nil {
+	dec.reset(r, order, nil)
+	if err = DecodeMessageBody(msg, dec); err != nil {
 		return nil, err
 	}
 	return msg, nil

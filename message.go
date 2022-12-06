@@ -118,13 +118,12 @@ type header struct {
 	Variant
 }
 
-func DecodeMessageBody(msg *Message, body io.Reader, order binary.ByteOrder, fds []int) error {
+func DecodeMessageBody(msg *Message, dec *decoder) error {
 	if err := msg.IsValid(); err != nil {
 		return err
 	}
 	sig, _ := msg.Headers[FieldSignature].value.(Signature)
 	if sig.str != "" {
-		dec := newDecoder(body, order, fds)
 		vs, err := dec.Decode(sig)
 		if err != nil {
 			return err
