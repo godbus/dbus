@@ -165,7 +165,7 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 	}
 
 	dec.align(8)
-	// Grow the buffer to accomodate for message body.
+	// Grow the buffer to accommodate for message body.
 	if int(t.rdr.blength) > cap(t.rdr.b) {
 		t.rdr.b = make([]byte, t.rdr.blength)
 	}

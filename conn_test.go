@@ -241,7 +241,11 @@ func TestAddAndRemoveMatchSignalContext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
+	t.Cleanup(func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	})
 
 	sigc := make(chan *Signal, 1)
 	conn.Signal(sigc)
@@ -304,7 +308,11 @@ func TestAddAndRemoveMatchSignal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
+	t.Cleanup(func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	})
 
 	sigc := make(chan *Signal, 1)
 	conn.Signal(sigc)
@@ -363,13 +371,21 @@ func TestStateCachingProxyPattern(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer srv.Close()
+	t.Cleanup(func() {
+		if err := srv.Close(); err != nil {
+			t.Error(err)
+		}
+	})
 
 	conn, err := ConnectSessionBus(WithSignalHandler(NewSequentialSignalHandler()))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
+	t.Cleanup(func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	})
 
 	serviceName := srv.Names()[0]
 	// message channel should have at least some buffering, to make sure Eavesdrop does not
@@ -708,7 +724,11 @@ func TestInterceptors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
+	t.Cleanup(func() {
+		if err := conn.Close(); err != nil {
+			t.Error(err)
+		}
+	})
 }
 
 func TestCloseCancelsConnectionContext(t *testing.T) {
@@ -716,7 +736,11 @@ func TestCloseCancelsConnectionContext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer bus.Close()
+	t.Cleanup(func() {
+		if err := bus.Close(); err != nil {
+			t.Error(err)
+		}
+	})
 
 	// The context is not done at this point
 	ctx := bus.Context()
