@@ -31,6 +31,7 @@ type oobReader struct {
 	// The following fields are used to reduce memory allocs.
 	headers  []header
 	csheader []byte
+	b        *bytes.Buffer
 	r        *bytes.Reader
 	lr       *io.LimitedReader
 	dec      *decoder
@@ -98,6 +99,7 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 			conn: t.UnixConn,
 			// This buffer is used to decode the part of the header that has a constant size.
 			csheader: make([]byte, 16),
+			b:        &bytes.Buffer{},
 			// The reader helps to read from the buffer several times.
 			r:   &bytes.Reader{},
 			lr:  &io.LimitedReader{},
@@ -108,7 +110,8 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 		t.rdr.headers = t.rdr.headers[:0]
 	}
 
-	if _, err := io.ReadFull(t.rdr, t.rdr.csheader); err != nil {
+	_, err := io.ReadFull(t.rdr, t.rdr.csheader)
+	if err != nil {
 		return nil, err
 	}
 
@@ -143,13 +146,16 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 	}
 
 	// Decode headers and look for unix fds.
-	headerdata := make([]byte, hlen+4)
-	copy(headerdata, t.rdr.csheader[12:])
-	if _, err := io.ReadFull(t.rdr, headerdata[4:]); err != nil {
+	b := t.rdr.b
+	b.Reset()
+	if _, err = b.Write(t.rdr.csheader[12:]); err != nil {
+		return nil, err
+	}
+	if _, err = io.CopyN(b, t.rdr, int64(hlen)); err != nil {
 		return nil, err
 	}
 	dec := t.rdr.dec
-	dec.Reset(bytes.NewBuffer(headerdata), order, nil)
+	dec.Reset(b, order, nil)
 	dec.pos = 12
 	vs, err := dec.Decode(Signature{"a(yv)"})
 	if err != nil {
@@ -192,7 +198,7 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 			return nil, err
 		}
 		dec.Reset(body, order, fds)
-		if err = decodeMessageBody(msg, dec); err != nil {
+		if err = decodeMessageBody(msg, dec, b); err != nil {
 			return nil, err
 		}
 		// substitute the values in the message body (which are indices for the
@@ -219,14 +225,16 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 	}
 
 	dec.Reset(body, order, nil)
-	if err = decodeMessageBody(msg, dec); err != nil {
+	if err = decodeMessageBody(msg, dec, b); err != nil {
 		return nil, err
 	}
 	return msg, nil
 }
 
-func decodeMessageBody(msg *Message, dec *decoder) error {
-	err := msg.IsValid()
+func decodeMessageBody(msg *Message, dec *decoder, b *bytes.Buffer) error {
+	// Check whether message is valid.
+	b.Reset()
+	err := msg.EncodeTo(b, nativeEndian)
 	if err != nil {
 		return err
 	}
