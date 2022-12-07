@@ -118,22 +118,6 @@ type header struct {
 	Variant
 }
 
-func DecodeMessageBody(msg *Message, dec *decoder) error {
-	if err := msg.IsValid(); err != nil {
-		return err
-	}
-	sig, _ := msg.Headers[FieldSignature].value.(Signature)
-	if sig.str != "" {
-		vs, err := dec.Decode(sig)
-		if err != nil {
-			return err
-		}
-		msg.Body = vs
-	}
-
-	return nil
-}
-
 func DecodeMessageWithFDs(rd io.Reader, fds []int) (msg *Message, err error) {
 	var order binary.ByteOrder
 	var hlength, length uint32

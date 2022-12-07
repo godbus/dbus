@@ -34,7 +34,8 @@ func newDecoder(in io.Reader, order binary.ByteOrder, fds []int) *decoder {
 	return dec
 }
 
-func (dec *decoder) reset(in io.Reader, order binary.ByteOrder, fds []int) {
+// Reset resets the decoder to be reading from in.
+func (dec *decoder) Reset(in io.Reader, order binary.ByteOrder, fds []int) {
 	dec.in = in
 	dec.order = order
 	dec.fds = fds
