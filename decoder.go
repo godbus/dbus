@@ -38,6 +38,7 @@ func newDecoder(in io.Reader, order binary.ByteOrder, fds []int) *decoder {
 func (dec *decoder) Reset(in io.Reader, order binary.ByteOrder, fds []int) {
 	dec.in = in
 	dec.order = order
+	dec.pos = 0
 	dec.fds = fds
 }
 

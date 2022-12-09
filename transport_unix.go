@@ -33,7 +33,6 @@ type oobReader struct {
 	csheader []byte
 	b        *bytes.Buffer
 	r        *bytes.Reader
-	lr       *io.LimitedReader
 	dec      *decoder
 	msghead
 }
@@ -102,13 +101,17 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 			b:        &bytes.Buffer{},
 			// The reader helps to read from the buffer several times.
 			r:   &bytes.Reader{},
-			lr:  &io.LimitedReader{},
 			dec: &decoder{},
 		}
 	} else {
 		t.rdr.oob = t.rdr.oob[:0]
 		t.rdr.headers = t.rdr.headers[:0]
 	}
+	var (
+		r   = t.rdr.r
+		b   = t.rdr.b
+		dec = t.rdr.dec
+	)
 
 	_, err := io.ReadFull(t.rdr, t.rdr.csheader)
 	if err != nil {
@@ -125,7 +128,6 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 		return nil, InvalidMessageError("invalid byte order")
 	}
 
-	r := t.rdr.r
 	r.Reset(t.rdr.csheader[1:])
 	if err := binary.Read(r, order, &t.rdr.msghead); err != nil {
 		return nil, err
@@ -146,7 +148,6 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 	}
 
 	// Decode headers and look for unix fds.
-	b := t.rdr.b
 	b.Reset()
 	if _, err = b.Write(t.rdr.csheader[12:]); err != nil {
 		return nil, err
@@ -154,7 +155,6 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 	if _, err = io.CopyN(b, t.rdr, int64(hlen)); err != nil {
 		return nil, err
 	}
-	dec := t.rdr.dec
 	dec.Reset(b, order, nil)
 	dec.pos = 12
 	vs, err := dec.Decode(Signature{"a(yv)"})
@@ -177,9 +177,11 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 	}
 
 	dec.align(8)
-	body := t.rdr.lr
-	body.R = t.rdr
-	body.N = int64(t.rdr.BodyLen)
+	body := make([]byte, t.rdr.BodyLen)
+	if _, err = io.ReadFull(t.rdr, body); err != nil {
+		return nil, err
+	}
+	r.Reset(body)
 
 	if unixfds != 0 {
 		if !t.hasUnixFDs {
@@ -197,7 +199,7 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 		if err != nil {
 			return nil, err
 		}
-		dec.Reset(body, order, fds)
+		dec.Reset(r, order, fds)
 		if err = decodeMessageBody(msg, dec, b); err != nil {
 			return nil, err
 		}
@@ -224,7 +226,7 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 		return msg, nil
 	}
 
-	dec.Reset(body, order, nil)
+	dec.Reset(r, order, nil)
 	if err = decodeMessageBody(msg, dec, b); err != nil {
 		return nil, err
 	}
