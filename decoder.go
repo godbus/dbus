@@ -34,6 +34,14 @@ func newDecoder(in io.Reader, order binary.ByteOrder, fds []int) *decoder {
 	return dec
 }
 
+// Reset resets the decoder to be reading from in.
+func (dec *decoder) Reset(in io.Reader, order binary.ByteOrder, fds []int) {
+	dec.in = in
+	dec.order = order
+	dec.pos = 0
+	dec.fds = fds
+}
+
 // align aligns the input to the given boundary and panics on error.
 func (dec *decoder) align(n int) {
 	if dec.pos%n != 0 {
