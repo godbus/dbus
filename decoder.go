@@ -100,6 +100,7 @@ func (dec *decoder) read2buf(n int) error {
 // decodeU decodes uint32 obtained from the reader dec.in.
 // The goal is to reduce memory allocs.
 func (dec *decoder) decodeU() uint32 {
+	dec.align(4)
 	dec.binread(&dec.u)
 	dec.pos += 4
 	return dec.u
