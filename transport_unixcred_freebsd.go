@@ -41,7 +41,7 @@ const (
 
 // http://golang.org/src/pkg/syscall/sockcmsg_unix.go
 func cmsgAlignOf(salen int) int {
-	salign := unix.SizeofPtr
+	salign := int(unix.SizeofPtr)
 
 	return (salen + salign - 1) & ^(salign - 1)
 }
