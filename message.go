@@ -290,8 +290,7 @@ func (msg *Message) EncodeTo(out io.Writer, order binary.ByteOrder) (err error) 
 // IsValid checks whether msg is a valid message and returns an
 // InvalidMessageError or FormatError if it is not.
 func (msg *Message) IsValid() error {
-	var b bytes.Buffer
-	return msg.EncodeTo(&b, nativeEndian)
+	return msg.EncodeTo(io.Discard, nativeEndian)
 }
 
 func (msg *Message) validateHeader() error {
