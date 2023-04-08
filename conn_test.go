@@ -497,7 +497,7 @@ process:
 				reply.Body = make([]interface{}, 1)
 				reply.Body[0] = state
 				reply.Headers[FieldSignature] = MakeVariant(SignatureOf(reply.Body...))
-				srv.sendMessageAndIfClosed(reply, nil)
+				_ = srv.sendMessageAndIfClosed(reply, nil)
 			}
 		case <-ctx.Done():
 			t.Logf("Context cancelled, server emitted %v signals", state)

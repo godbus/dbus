@@ -235,18 +235,15 @@ func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) erro
 	if len(values) > 0 {
 		msg.Headers[FieldSignature] = MakeVariant(SignatureOf(values...))
 	}
-	if err := msg.IsValid(); err != nil {
-		return err
-	}
 
 	var closed bool
-	conn.sendMessageAndIfClosed(msg, func() {
+	err := conn.sendMessageAndIfClosed(msg, func() {
 		closed = true
 	})
 	if closed {
 		return ErrClosed
 	}
-	return nil
+	return err
 }
 
 // Export registers the given value to be exported as an object on the

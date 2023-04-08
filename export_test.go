@@ -54,6 +54,20 @@ func (export *noErrorExport) Run(message Message, param string) string {
 	return "cool"
 }
 
+// Test that trying to emit an invalid message leads to an error.
+func TestEmit_invalidMessage(t *testing.T) {
+	connection, err := ConnectSessionBus()
+	if err != nil {
+		t.Fatalf("Unexpected error connecting to session bus: %s", err)
+	}
+	defer connection.Close()
+
+	err = connection.Emit("/org/guelfey/DBus/Test", "org.guelfey.DBusTest", "\x00")
+	if _, ok := err.(FormatError); !ok {
+		t.Fatal("expected FormatError when emitting invalid message")
+	}
+}
+
 // Test typical Export usage.
 func TestExport(t *testing.T) {
 	connection, err := ConnectSessionBus()
