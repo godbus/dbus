@@ -15,12 +15,6 @@ type decoder struct {
 	// The following fields are used to reduce memory allocs.
 	buf []byte
 	d   float64
-	t   uint64
-	x   int64
-	u   uint32
-	i   int32
-	n   int16
-	q   uint16
 	y   [1]byte
 }
 
@@ -46,9 +40,7 @@ func (dec *decoder) Reset(in io.Reader, order binary.ByteOrder, fds []int) {
 func (dec *decoder) align(n int) {
 	if dec.pos%n != 0 {
 		newpos := (dec.pos + n - 1) & ^(n - 1)
-		if err := dec.read2buf(newpos - dec.pos); err != nil {
-			panic(err)
-		}
+		dec.read2buf(newpos - dec.pos)
 		dec.pos = newpos
 	}
 }
@@ -87,23 +79,24 @@ func (dec *decoder) Decode(sig Signature) (vs []interface{}, err error) {
 // read2buf reads exactly n bytes from the reader dec.in into the buffer dec.buf
 // to reduce memory allocs.
 // The buffer grows automatically.
-func (dec *decoder) read2buf(n int) error {
+func (dec *decoder) read2buf(n int) {
 	if cap(dec.buf) < n {
 		dec.buf = make([]byte, n)
 	} else {
 		dec.buf = dec.buf[:n]
 	}
-	_, err := io.ReadFull(dec.in, dec.buf)
-	return err
+	if _, err := io.ReadFull(dec.in, dec.buf); err != nil {
+		panic(err)
+	}
 }
 
 // decodeU decodes uint32 obtained from the reader dec.in.
 // The goal is to reduce memory allocs.
 func (dec *decoder) decodeU() uint32 {
 	dec.align(4)
-	dec.binread(&dec.u)
+	dec.read2buf(4)
 	dec.pos += 4
-	return dec.u
+	return dec.order.Uint32(dec.buf)
 }
 
 func (dec *decoder) decode(s string, depth int) interface{} {
@@ -125,27 +118,27 @@ func (dec *decoder) decode(s string, depth int) interface{} {
 			panic(FormatError("invalid value for boolean"))
 		}
 	case 'n':
-		dec.binread(&dec.n)
+		dec.read2buf(2)
 		dec.pos += 2
-		return dec.n
+		return int16(dec.order.Uint16(dec.buf))
 	case 'i':
-		dec.binread(&dec.i)
+		dec.read2buf(4)
 		dec.pos += 4
-		return dec.i
+		return int32(dec.order.Uint32(dec.buf))
 	case 'x':
-		dec.binread(&dec.x)
+		dec.read2buf(8)
 		dec.pos += 8
-		return dec.x
+		return int64(dec.order.Uint64(dec.buf))
 	case 'q':
-		dec.binread(&dec.q)
+		dec.read2buf(2)
 		dec.pos += 2
-		return dec.q
+		return dec.order.Uint16(dec.buf)
 	case 'u':
 		return dec.decodeU()
 	case 't':
-		dec.binread(&dec.t)
+		dec.read2buf(8)
 		dec.pos += 8
-		return dec.t
+		return dec.order.Uint64(dec.buf)
 	case 'd':
 		dec.binread(&dec.d)
 		dec.pos += 8
@@ -153,9 +146,7 @@ func (dec *decoder) decode(s string, depth int) interface{} {
 	case 's':
 		length := dec.decodeU()
 		p := int(length) + 1
-		if err := dec.read2buf(p); err != nil {
-			panic(err)
-		}
+		dec.read2buf(p)
 		dec.pos += p
 		return string(dec.buf[:len(dec.buf)-1])
 	case 'o':
@@ -163,9 +154,7 @@ func (dec *decoder) decode(s string, depth int) interface{} {
 	case 'g':
 		length := dec.decode("y", depth).(byte)
 		p := int(length) + 1
-		if err := dec.read2buf(p); err != nil {
-			panic(err)
-		}
+		dec.read2buf(p)
 		dec.pos += p
 		sig, err := ParseSignature(
 			string(dec.buf[:len(dec.buf)-1]),
