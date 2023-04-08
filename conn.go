@@ -484,7 +484,7 @@ func (conn *Conn) Object(dest string, path ObjectPath) BusObject {
 	return &Object{conn, dest, path}
 }
 
-func (conn *Conn) sendMessageAndIfClosed(msg *Message, ifClosed func()) {
+func (conn *Conn) sendMessageAndIfClosed(msg *Message, ifClosed func()) error {
 	if msg.serial == 0 {
 		msg.serial = conn.getSerial()
 	}
@@ -497,6 +497,7 @@ func (conn *Conn) sendMessageAndIfClosed(msg *Message, ifClosed func()) {
 	} else if msg.Type != TypeMethodCall {
 		conn.serialGen.RetireSerial(msg.serial)
 	}
+	return err
 }
 
 func (conn *Conn) handleSendError(msg *Message, err error) {
@@ -504,6 +505,9 @@ func (conn *Conn) handleSendError(msg *Message, err error) {
 		conn.calls.handleSendError(msg, err)
 	} else if msg.Type == TypeMethodReply {
 		if _, ok := err.(FormatError); ok {
+			// Make sure that the caller gets some kind of error response if
+			// the application code tried to respond, but the resulting message
+			// was malformed in the end
 			conn.sendError(err, msg.Headers[FieldDestination].value.(string), msg.Headers[FieldReplySerial].value.(uint32))
 		}
 	}

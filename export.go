@@ -208,10 +208,10 @@ func (conn *Conn) handleCall(msg *Message) {
 		copy(reply.Body, ret)
 		reply.Headers[FieldSignature] = MakeVariant(SignatureOf(reply.Body...))
 
-		if err := reply.IsValid(); err != nil {
-			fmt.Fprintf(os.Stderr, "dbus: dropping invalid reply to %s.%s on obj %s: %s\n", ifaceName, name, path, err)
-		} else {
-			conn.sendMessageAndIfClosed(reply, nil)
+		if err := conn.sendMessageAndIfClosed(reply, nil); err != nil {
+			if _, ok := err.(FormatError); ok {
+				fmt.Fprintf(os.Stderr, "dbus: replacing invalid reply to %s.%s on obj %s: %s\n", ifaceName, name, path, err)
+			}
 		}
 	}
 }

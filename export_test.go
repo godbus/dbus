@@ -30,6 +30,12 @@ func (export badExport) Foo(param string) string {
 	return "bar"
 }
 
+type invalidMessageExport struct{}
+
+func (export invalidMessageExport) Foo(param string) (string, *Error) {
+	return "\x00", nil
+}
+
 type errorExport struct {
 	message Message
 }
@@ -251,6 +257,32 @@ func TestExport_badSignature(t *testing.T) {
 	err = call.Store(&response)
 	if err == nil {
 		t.Errorf("Expected an error due to the method lacking the right signature")
+	}
+}
+
+// Test Export with a method returning an invalid message. This should result in an
+// error reply being generated instead.
+func TestExport_invalidMessage(t *testing.T) {
+	connection, err := ConnectSessionBus()
+	if err != nil {
+		t.Fatalf("Unexpected error connecting to session bus: %s", err)
+	}
+	defer connection.Close()
+
+	name := connection.Names()[0]
+
+	err = connection.Export(invalidMessageExport{}, "/org/guelfey/DBus/Test", "org.guelfey.DBus.Test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	object := connection.Object(name, "/org/guelfey/DBus/Test")
+
+	var response string
+	call := object.Call("org.guelfey.DBus.Test.Foo", 0, "test")
+	err = call.Store(&response)
+	t.Log(err)
+	if err == nil {
+		t.Errorf("Expected an error due to the response message being invalid")
 	}
 }
 
