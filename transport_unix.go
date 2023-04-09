@@ -234,6 +234,10 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 }
 
 func decodeMessageBody(msg *Message, dec *decoder) error {
+	if err := msg.validateHeader(); err != nil {
+		return err
+	}
+
 	sig, _ := msg.Headers[FieldSignature].value.(Signature)
 	if sig.str == "" {
 		return nil
