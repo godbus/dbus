@@ -200,7 +200,7 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 			return nil, err
 		}
 		dec.Reset(r, order, fds)
-		if err = decodeMessageBody(msg, dec, b); err != nil {
+		if err = decodeMessageBody(msg, dec); err != nil {
 			return nil, err
 		}
 		// substitute the values in the message body (which are indices for the
@@ -227,17 +227,14 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 	}
 
 	dec.Reset(r, order, nil)
-	if err = decodeMessageBody(msg, dec, b); err != nil {
+	if err = decodeMessageBody(msg, dec); err != nil {
 		return nil, err
 	}
 	return msg, nil
 }
 
-func decodeMessageBody(msg *Message, dec *decoder, b *bytes.Buffer) error {
-	// Check whether message is valid.
-	b.Reset()
-	err := msg.EncodeTo(b, nativeEndian)
-	if err != nil {
+func decodeMessageBody(msg *Message, dec *decoder) error {
+	if err := msg.validateHeader(); err != nil {
 		return err
 	}
 
@@ -246,6 +243,7 @@ func decodeMessageBody(msg *Message, dec *decoder, b *bytes.Buffer) error {
 		return nil
 	}
 
+	var err error
 	msg.Body, err = dec.Decode(sig)
 	return err
 }

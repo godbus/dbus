@@ -188,7 +188,7 @@ func DecodeMessageWithFDs(rd io.Reader, fds []int) (msg *Message, err error) {
 		}
 	}
 
-	if err = msg.IsValid(); err != nil {
+	if err = msg.validateHeader(); err != nil {
 		return nil, err
 	}
 	sig, _ := msg.Headers[FieldSignature].value.(Signature)
