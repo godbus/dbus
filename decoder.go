@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"io"
 	"reflect"
-	"unsafe"
 )
 
 type decoder struct {
@@ -364,7 +363,7 @@ func (c *stringConverter) String(b []byte) string {
 	c.buf = append(c.buf, b...)
 
 	b = c.buf[c.offset:]
-	s := unsafe.String(&b[0], n)
+	s := toString(b)
 	c.offset += n
 	return s
 }
