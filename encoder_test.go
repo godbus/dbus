@@ -171,6 +171,31 @@ func TestEncodeSliceInterface(t *testing.T) {
 	}
 }
 
+func BenchmarkEncodeSliceInterface(b *testing.B) {
+	val := []interface{}{"foo", "bar"}
+	sig := SignatureOf(val)
+	buf := &bytes.Buffer{}
+	fds := make([]int, 0)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		buf.Reset()
+
+		enc := newEncoder(buf, binary.LittleEndian, fds)
+		err := enc.Encode(val)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		dec := newDecoder(buf, binary.LittleEndian, enc.fds)
+		_, err = dec.Decode(sig)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func TestEncodeSliceNamedInterface(t *testing.T) {
 	val := []empty{"foo", "bar"}
 	buf := new(bytes.Buffer)

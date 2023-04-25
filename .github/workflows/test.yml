@@ -6,54 +6,50 @@ on:
   pull_request:
     branches: [ master ]
 
+permissions:
+  contents: read
+
 jobs:
 
   lint:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          # currently broken on Go 1.18, see https://github.com/golangci/golangci-lint/issues/2374
-          go-version: 1.17
+          go-version: 1.19
       - uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.44
+          version: v1.50
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.16.x, 1.17.x, 1.18.x]
-        race: ["-race", ""]
+        go-version: [1.16, 1.17, 1.18, 1.19]
 
     steps:
 
     - name: Set up Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v3
       with:
-        stable: '!contains(${{ matrix.go-version }}, "beta") && !contains(${{ matrix.go-version }}, "rc")'
         go-version: ${{ matrix.go-version }}
 
     - name: Checkout
       uses: actions/checkout@v3
 
     - name: Install dbus
-      run: sudo apt-get install dbus dbus-x11
+      run: sudo apt-get update && sudo apt-get install dbus dbus-x11
 
     - name: Build
-      run: go build ${{ matrix.race }} -v ./...
+      run: go build -race -v ./...
 
     - name: Test
-      run: go test ${{ matrix.race }} -v ./...
+      run: go test -race -v ./...
 
   codespell:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v3
-    - name: install deps
-      # Version of codespell bundled with Ubuntu is way old, so use pip.
-      run: pip install codespell
-    - name: run codespell
-      run: codespell
+    - uses: codespell-project/actions-codespell@master
