@@ -45,6 +45,19 @@ func (h *defaultHandler) GetExportedObject(path ObjectPath) (*exportedObj, bool)
 	return obj, ok
 }
 
+// GetOrAddExportedObject returns an exportedObj for an specific ObjectPath
+// A new exportedObj is created if none existed for ObjectPath
+func (h *defaultHandler) GetOrAddExportedObject(path ObjectPath) *exportedObj {
+	h.RLock()
+	defer h.RUnlock()
+	obj, ok := h.objects[path]
+	if !ok {
+		obj = newExportedObject()
+		h.objects[path] = obj
+	}
+	return obj
+}
+
 func (h *defaultHandler) introspectPath(path ObjectPath) string {
 	h.RLock()
 	defer h.RUnlock()
@@ -69,8 +82,8 @@ func (h *defaultHandler) introspectPath(path ObjectPath) string {
 }
 
 func (h *defaultHandler) LookupObject(path ObjectPath) (ServerObject, bool) {
-	h.RLock()
-	defer h.RUnlock()
+	h.Lock()
+	defer h.Unlock()
 	object, ok := h.objects[path]
 	if ok {
 		return object, ok
