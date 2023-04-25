@@ -45,6 +45,19 @@ func (h *defaultHandler) GetExportedObject(path ObjectPath) (*exportedObj, bool)
 	return obj, ok
 }
 
+// GetAnExportedObject returns an exportedObj for an specific ObjectPath
+// A new exportedObj is creaated if none existed for ObjectPath
+func (h *defaultHandler) GetAnExportedObject(path ObjectPath) *exportedObj {
+	h.RLock()
+	defer h.RUnlock()
+	obj, ok := h.objects[path]
+	if !ok {
+		obj = newExportedObject()
+		h.objects[path] = obj
+	}
+	return obj
+}
+
 func (h *defaultHandler) introspectPath(path ObjectPath) string {
 	h.RLock()
 	defer h.RUnlock()

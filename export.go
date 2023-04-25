@@ -390,23 +390,17 @@ func (conn *Conn) export(methods map[string]reflect.Value, path ObjectPath, ifac
 		return conn.unexport(h, path, iface)
 	}
 
-	// If this is the first handler for this path, make a new map to hold all
-	// handlers for this path.
-	if _, ok := h.GetExportedObject(path); !ok {
-		h.AddObject(path, newExportedObject())
-	}
-
+	// Get all Methods that should be exported
 	exportedMethods := make(map[string]Method)
 	for name, method := range methods {
 		exportedMethods[name] = exportedMethod{method}
 	}
 
+	// Get a handler for the path, either an existing or a new fresh one
+	obj := h.GetAnExportedObject(path)
+
 	// Finally, save this handler
-	if obj, ok := h.GetExportedObject(path); ok {
-		obj.AddInterface(iface, newExportedIntf(exportedMethods, includeSubtree))
-	} else {
-		return fmt.Errorf(`dbus: Object removed while export: "%s"`, path)
-	}
+	obj.AddInterface(iface, newExportedIntf(exportedMethods, includeSubtree))
 	return nil
 }
 
