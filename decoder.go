@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"io"
 	"reflect"
+	"unsafe"
 )
 
 type decoder struct {
@@ -331,7 +332,7 @@ func newStringConverter(capacity int) *stringConverter {
 
 // stringConverter converts bytes to strings with less allocs.
 // The idea is to accumulate bytes in a buffer with specified capacity
-// and create strings with unsafe.String using bytes from a buffer.
+// and create strings with unsafe package using bytes from a buffer.
 // For example, 10 "fizz" strings written to a 40-byte buffer
 // will result in 1 alloc instead of 10.
 //
@@ -365,5 +366,16 @@ func (c *stringConverter) String(b []byte) string {
 	b = c.buf[c.offset:]
 	s := toString(b)
 	c.offset += n
+	return s
+}
+
+// toString converts a byte slice to a string without allocating.
+// Starting from Go 1.20 you should use unsafe.String.
+func toString(b []byte) string {
+	var s string
+	h := (*reflect.StringHeader)(unsafe.Pointer(&s))
+	h.Data = uintptr(unsafe.Pointer(&b[0]))
+	h.Len = len(b)
+
 	return s
 }
