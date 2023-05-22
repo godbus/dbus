@@ -278,32 +278,40 @@ func (p *Properties) Introspection(iface string) []introspect.Property {
 
 // set sets the given property and emits PropertyChanged if appropriate. p.mut
 // must already be locked.
-func (p *Properties) set(iface, property string, v interface{}) error {
-	prop := p.m[iface][property]
-	err := dbus.Store([]interface{}{v}, prop.Value)
+func (p *Properties) set(iface string, properties []string, v ...interface{}) error {
+	var props []interface{}
+	for _, property := range properties {
+		props = append(props, p.m[iface][property].Value)
+	}
+	err := dbus.Store(v, props...)
 	if err != nil {
 		return err
 	}
-	return p.emitChange(iface, property)
+	return p.emitChange(iface, properties...)
 }
 
-func (p *Properties) emitChange(iface, property string) error {
-	prop := p.m[iface][property]
-	switch prop.Emit {
-	case EmitFalse:
-		return nil // do nothing
-	case EmitInvalidates:
-		return p.conn.Emit(p.path, "org.freedesktop.DBus.Properties.PropertiesChanged",
-			iface, map[string]dbus.Variant{}, []string{property})
-	case EmitTrue:
-		return p.conn.Emit(p.path, "org.freedesktop.DBus.Properties.PropertiesChanged",
-			iface, map[string]dbus.Variant{property: dbus.MakeVariant(prop.Value)},
-			[]string{})
-	case EmitConst:
-		return nil
-	default:
-		panic("invalid value for EmitType")
+func (p *Properties) emitChange(iface string, properties ...string) error {
+	changes := make(map[string]dbus.Variant)
+	invalidates := []string{}
+
+	for _, property := range properties {
+		prop := p.m[iface][property]
+		switch prop.Emit {
+		case EmitFalse:
+			continue
+		case EmitInvalidates:
+			invalidates = append(invalidates, property)
+		case EmitTrue:
+			changes[property] = dbus.MakeVariant(prop.Value)
+		case EmitConst:
+			continue
+		default:
+			panic("invalid value for EmitType")
+		}
 	}
+
+	return p.conn.Emit(p.path, "org.freedesktop.DBus.Properties.PropertiesChanged",
+		iface, changes, invalidates)
 }
 
 // Set implements org.freedesktop.Properties.Set.
@@ -330,7 +338,7 @@ func (p *Properties) Set(iface, property string, newv dbus.Variant) *dbus.Error 
 			return err
 		}
 	}
-	if err := p.set(iface, property, newv.Value()); err != nil {
+	if err := p.set(iface, []string{property}, newv.Value()); err != nil {
 		return dbus.MakeFailedError(err)
 	}
 	return nil
@@ -341,7 +349,25 @@ func (p *Properties) Set(iface, property string, newv dbus.Variant) *dbus.Error 
 func (p *Properties) SetMust(iface, property string, v interface{}) {
 	p.mut.Lock()
 	defer p.mut.Unlock() // unlock in case of panic
-	err := p.set(iface, property, v)
+	err := p.set(iface, []string{property}, v)
+	if err != nil {
+		panic(err)
+	}
+}
+
+// SetMustMany sets the values of the given property value map and panics if any interface or
+// property name are invalid.
+func (p *Properties) SetMustMany(iface string, newValues map[string]interface{}) {
+	p.mut.Lock()
+	defer p.mut.Unlock()
+
+	properties := make([]string, 0, len(newValues))
+	values := make([]interface{}, 0, len(newValues))
+	for key, val := range newValues {
+		properties = append(properties, key)
+		values = append(values, val)
+	}
+	err := p.set(iface, properties, values...)
 	if err != nil {
 		panic(err)
 	}
