@@ -159,3 +159,171 @@ func TestInt32(t *testing.T) {
 		t.Errorf("expected r to be int32(101), but was %#v", r)
 	}
 }
+
+func TestMany(t *testing.T) {
+	srv, err := dbus.SessionBus()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+
+	cli, err := dbus.SessionBus()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cli.Close()
+
+	propsSpec := map[string]map[string]*Prop{
+		"org.guelfey.DBus.Test": {
+			"one": {
+				"oneValue",
+				true,
+				EmitTrue,
+				nil,
+			},
+			"two": {
+				0,
+				true,
+				EmitInvalidates,
+				nil,
+			},
+		},
+	}
+	props := New(srv, "/org/guelfey/DBus/Test", propsSpec)
+
+	r := props.GetMust("org.guelfey.DBus.Test", "one")
+	if r != "oneValue" {
+		t.Errorf("expected r to be 'oneValue', but was %#v", r)
+	}
+	r = props.GetMust("org.guelfey.DBus.Test", "two")
+	if r != 0 {
+		t.Errorf("expected r to be 0, but was %#v", r)
+	}
+
+	ready := make(chan struct{})
+	c := make(chan *dbus.Signal, 1)
+	go func() {
+		err := cli.AddMatchSignal(dbus.WithMatchMember("PropertiesChanged"))
+		if err != nil {
+			t.Error(err)
+		}
+
+		sigChan := make(chan *dbus.Signal, 1)
+		cli.Signal(sigChan)
+		close(ready)
+		sig := <-sigChan
+
+		err = cli.RemoveMatchSignal(dbus.WithMatchMember("PropertiesChanged"))
+		if err != nil {
+			t.Error(err)
+		}
+
+		if sig.Name == "org.freedesktop.DBus.Properties.PropertiesChanged" {
+			c <- sig
+		} else {
+			t.Errorf("Got wrong signal: %v\n", sig.Name)
+		}
+	}()
+
+	<-ready
+	props.SetMustMany("org.guelfey.DBus.Test", map[string]interface{}{"one": "otherValue", "two": 1})
+	sig := <-c
+
+	changed := sig.Body[1].(map[string]dbus.Variant)
+	invalidated := sig.Body[2].([]string)
+	if len(changed) != 1 || len(invalidated) != 1 {
+		t.Fatalf("changed len or invalidated len mismatch")
+	}
+	if changed["one"].Value() != "otherValue" {
+		t.Fatalf("changed value mismatch")
+	}
+}
+
+func TestManyEmitFalseAndConst(t *testing.T) {
+	srv, err := dbus.SessionBus()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+
+	cli, err := dbus.SessionBus()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cli.Close()
+
+	propsSpec := map[string]map[string]*Prop{
+		"org.guelfey.DBus.Test": {
+			"emit": {
+				"emitValue",
+				true,
+				EmitTrue,
+				nil,
+			},
+			"const": {
+				0,
+				false,
+				EmitConst,
+				nil,
+			},
+			"noEmit": {
+				"no",
+				true,
+				EmitFalse,
+				nil,
+			},
+		},
+	}
+	props := New(srv, "/org/guelfey/DBus/Test", propsSpec)
+
+	r := props.GetMust("org.guelfey.DBus.Test", "emit")
+	if r != "emitValue" {
+		t.Errorf("expected r to be 'emitValue', but was %#v", r)
+	}
+	r = props.GetMust("org.guelfey.DBus.Test", "const")
+	if r != 0 {
+		t.Errorf("expected r to be 0, but was %#v", r)
+	}
+	r = props.GetMust("org.guelfey.DBus.Test", "noEmit")
+	if r != "no" {
+		t.Errorf("expected r to be 'no', but was %#v", r)
+	}
+
+	ready := make(chan struct{})
+	c := make(chan *dbus.Signal, 1)
+	go func() {
+		err := cli.AddMatchSignal(dbus.WithMatchMember("PropertiesChanged"))
+		if err != nil {
+			t.Error(err)
+		}
+
+		sigChan := make(chan *dbus.Signal, 1)
+		cli.Signal(sigChan)
+		close(ready)
+		sig := <-sigChan
+
+		err = cli.RemoveMatchSignal(dbus.WithMatchMember("PropertiesChanged"))
+		if err != nil {
+			t.Error(err)
+		}
+
+		if sig.Name == "org.freedesktop.DBus.Properties.PropertiesChanged" {
+			c <- sig
+		} else {
+			t.Errorf("Got wrong signal: %v\n", sig.Name)
+		}
+	}()
+
+	<-ready
+	props.SetMustMany("org.guelfey.DBus.Test", map[string]interface{}{"emit": "otherEmitValue", "const": 1, "noEmit": "otherNoEmitValue"})
+	sig := <-c
+
+	changed := sig.Body[1].(map[string]dbus.Variant)
+	invalidated := sig.Body[2].([]string)
+	if len(changed) != 1 || len(invalidated) != 0 {
+		t.Fatalf("changed len or invalidated len mismatch")
+	}
+	if changed["emit"].Value() != "otherEmitValue" {
+		t.Fatalf("changed value mismatch for emit")
+	}
+}
