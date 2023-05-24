@@ -117,11 +117,24 @@ type exportedMethod struct {
 	reflect.Value
 }
 
-func (m exportedMethod) Call(args ...interface{}) ([]interface{}, error) {
+func (m exportedMethod) Call(sender Sender, args ...interface{}) ([]interface{}, error) {
 	t := m.Type()
 
-	params := make([]reflect.Value, len(args))
-	for i := 0; i < len(args); i++ {
+	hasSenderParam := false
+	if m.NumArguments() > 0 && m.Type().In(0) == reflect.TypeOf(sender) {
+		hasSenderParam = true
+	}
+
+	params := make([]reflect.Value, m.NumArguments())
+
+	startIdxForArgumentsCopy := 0
+	if hasSenderParam {
+		params[0] = reflect.ValueOf(sender)
+		startIdxForArgumentsCopy = 1
+	}
+
+	for i := startIdxForArgumentsCopy; i < m.NumArguments(); i++ {
+		reflect.TypeOf(&ErrMsgInvalidArg)
 		params[i] = reflect.ValueOf(args[i]).Elem()
 	}
 
