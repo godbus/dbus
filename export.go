@@ -391,6 +391,7 @@ func (conn *Conn) export(methods map[string]reflect.Value, path ObjectPath, ifac
 	}
 
 	// Get all Methods that should be exported
+	// Get all Methods that should be exported
 	exportedMethods := make(map[string]Method)
 	for name, method := range methods {
 		exportedMethods[name] = exportedMethod{method}
