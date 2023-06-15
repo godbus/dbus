@@ -10,7 +10,7 @@ import (
 func main() {
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to connect to session bus:", err)
+		_, _ = fmt.Fprintln(os.Stderr, "Failed to connect to session bus:", err)
 		os.Exit(1)
 	}
 	defer conn.Close()
@@ -19,7 +19,7 @@ func main() {
 		call := conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0,
 			"eavesdrop='true',type='"+v+"'")
 		if call.Err != nil {
-			fmt.Fprintln(os.Stderr, "Failed to add match:", call.Err)
+			_, _ = fmt.Fprintln(os.Stderr, "Failed to add match:", call.Err)
 			os.Exit(1)
 		}
 	}

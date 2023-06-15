@@ -51,7 +51,7 @@ func main() {
 		panic(err)
 	}
 	if reply != dbus.RequestNameReplyPrimaryOwner {
-		fmt.Fprintln(os.Stderr, "name already taken")
+		_, _ = fmt.Fprintln(os.Stderr, "name already taken")
 		os.Exit(1)
 	}
 	fmt.Println("Listening on com.github.guelfey.Demo / /com/github/guelfey/Demo ...")

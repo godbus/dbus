@@ -10,7 +10,7 @@ import (
 func main() {
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to connect to session bus:", err)
+		_, _ = fmt.Fprintln(os.Stderr, "Failed to connect to session bus:", err)
 		os.Exit(1)
 	}
 	defer conn.Close()
@@ -25,7 +25,7 @@ func main() {
 
 	call := conn.BusObject().Call("org.freedesktop.DBus.Monitoring.BecomeMonitor", 0, rules, flag)
 	if call.Err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to become monitor:", call.Err)
+		_, _ = fmt.Fprintln(os.Stderr, "Failed to become monitor:", call.Err)
 		os.Exit(1)
 	}
 
