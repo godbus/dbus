@@ -728,6 +728,73 @@ type Signal struct {
 	Sequence Sequence
 }
 
+// PropertiesChanged is a representation of a signal parsed from
+// org.freedesktop.DBus.Properties.PropertiesChanged
+type PropertiesChanged struct {
+	// STRING interface_name
+	Iface                 string
+	// ARRAY of DICT_ENTRY<STRING,VARIANT> changed_properties
+	Changes               map[string]Variant
+	// ARRAY<STRING> invalidated_properties
+	InvalidatedProperties []string
+}
+
+// Uses a received signal to parse PropertiesChanged. Based off:
+//
+// org.freedesktop.DBus.Properties.PropertiesChanged (STRING interface_name,
+//	ARRAY of DICT_ENTRY<STRING,VARIANT> changed_properties,
+//	ARRAY<STRING> invalidated_properties);
+func (s *Signal) ParsePropertiesChanged() (pc PropertiesChanged, err error) {
+	pc = PropertiesChanged{}
+
+	if len(s.Body) != 3 {
+		err = errors.New("dbus: invalid body length for PropertiesChanged")
+		return
+	}
+
+	var ok bool
+	pc.Iface, ok = s.Body[0].(string)
+	if !ok {
+		err = errors.New("dbus: unable to parse interface_name from PropertiesChanged signal")
+		return
+	}
+
+	pc.Changes, ok = s.Body[1].(map[string]Variant)
+	if !ok {
+		err = errors.New("dbus: unable to parse changed_properties from PropertiesChanged signal")
+		return
+	}
+
+	pc.InvalidatedProperties, ok = s.Body[2].([]string)
+	if !ok {
+		err = errors.New("dbus: unable to parse invalidated_properties from PropertiesChanged signal")
+		return
+	}
+
+	return
+}
+
+// Checks the changed_properties map for a given property, if it is present we know it
+// has changed and will return true.
+func (pc *PropertiesChanged) IsPropertyChanged(property string) bool {
+	_, changed := pc.Changes[property]
+	return changed
+}
+
+// Returns the new value for a given property provided by changed_properties. If the property
+// is not found, returns false.
+func (pc *PropertiesChanged) GetChangedProperty(property string) (val interface{}, ok bool) {
+	var variant Variant
+	variant, ok = pc.Changes[property]
+	if !ok {
+		val = nil
+		return
+	}
+
+	val = variant.value
+	return
+}
+
 // transport is a D-Bus transport.
 type transport interface {
 	// Read and Write raw data (for example, for the authentication protocol).
