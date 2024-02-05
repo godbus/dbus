@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 )
 
 var (
@@ -30,8 +31,9 @@ var ErrClosed = errors.New("dbus: connection closed by user")
 type Conn struct {
 	transport
 
-	ctx       context.Context
-	cancelCtx context.CancelFunc
+	ctx            context.Context
+	cancelCtx      context.CancelFunc
+	defaultTimeout time.Duration
 
 	closeOnce sync.Once
 	closeErr  error
@@ -254,6 +256,14 @@ func WithOutgoingInterceptor(interceptor Interceptor) ConnOption {
 func WithContext(ctx context.Context) ConnOption {
 	return func(conn *Conn) error {
 		conn.ctx = ctx
+		return nil
+	}
+}
+
+// WithDeafultTimeout supplies the connection with a default timeout to outgoing messages.
+func WithDefaultSendTimeout(timeout time.Duration) ConnOption {
+	return func(conn *Conn) error {
+		conn.defaultTimeout = timeout
 		return nil
 	}
 }
@@ -540,7 +550,12 @@ func (conn *Conn) send(ctx context.Context, msg *Message, ch chan *Call) *Call {
 	}
 
 	var call *Call
-	ctx, canceler := context.WithCancel(ctx)
+	var canceler context.CancelFunc
+	if conn.defaultTimeout > 0 {
+		ctx, canceler = context.WithTimeout(context.Background(), conn.defaultTimeout)
+	} else {
+		ctx, canceler = context.WithCancel(ctx)
+	}
 	msg.serial = conn.getSerial()
 	if msg.Type == TypeMethodCall && msg.Flags&FlagNoReplyExpected == 0 {
 		call = new(Call)
