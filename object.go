@@ -31,12 +31,12 @@ type Object struct {
 
 // Call calls a method with (*Object).Go and waits for its reply.
 func (o *Object) Call(method string, flags Flags, args ...interface{}) *Call {
-	return <-o.createCall(context.Background(), method, flags, make(chan *Call, 1), args...).Done
+	return <-o.createCall(context.Background(), method, flags, make(chan *Call, 1), false, args...).Done
 }
 
 // CallWithContext acts like Call but takes a context
 func (o *Object) CallWithContext(ctx context.Context, method string, flags Flags, args ...interface{}) *Call {
-	return <-o.createCall(ctx, method, flags, make(chan *Call, 1), args...).Done
+	return <-o.createCall(ctx, method, flags, make(chan *Call, 1), true, args...).Done
 }
 
 // AddMatchSignal subscribes BusObject to signals from specified interface,
@@ -90,15 +90,15 @@ func (o *Object) RemoveMatchSignal(iface, member string, options ...MatchOption)
 // If the method parameter contains a dot ('.'), the part before the last dot
 // specifies the interface on which the method is called.
 func (o *Object) Go(method string, flags Flags, ch chan *Call, args ...interface{}) *Call {
-	return o.createCall(context.Background(), method, flags, ch, args...)
+	return o.createCall(context.Background(), method, flags, ch, false, args...)
 }
 
 // GoWithContext acts like Go but takes a context
 func (o *Object) GoWithContext(ctx context.Context, method string, flags Flags, ch chan *Call, args ...interface{}) *Call {
-	return o.createCall(ctx, method, flags, ch, args...)
+	return o.createCall(ctx, method, flags, ch, true, args...)
 }
 
-func (o *Object) createCall(ctx context.Context, method string, flags Flags, ch chan *Call, args ...interface{}) *Call {
+func (o *Object) createCall(ctx context.Context, method string, flags Flags, ch chan *Call, withContext bool, args ...interface{}) *Call {
 	if ctx == nil {
 		panic("nil context")
 	}
@@ -122,7 +122,10 @@ func (o *Object) createCall(ctx context.Context, method string, flags Flags, ch 
 	if len(args) > 0 {
 		msg.Headers[FieldSignature] = MakeVariant(SignatureOf(args...))
 	}
-	return o.conn.SendWithContext(ctx, msg, ch)
+	if withContext {
+		return o.conn.SendWithContext(ctx, msg, ch)
+	}
+	return o.conn.Send(msg, ch)
 }
 
 // GetProperty calls org.freedesktop.DBus.Properties.Get on the given

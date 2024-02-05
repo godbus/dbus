@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 )
 
 var (
@@ -30,8 +31,9 @@ var ErrClosed = errors.New("dbus: connection closed by user")
 type Conn struct {
 	transport
 
-	ctx       context.Context
-	cancelCtx context.CancelFunc
+	ctx            context.Context
+	cancelCtx      context.CancelFunc
+	defaultTimeout time.Duration
 
 	closeOnce sync.Once
 	closeErr  error
@@ -254,6 +256,14 @@ func WithOutgoingInterceptor(interceptor Interceptor) ConnOption {
 func WithContext(ctx context.Context) ConnOption {
 	return func(conn *Conn) error {
 		conn.ctx = ctx
+		return nil
+	}
+}
+
+// WithDeafultSendTimeout supplies the connection with a default timeout for outgoing messages.
+func WithDefaultSendTimeout(timeout time.Duration) ConnOption {
+	return func(conn *Conn) error {
+		conn.defaultTimeout = timeout
 		return nil
 	}
 }
@@ -521,15 +531,15 @@ func (conn *Conn) handleSendError(msg *Message, err error) {
 // once the call is complete. Otherwise, ch is ignored and a Call structure is
 // returned of which only the Err member is valid.
 func (conn *Conn) Send(msg *Message, ch chan *Call) *Call {
-	return conn.send(context.Background(), msg, ch)
+	return conn.send(context.Background(), msg, ch, false)
 }
 
 // SendWithContext acts like Send but takes a context
 func (conn *Conn) SendWithContext(ctx context.Context, msg *Message, ch chan *Call) *Call {
-	return conn.send(ctx, msg, ch)
+	return conn.send(ctx, msg, ch, true)
 }
 
-func (conn *Conn) send(ctx context.Context, msg *Message, ch chan *Call) *Call {
+func (conn *Conn) send(ctx context.Context, msg *Message, ch chan *Call, withContext bool) *Call {
 	if ctx == nil {
 		panic("nil context")
 	}
@@ -540,7 +550,12 @@ func (conn *Conn) send(ctx context.Context, msg *Message, ch chan *Call) *Call {
 	}
 
 	var call *Call
-	ctx, canceler := context.WithCancel(ctx)
+	var canceler context.CancelFunc
+	if !withContext && conn.defaultTimeout > 0 {
+		ctx, canceler = context.WithTimeout(context.Background(), conn.defaultTimeout)
+	} else {
+		ctx, canceler = context.WithCancel(ctx)
+	}
 	msg.serial = conn.getSerial()
 	if msg.Type == TypeMethodCall && msg.Flags&FlagNoReplyExpected == 0 {
 		call = new(Call)
