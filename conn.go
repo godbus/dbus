@@ -400,15 +400,17 @@ func (conn *Conn) inWorker() {
 			continue
 		}
 		conn.eavesdroppedLck.Lock()
+		eavesdropped := conn.eavesdropped
+		conn.eavesdroppedLck.Unlock()
+
 		if conn.eavesdropped != nil {
 			select {
-			case conn.eavesdropped <- msg:
+			case eavesdropped <- msg:
 			default:
 			}
-			conn.eavesdroppedLck.Unlock()
+
 			continue
 		}
-		conn.eavesdroppedLck.Unlock()
 		dest, _ := msg.Headers[FieldDestination].value.(string)
 		found := dest == "" ||
 			!conn.names.uniqueNameIsKnown() ||

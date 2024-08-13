@@ -7,6 +7,8 @@ import (
 	"unsafe"
 )
 
+const defaultStartingBufferSize = 4096
+
 type decoder struct {
 	in    io.Reader
 	order binary.ByteOrder
@@ -28,6 +30,7 @@ func newDecoder(in io.Reader, order binary.ByteOrder, fds []int) *decoder {
 	dec.order = order
 	dec.fds = fds
 	dec.conv = newStringConverter(stringConverterBufferSize)
+	dec.buf = make([]byte, defaultStartingBufferSize)
 	return dec
 }
 
@@ -69,16 +72,23 @@ func (dec *decoder) Decode(sig Signature) (vs []interface{}, err error) {
 			}
 		}
 	}()
-	vs = make([]interface{}, 0)
 	s := sig.str
+	//There will be at most one item per character in the signature, probably less
+	itemCount := len(s)
+	realCount := 0
+	vs = make([]interface{}, itemCount)
 	for s != "" {
 		err, rem := validSingle(s, &depthCounter{})
 		if err != nil {
 			return nil, err
 		}
 		v := dec.decode(s[:len(s)-len(rem)], 0)
-		vs = append(vs, v)
+		vs[realCount] = v
+		realCount++
 		s = rem
+	}
+	if realCount < itemCount {
+		vs = vs[:realCount]
 	}
 	return vs, nil
 }
@@ -89,10 +99,8 @@ func (dec *decoder) Decode(sig Signature) (vs []interface{}, err error) {
 func (dec *decoder) read2buf(n int) {
 	if cap(dec.buf) < n {
 		dec.buf = make([]byte, n)
-	} else {
-		dec.buf = dec.buf[:n]
 	}
-	if _, err := io.ReadFull(dec.in, dec.buf); err != nil {
+	if _, err := io.ReadFull(dec.in, dec.buf[:n]); err != nil {
 		panic(err)
 	}
 }
@@ -106,15 +114,59 @@ func (dec *decoder) decodeU() uint32 {
 	return dec.order.Uint32(dec.buf)
 }
 
+func (dec *decoder) decodeY() byte {
+	if _, err := dec.in.Read(dec.y[:]); err != nil {
+		panic(err)
+	}
+	dec.pos++
+	return dec.y[0]
+}
+
+func (dec *decoder) decodeS() string {
+	length := dec.decodeU()
+	p := int(length) + 1
+	dec.read2buf(p)
+	dec.pos += p
+	return dec.conv.String(dec.buf[:p-1])
+}
+
+func (dec *decoder) decodeG() Signature {
+	length := dec.decodeY()
+	p := int(length) + 1
+	dec.read2buf(p)
+	dec.pos += p
+	sig, err := ParseSignature(
+		dec.conv.String(dec.buf[:p-1]),
+	)
+	if err != nil {
+		panic(err)
+	}
+	return sig
+}
+
+func (dec *decoder) decodeV(depth int) Variant {
+	sig := dec.decodeG()
+	if len(sig.str) == 0 {
+		panic(FormatError("variant signature is empty"))
+	}
+	err, rem := validSingle(sig.str, &depthCounter{})
+	if err != nil {
+		panic(err)
+	}
+	if rem != "" {
+		panic(FormatError("variant signature has multiple types"))
+	}
+	return Variant{
+		sig:   sig,
+		value: dec.decode(sig.str, depth+1),
+	}
+}
+
 func (dec *decoder) decode(s string, depth int) interface{} {
 	dec.align(alignment(typeFor(s)))
 	switch s[0] {
 	case 'y':
-		if _, err := dec.in.Read(dec.y[:]); err != nil {
-			panic(err)
-		}
-		dec.pos++
-		return dec.y[0]
+		return dec.decodeY()
 	case 'b':
 		switch dec.decodeU() {
 		case 0:
@@ -151,44 +203,16 @@ func (dec *decoder) decode(s string, depth int) interface{} {
 		dec.pos += 8
 		return dec.d
 	case 's':
-		length := dec.decodeU()
-		p := int(length) + 1
-		dec.read2buf(p)
-		dec.pos += p
-		return dec.conv.String(dec.buf[:len(dec.buf)-1])
+		return dec.decodeS()
 	case 'o':
-		return ObjectPath(dec.decode("s", depth).(string))
+		return ObjectPath(dec.decodeS())
 	case 'g':
-		length := dec.decode("y", depth).(byte)
-		p := int(length) + 1
-		dec.read2buf(p)
-		dec.pos += p
-		sig, err := ParseSignature(
-			dec.conv.String(dec.buf[:len(dec.buf)-1]),
-		)
-		if err != nil {
-			panic(err)
-		}
-		return sig
+		return dec.decodeG()
 	case 'v':
 		if depth >= 64 {
 			panic(FormatError("input exceeds container depth limit"))
 		}
-		var variant Variant
-		sig := dec.decode("g", depth).(Signature)
-		if len(sig.str) == 0 {
-			panic(FormatError("variant signature is empty"))
-		}
-		err, rem := validSingle(sig.str, &depthCounter{})
-		if err != nil {
-			panic(err)
-		}
-		if rem != "" {
-			panic(FormatError("variant signature has multiple types"))
-		}
-		variant.sig = sig
-		variant.value = dec.decode(sig.str, depth+1)
-		return variant
+		return dec.decodeV(depth)
 	case 'h':
 		idx := dec.decodeU()
 		if int(idx) < len(dec.fds) {
@@ -199,13 +223,25 @@ func (dec *decoder) decode(s string, depth int) interface{} {
 		if len(s) > 1 && s[1] == '{' {
 			ksig := s[2:3]
 			vsig := s[3 : len(s)-1]
+			length := dec.decodeU()
+			// Even for empty maps, the correct padding must be included
+			dec.align(8)
+			if ksig[0] == 's' && vsig[0] == 'v' {
+				// Optimization for this case as it is one of the most common
+				ret := make(map[string]Variant, 1)
+				spos := dec.pos
+				for dec.pos < spos+int(length) {
+					dec.align(8)
+					kv := dec.decodeS()
+					vv := dec.decodeV(depth + 2)
+					ret[kv] = vv
+				}
+				return ret
+			}
 			v := reflect.MakeMap(reflect.MapOf(typeFor(ksig), typeFor(vsig)))
 			if depth >= 63 {
 				panic(FormatError("input exceeds container depth limit"))
 			}
-			length := dec.decodeU()
-			// Even for empty maps, the correct padding must be included
-			dec.align(8)
 			spos := dec.pos
 			for dec.pos < spos+int(length) {
 				dec.align(8)
@@ -239,8 +275,9 @@ func (dec *decoder) decode(s string, depth int) interface{} {
 		}
 		dec.align(align)
 		spos := dec.pos
+		arrayType := s[1:]
 		for dec.pos < spos+int(length) {
-			ev := dec.decode(s[1:], depth+1)
+			ev := dec.decode(arrayType, depth+1)
 			v = reflect.Append(v, reflect.ValueOf(ev))
 		}
 		return v.Interface()
@@ -249,8 +286,9 @@ func (dec *decoder) decode(s string, depth int) interface{} {
 			panic(FormatError("input exceeds container depth limit"))
 		}
 		dec.align(8)
-		v := make([]interface{}, 0)
 		s = s[1 : len(s)-1]
+		// Capacity is at most len(s) elements
+		v := make([]interface{}, 0, len(s))
 		for s != "" {
 			err, rem := validSingle(s, &depthCounter{})
 			if err != nil {
@@ -370,12 +408,7 @@ func (c *stringConverter) String(b []byte) string {
 }
 
 // toString converts a byte slice to a string without allocating.
-// Starting from Go 1.20 you should use unsafe.String.
-func toString(b []byte) string {
-	var s string
-	h := (*reflect.StringHeader)(unsafe.Pointer(&s))
-	h.Data = uintptr(unsafe.Pointer(&b[0]))
-	h.Len = len(b)
 
-	return s
+func toString(b []byte) string {
+	return unsafe.String(&b[0], len(b))
 }

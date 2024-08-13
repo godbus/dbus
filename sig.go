@@ -273,24 +273,45 @@ func findMatching(s string, left, right rune) int {
 // typeFor returns the type of the given signature. It ignores any left over
 // characters and panics if s doesn't start with a valid type signature.
 func typeFor(s string) (t reflect.Type) {
-	err, _ := validSingle(s, &depthCounter{})
-	if err != nil {
-		panic(err)
-	}
-
-	if t, ok := sigToType[s[0]]; ok {
-		return t
-	}
 	switch s[0] {
+	case 'y':
+		return byteType
+	case 'b':
+		return boolType
+	case 'n':
+		return int16Type
+	case 'q':
+		return uint16Type
+	case 'i':
+		return int32Type
+	case 'u':
+		return uint32Type
+	case 'x':
+		return int64Type
+	case 't':
+		return uint64Type
+	case 'd':
+		return float64Type
+	case 's':
+		return stringType
+	case 'g':
+		return signatureType
+	case 'o':
+		return objectPathType
+	case 'v':
+		return variantType
+	case 'h':
+		return unixFDIndexType
 	case 'a':
 		if s[1] == '{' {
 			i := strings.LastIndex(s, "}")
-			t = reflect.MapOf(sigToType[s[2]], typeFor(s[3:i]))
+			return reflect.MapOf(sigToType[s[2]], typeFor(s[3:i]))
 		} else {
-			t = reflect.SliceOf(typeFor(s[1:]))
+			return reflect.SliceOf(typeFor(s[1:]))
 		}
 	case '(':
-		t = interfacesType
+		return interfacesType
+	default:
+		panic("invalid type character")
 	}
-	return
 }

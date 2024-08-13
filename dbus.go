@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 )
 
 var (
@@ -44,6 +43,7 @@ func (e InvalidTypeError) Error() string {
 // their elements don't match.
 func Store(src []interface{}, dest ...interface{}) error {
 	if len(src) != len(dest) {
+		fmt.Printf("%#v %#v\n", src, dest)
 		return errors.New("dbus.Store: length mismatch")
 	}
 
@@ -81,21 +81,29 @@ func storeBase(dest, src reflect.Value) error {
 }
 
 func setDest(dest, src reflect.Value) error {
-	if !isVariant(src.Type()) && isVariant(dest.Type()) {
+	srcType := src.Type()
+	destType := dest.Type()
+	srcIsVariant := isVariant(srcType)
+	destIsVariant := isVariant(destType)
+	if !srcIsVariant && destIsVariant {
 		// special conversion for dbus.Variant
 		dest.Set(reflect.ValueOf(MakeVariant(src.Interface())))
 		return nil
 	}
-	if isVariant(src.Type()) && !isVariant(dest.Type()) {
+	if srcIsVariant && !destIsVariant {
 		src = getVariantValue(src)
 		return store(dest, src)
 	}
-	if !src.Type().ConvertibleTo(dest.Type()) {
+	if srcType == destType {
+		dest.Set(src)
+		return nil
+	}
+	if !srcType.ConvertibleTo(destType) {
 		return fmt.Errorf(
 			"dbus.Store: type mismatch: cannot convert %s to %s",
 			src.Type(), dest.Type())
 	}
-	dest.Set(src.Convert(dest.Type()))
+	dest.Set(src.Convert(destType))
 	return nil
 }
 
@@ -222,9 +230,11 @@ func storeStruct(dest, src reflect.Value) error {
 	if isVariant(dest.Type()) {
 		return storeBase(dest, src)
 	}
-	dval := make([]interface{}, 0, dest.NumField())
+	fieldCount := dest.NumField()
+	dval := make([]interface{}, fieldCount)
+	j := 0
 	dtype := dest.Type()
-	for i := 0; i < dest.NumField(); i++ {
+	for i := 0; i < fieldCount; i++ {
 		field := dest.Field(i)
 		ftype := dtype.Field(i)
 		if ftype.PkgPath != "" {
@@ -233,14 +243,18 @@ func storeStruct(dest, src reflect.Value) error {
 		if ftype.Tag.Get("dbus") == "-" {
 			continue
 		}
-		dval = append(dval, field.Addr().Interface())
+		dval[j] = field.Addr().Interface()
+		j++
 	}
-	if src.Len() != len(dval) {
+	if src.Len() != j {
 		return fmt.Errorf(
 			"dbus.Store: type mismatch: "+
 				"destination struct does not have "+
 				"enough fields need: %d have: %d",
-			src.Len(), len(dval))
+			src.Len(), j)
+	}
+	if fieldCount > j {
+		dval = dval[:j]
 	}
 	return Store(src.Interface().([]interface{}), dval...)
 }
@@ -303,28 +317,25 @@ type ObjectPath string
 // IsValid returns whether the object path is valid.
 func (o ObjectPath) IsValid() bool {
 	s := string(o)
-	if len(s) == 0 {
+	length := len(s)
+	if length == 0 || s[0] != '/' {
 		return false
 	}
-	if s[0] != '/' {
-		return false
+	if s[length-1] == '/' {
+		return length == 1
 	}
-	if s[len(s)-1] == '/' && len(s) != 1 {
-		return false
-	}
-	// probably not used, but technically possible
-	if s == "/" {
-		return true
-	}
-	split := strings.Split(s[1:], "/")
-	for _, v := range split {
-		if len(v) == 0 {
-			return false
-		}
-		for _, c := range v {
-			if !isMemberChar(c) {
+	lastSlashIndex := 0
+	for i := 1; i < length; i++ {
+		if s[i] == '/' {
+			// Find back to back slashes
+			if i == lastSlashIndex+1 {
 				return false
 			}
+			lastSlashIndex = i
+			continue
+		}
+		if !isMemberChar(rune(s[i])) {
+			return false
 		}
 	}
 	return true
@@ -378,43 +389,41 @@ func isKeyType(t reflect.Type) bool {
 
 // isValidInterface returns whether s is a valid name for an interface.
 func isValidInterface(s string) bool {
-	if len(s) == 0 || len(s) > 255 || s[0] == '.' {
+	length := len(s)
+	if length == 0 || length > 255 || s[0] == '.' {
 		return false
 	}
-	elem := strings.Split(s, ".")
-	if len(elem) < 2 {
-		return false
-	}
-	for _, v := range elem {
-		if len(v) == 0 {
-			return false
-		}
-		if v[0] >= '0' && v[0] <= '9' {
-			return false
-		}
-		for _, c := range v {
-			if !isMemberChar(c) {
+	dotCount := 0
+	lastDotLocation := -1
+	for i := 0; i < length; i++ {
+		if s[i] == '.' {
+			if i == length-1 {
 				return false
 			}
+			dotCount++
+			lastDotLocation = i
+			continue
+		} else if !isMemberChar(rune(s[i])) {
+			return false
+		}
+		if lastDotLocation == i-1 && s[i] >= '0' && s[i] <= '9' {
+			return false
 		}
 	}
-	return true
+	return dotCount >= 1
 }
 
 // isValidMember returns whether s is a valid name for a member.
 func isValidMember(s string) bool {
-	if len(s) == 0 || len(s) > 255 {
-		return false
-	}
-	i := strings.Index(s, ".")
-	if i != -1 {
+	length := len(s)
+	if length == 0 || length > 255 {
 		return false
 	}
 	if s[0] >= '0' && s[0] <= '9' {
 		return false
 	}
-	for _, c := range s {
-		if !isMemberChar(c) {
+	for i := 0; i < length; i++ {
+		if !isMemberChar(rune(s[i])) {
 			return false
 		}
 	}

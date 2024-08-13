@@ -103,6 +103,8 @@ var requiredFields = [typeMax][]HeaderField{
 	TypeSignal:      {FieldPath, FieldInterface, FieldMember},
 }
 
+var reuseDecoder *decoder
+
 // Message represents a single D-Bus message.
 type Message struct {
 	Type
@@ -120,9 +122,6 @@ type header struct {
 
 func DecodeMessageWithFDs(rd io.Reader, fds []int) (msg *Message, err error) {
 	var order binary.ByteOrder
-	var hlength, length uint32
-	var typ, flags, proto byte
-	var headers []header
 
 	b := make([]byte, 1)
 	_, err = rd.Read(b)
@@ -138,45 +137,36 @@ func DecodeMessageWithFDs(rd io.Reader, fds []int) (msg *Message, err error) {
 		return nil, InvalidMessageError("invalid byte order")
 	}
 
-	dec := newDecoder(rd, order, fds)
+	if reuseDecoder == nil || reuseDecoder.order != order {
+		reuseDecoder = newDecoder(rd, order, fds)
+	} else {
+		reuseDecoder.Reset(rd, order, fds)
+	}
+	dec := reuseDecoder
 	dec.pos = 1
 
 	msg = new(Message)
-	vs, err := dec.Decode(Signature{"yyyuu"})
-	if err != nil {
-		return nil, err
-	}
-	if err = Store(vs, &typ, &flags, &proto, &length, &msg.serial); err != nil {
-		return nil, err
-	}
-	msg.Type = Type(typ)
-	msg.Flags = Flags(flags)
+	msg.Type = Type(dec.decodeY())
+	msg.Flags = Flags(dec.decodeY())
+	// Right now we don't store the proto version
+	_ = dec.decodeY()
+	length := dec.decodeU()
+	msg.serial = dec.decodeU()
 
 	// get the header length separately because we need it later
-	b = make([]byte, 4)
-	_, err = io.ReadFull(rd, b)
-	if err != nil {
-		return nil, err
-	}
-	if err := binary.Read(bytes.NewBuffer(b), order, &hlength); err != nil {
-		return nil, err
-	}
-	if hlength+length+16 > 1<<27 {
+	headerLength := dec.decodeU()
+	if headerLength+length+16 > 1<<27 {
 		return nil, InvalidMessageError("message is too long")
 	}
-	dec = newDecoder(io.MultiReader(bytes.NewBuffer(b), rd), order, fds)
-	dec.pos = 12
-	vs, err = dec.Decode(Signature{"a(yv)"})
-	if err != nil {
-		return nil, err
-	}
-	if err = Store(vs, &headers); err != nil {
-		return nil, err
-	}
-
-	msg.Headers = make(map[HeaderField]Variant)
-	for _, v := range headers {
-		msg.Headers[HeaderField(v.Field)] = v.Variant
+	// Signals have 3 required headers. This will over alloc for the other message types, but not much
+	msg.Headers = make(map[HeaderField]Variant, 3)
+	spos := dec.pos
+	header := header{}
+	for dec.pos < spos+int(headerLength) {
+		dec.align(8)
+		header.Field = dec.decodeY()
+		header.Variant = dec.decodeV(0)
+		msg.Headers[HeaderField(header.Field)] = header.Variant
 	}
 
 	dec.align(8)
@@ -194,7 +184,8 @@ func DecodeMessageWithFDs(rd io.Reader, fds []int) (msg *Message, err error) {
 	sig, _ := msg.Headers[FieldSignature].value.(Signature)
 	if sig.str != "" {
 		buf := bytes.NewBuffer(body)
-		dec = newDecoder(buf, order, fds)
+		//dec = newDecoder(buf, order, fds)
+		dec.Reset(buf, order, fds)
 		vs, err := dec.Decode(sig)
 		if err != nil {
 			return nil, err
