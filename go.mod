@@ -1,4 +1,4 @@
-module github.com/godbus/dbus/v5
+module github.com/pboyd04/dbus/v5
 
 go 1.20
 
