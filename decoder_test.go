@@ -19,12 +19,6 @@ type property struct {
 	Description string
 }
 
-type propertyChanged struct {
-	InterfaceName         string
-	ChangedProperties     map[string]Variant
-	InvalidatedProperties []string
-}
-
 func TestDecodeArrayEmptyStruct(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
 	msg := &Message{
@@ -146,63 +140,6 @@ func BenchmarkDecodeArrayEmptyStruct(b *testing.B) {
 		_, err = DecodeMessage(buf)
 		if err != nil {
 			b.Fatal(err)
-		}
-	}
-}
-
-func BenchmarkDecodeArrayEmptyStruct(b *testing.B) {
-	buf := bytes.NewBuffer(nil)
-	msg := &Message{
-		Type:  0x02,
-		Flags: 0x00,
-		Headers: map[HeaderField]Variant{
-			0x06: {
-				sig: Signature{
-					str: "s",
-				},
-				value: ":1.391",
-			},
-			0x05: {
-				sig: Signature{
-					str: "u",
-				},
-				value: uint32(2),
-			},
-			0x08: {
-				sig: Signature{
-					str: "g",
-				},
-				value: Signature{
-					str: "v",
-				},
-			},
-		},
-		Body: []interface{}{
-			Variant{
-				sig: Signature{
-					str: "(sa(iiay)ss)",
-				},
-				value: property{
-					IconName:    "iconname",
-					Pixmaps:     []pixmap{},
-					Title:       "title",
-					Description: "description",
-				},
-			},
-		},
-		serial: 0x00000003,
-	}
-	err := msg.EncodeTo(buf, binary.LittleEndian)
-	if err != nil {
-		b.Fatal(err)
-	}
-	data := buf.Bytes()
-	for n := 0; n < b.N; n++ {
-		buf.Reset()
-		buf.Write(data)
-		_, err = DecodeMessage(buf)
-		if err != nil {
-			b.Fatalf("%d %v\n", n, err)
 		}
 	}
 }

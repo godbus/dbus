@@ -2,6 +2,25 @@
 
 linters:
   enable:
+    - dupl
+    - exportloopref
+    - gci
+    - goconst
+    - gocritic
+    - gofmt
     - gofumpt
+    - perfsprint
+    - prealloc
     - unconvert
     - unparam
+    - usestdlibvars
+    - wastedassign
+
+linters-settings:
+  gocritic:
+    disabled-checks:
+      - appendAssign
+      - unlambda
+    settings:
+      ifElseChain:
+        minThreshold: 4

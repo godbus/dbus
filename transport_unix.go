@@ -40,7 +40,7 @@ const defaultBufferSize uint32 = 4096
 func (o *oobReader) Read(b []byte) (n int, err error) {
 	n, oobn, flags, _, err := o.conn.ReadMsgUnix(b, o.buf[:])
 	if err != nil {
-		return n, err
+		return 0, err
 	}
 	if flags&syscall.MSG_CTRUNC != 0 {
 		return n, errors.New("dbus: control data truncated (too many fds received)")
@@ -267,7 +267,6 @@ func (t *unixTransport) SendMessage(msg *Message) error {
 			return io.ErrShortWrite
 		}
 	} else {
-
 		if err := msg.EncodeTo(t, nativeEndian); err != nil {
 			return err
 		}

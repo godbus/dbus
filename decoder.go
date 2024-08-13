@@ -73,7 +73,7 @@ func (dec *decoder) Decode(sig Signature) (vs []interface{}, err error) {
 		}
 	}()
 	s := sig.str
-	//There will be at most one item per character in the signature, probably less
+	// There will be at most one item per character in the signature, probably less
 	itemCount := len(s)
 	realCount := 0
 	vs = make([]interface{}, itemCount)

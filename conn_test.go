@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"sync"
 	"testing"
@@ -172,7 +171,7 @@ func TestCloseBeforeSignal(t *testing.T) {
 	defer reader.Close()
 	wg := sync.WaitGroup{}
 
-	bus, err := NewConn(rwc{Reader: reader, Writer: ioutil.Discard})
+	bus, err := NewConn(rwc{Reader: reader, Writer: io.Discard})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -747,7 +746,7 @@ func TestDisconnectCancelsConnectionContext(t *testing.T) {
 	defer pipewriter.Close()
 	defer reader.Close()
 
-	bus, err := NewConn(rwc{Reader: reader, Writer: ioutil.Discard})
+	bus, err := NewConn(rwc{Reader: reader, Writer: io.Discard})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -782,7 +781,7 @@ func TestCancellingContextClosesConnection(t *testing.T) {
 	defer pipewriter.Close()
 	defer reader.Close()
 
-	bus, err := NewConn(rwc{Reader: reader, Writer: ioutil.Discard}, WithContext(ctx))
+	bus, err := NewConn(rwc{Reader: reader, Writer: io.Discard}, WithContext(ctx))
 	if err != nil {
 		t.Fatal(err)
 	}

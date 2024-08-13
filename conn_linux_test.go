@@ -2,7 +2,6 @@ package dbus
 
 import (
 	"bufio"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"syscall"
@@ -46,7 +45,7 @@ func startDaemonInDifferentUserNamespace(t *testing.T) (string, *os.Process) {
 	</policy>   
    </busconfig>
    `
-	cfg, err := ioutil.TempFile("", "")
+	cfg, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}

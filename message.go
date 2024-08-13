@@ -184,7 +184,6 @@ func DecodeMessageWithFDs(rd io.Reader, fds []int) (msg *Message, err error) {
 	sig, _ := msg.Headers[FieldSignature].value.(Signature)
 	if sig.str != "" {
 		buf := bytes.NewBuffer(body)
-		//dec = newDecoder(buf, order, fds)
 		dec.Reset(buf, order, fds)
 		vs, err := dec.Decode(sig)
 		if err != nil {
