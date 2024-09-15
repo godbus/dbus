@@ -16,19 +16,35 @@ import (
 type Introspectable string
 
 // NewIntrospectable returns an Introspectable that returns the introspection
-// data that corresponds to the given Node. If n.Interfaces doesn't contain the
-// data for org.freedesktop.DBus.Introspectable, it is added automatically.
+// data that corresponds to the given Node.
+//
+// If n.Interfaces doesn't contain the data for
+// org.freedesktop.DBus.Introspectable or org.freedesktop.DBus.Peer, they are
+// added automatically.
 func NewIntrospectable(n *Node) Introspectable {
-	found := false
+	foundIntrospect := false
+	foundPeer := false
+
 	for _, v := range n.Interfaces {
 		if v.Name == "org.freedesktop.DBus.Introspectable" {
-			found = true
+			foundIntrospect = true
+			break
+		}
+
+		if v.Name == "org.freedesktop.DBus.Peer" {
+			foundPeer = true
 			break
 		}
 	}
-	if !found {
+
+	if !foundIntrospect {
 		n.Interfaces = append(n.Interfaces, IntrospectData)
 	}
+
+	if !foundPeer {
+		n.Interfaces = append(n.Interfaces, PeerData)
+	}
+
 	b, err := xml.Marshal(n)
 	if err != nil {
 		panic(err)

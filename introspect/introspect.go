@@ -17,6 +17,22 @@ var IntrospectData = Interface{
 	},
 }
 
+// PeerData is the introspection data for the org.freedesktop.DBus.Peer interface.
+var PeerData = Interface{
+	Name: "org.freedesktop.DBus.Peer",
+	Methods: []Method{
+		{
+			Name: "Ping",
+		},
+		{
+			Name: "GetMachineId",
+			Args: []Arg{
+				{"machine_uuid", "s", "out"},
+			},
+		},
+	},
+}
+
 // XML document type declaration of the introspection format version 1.0
 const IntrospectDeclarationString = `
 	<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
