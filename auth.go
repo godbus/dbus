@@ -35,6 +35,8 @@ const (
 	waitingForReject
 )
 
+const rejectedString = "REJECTED"
+
 // Auth defines the behaviour of an authentication mechanism.
 type Auth interface {
 	// Return the name of the mechanism, the argument to the first AUTH command
@@ -69,7 +71,7 @@ func (conn *Conn) Auth(methods []Auth) error {
 	if err != nil {
 		return err
 	}
-	if len(s) < 2 || !bytes.Equal(s[0], []byte("REJECTED")) {
+	if len(s) < 2 || !bytes.Equal(s[0], []byte(rejectedString)) {
 		return errors.New("dbus: authentication protocol error")
 	}
 	s = s[1:]
@@ -161,7 +163,7 @@ func (conn *Conn) tryAuth(m Auth, state authState, in *bufio.Reader) (bool, erro
 					return false, err
 				}
 			}
-		case state == waitingForData && string(s[0]) == "REJECTED":
+		case state == waitingForData && string(s[0]) == rejectedString:
 			return false, nil
 		case state == waitingForData && string(s[0]) == "ERROR":
 			err = authWriteLine(conn.transport, []byte("CANCEL"))
@@ -201,7 +203,7 @@ func (conn *Conn) tryAuth(m Auth, state authState, in *bufio.Reader) (bool, erro
 			if err != nil {
 				return false, nil
 			}
-		case state == waitingForOk && string(s[0]) == "REJECTED":
+		case state == waitingForOk && string(s[0]) == rejectedString:
 			return false, nil
 		case state == waitingForOk && string(s[0]) == "ERROR":
 			err = authWriteLine(conn.transport, []byte("CANCEL"))
@@ -214,7 +216,7 @@ func (conn *Conn) tryAuth(m Auth, state authState, in *bufio.Reader) (bool, erro
 			if err != nil {
 				return false, err
 			}
-		case state == waitingForReject && string(s[0]) == "REJECTED":
+		case state == waitingForReject && string(s[0]) == rejectedString:
 			return false, nil
 		case state == waitingForReject:
 			return false, errors.New("dbus: authentication protocol error")

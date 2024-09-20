@@ -6,8 +6,6 @@ package dbus
 import (
 	"bytes"
 	"errors"
-	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/user"
@@ -54,14 +52,14 @@ func tryDiscoverDbusSessionBusAddress() string {
 		if runUserBusFile := path.Join(runtimeDirectory, "bus"); fileExists(runUserBusFile) {
 			// if /run/user/<uid>/bus exists, that file itself
 			// *is* the unix socket, so return its path
-			return fmt.Sprintf("unix:path=%s", EscapeBusAddressValue(runUserBusFile))
+			return "unix:path=" + EscapeBusAddressValue(runUserBusFile)
 		}
 		if runUserSessionDbusFile := path.Join(runtimeDirectory, "dbus-session"); fileExists(runUserSessionDbusFile) {
 			// if /run/user/<uid>/dbus-session exists, it's a
 			// text file // containing the address of the socket, e.g.:
 			// DBUS_SESSION_BUS_ADDRESS=unix:abstract=/tmp/dbus-E1c73yNqrG
 
-			if f, err := ioutil.ReadFile(runUserSessionDbusFile); err == nil {
+			if f, err := os.ReadFile(runUserSessionDbusFile); err == nil {
 				fileContent := string(f)
 
 				prefix := "DBUS_SESSION_BUS_ADDRESS="
@@ -80,7 +78,7 @@ func getRuntimeDirectory() (string, error) {
 	if currentUser, err := user.Current(); err != nil {
 		return "", err
 	} else {
-		return fmt.Sprintf("/run/user/%s", currentUser.Uid), nil
+		return "/run/user/" + currentUser.Uid, nil
 	}
 }
 

@@ -7,6 +7,11 @@ import (
 	"testing"
 )
 
+const (
+	barString = "bar"
+	fooString = "foo"
+)
+
 type lowerCaseExport struct{}
 
 type fooExport struct {
@@ -15,19 +20,19 @@ type fooExport struct {
 
 func (export *fooExport) Foo(message Message, param string) (string, *Error) {
 	export.message = message
-	return "foo", nil
+	return fooString, nil
 }
 
 type barExport struct{}
 
 func (export barExport) Foo(param string) (string, *Error) {
-	return "bar", nil
+	return barString, nil
 }
 
 type badExport struct{}
 
 func (export badExport) Foo(param string) string {
-	return "bar"
+	return barString
 }
 
 type invalidMessageExport struct{}
@@ -170,7 +175,7 @@ func TestExport_noerror(t *testing.T) {
 	}
 
 	if response != "cool" {
-		t.Errorf(`Response was %s, expected "foo"`, response)
+		t.Errorf(`Response was %s, expected "cool"`, response)
 	}
 
 	if export.message.serial == 0 {
@@ -201,7 +206,7 @@ func TestExport_message(t *testing.T) {
 		t.Errorf("Unexpected error calling Foo: %s", err)
 	}
 
-	if response != "foo" {
+	if response != fooString {
 		t.Errorf(`Response was %s, expected "foo"`, response)
 	}
 
@@ -218,7 +223,7 @@ func TestExport_invalidPath(t *testing.T) {
 	}
 	defer connection.Close()
 
-	err = connection.Export(nil, "foo", "bar")
+	err = connection.Export(nil, fooString, barString)
 	if err == nil {
 		t.Error("Expected an error due to exporting with an invalid path")
 	}
@@ -382,7 +387,7 @@ func TestExportSubtree(t *testing.T) {
 		t.Errorf("Unexpected error calling Foo: %s", err)
 	}
 
-	if response != "foo" {
+	if response != fooString {
 		t.Errorf(`Response was %s, expected "foo"`, response)
 	}
 
@@ -475,7 +480,7 @@ func TestExportSubtree_exportPrecedence(t *testing.T) {
 		t.Errorf("Unexpected error calling Foo: %s", err)
 	}
 
-	if response != "bar" {
+	if response != barString {
 		t.Errorf(`Response was %s, expected "bar"`, response)
 	}
 
@@ -493,7 +498,7 @@ func TestExportSubtree_exportPrecedence(t *testing.T) {
 	}
 
 	// Now the subtree export should handle the call
-	if response != "foo" {
+	if response != fooString {
 		t.Errorf(`Response was %s, expected "foo"`, response)
 	}
 }
@@ -509,7 +514,7 @@ func TestExportSubtreeWithMap(t *testing.T) {
 	name := connection.Names()[0]
 
 	mapping := make(map[string]string)
-	mapping["Foo"] = "foo" // Export this method as lower-case
+	mapping[fooString] = fooString // Export this method as lower-case
 
 	err = connection.ExportSubtreeWithMap(&fooExport{}, mapping, "/org/guelfey/DBus/Test", "org.guelfey.DBus.Test")
 	if err != nil {
@@ -526,7 +531,7 @@ func TestExportSubtreeWithMap(t *testing.T) {
 		t.Errorf("Unexpected error calling Foo: %s", err)
 	}
 
-	if response != "foo" {
+	if response != fooString {
 		t.Errorf(`Response was %s, expected "foo"`, response)
 	}
 
@@ -553,7 +558,7 @@ func TestExportSubtreeWithMap_bypassAlias(t *testing.T) {
 	name := connection.Names()[0]
 
 	mapping := make(map[string]string)
-	mapping["Foo"] = "foo" // Export this method as lower-case
+	mapping[fooString] = fooString // Export this method as lower-case
 
 	err = connection.ExportSubtreeWithMap(&fooExport{}, mapping, "/org/guelfey/DBus/Test", "org.guelfey.DBus.Test")
 	if err != nil {
@@ -570,6 +575,7 @@ func TestExportSubtreeWithMap_bypassAlias(t *testing.T) {
 	}
 }
 
+//nolint:dupl
 func TestExportMethodTable(t *testing.T) {
 	connection, err := ConnectSessionBus()
 	if err != nil {
@@ -580,7 +586,7 @@ func TestExportMethodTable(t *testing.T) {
 	name := connection.Names()[0]
 	export := &fooExport{}
 	tbl := make(map[string]interface{})
-	tbl["Foo"] = func(message Message, param string) (string, *Error) {
+	tbl[fooString] = func(message Message, param string) (string, *Error) {
 		return export.Foo(message, param)
 	}
 	tbl["Foo2"] = export.Foo
@@ -597,7 +603,7 @@ func TestExportMethodTable(t *testing.T) {
 		t.Errorf("Unexpected error calling Foo: %s", err)
 	}
 
-	if response != "foo" {
+	if response != fooString {
 		t.Errorf(`Response was %s, expected "foo"`, response)
 	}
 
@@ -610,7 +616,7 @@ func TestExportMethodTable(t *testing.T) {
 		t.Errorf("Unexpected error calling Foo: %s", err)
 	}
 
-	if response != "foo" {
+	if response != fooString {
 		t.Errorf(`Response was %s, expected "foo"`, response)
 	}
 
@@ -630,6 +636,7 @@ func TestExportMethodTable(t *testing.T) {
 	}
 }
 
+//nolint:dupl
 func TestExportSubtreeMethodTable(t *testing.T) {
 	connection, err := ConnectSessionBus()
 	if err != nil {
@@ -641,7 +648,7 @@ func TestExportSubtreeMethodTable(t *testing.T) {
 
 	export := &fooExport{}
 	tbl := make(map[string]interface{})
-	tbl["Foo"] = func(message Message, param string) (string, *Error) {
+	tbl[fooString] = func(message Message, param string) (string, *Error) {
 		return export.Foo(message, param)
 	}
 	tbl["Foo2"] = export.Foo
@@ -659,7 +666,7 @@ func TestExportSubtreeMethodTable(t *testing.T) {
 		t.Errorf("Unexpected error calling Foo: %s", err)
 	}
 
-	if response != "foo" {
+	if response != fooString {
 		t.Errorf(`Response was %s, expected "foo"`, response)
 	}
 
@@ -672,7 +679,7 @@ func TestExportSubtreeMethodTable(t *testing.T) {
 		t.Errorf("Unexpected error calling Foo: %s", err)
 	}
 
-	if response != "foo" {
+	if response != fooString {
 		t.Errorf(`Response was %s, expected "foo"`, response)
 	}
 
@@ -720,7 +727,7 @@ func TestExportMethodTable_NotFunc(t *testing.T) {
 		t.Errorf("Unexpected error calling Foo: %s", err)
 	}
 
-	if response != "foo" {
+	if response != fooString {
 		t.Errorf(`Response was %s, expected "foo"`, response)
 	}
 

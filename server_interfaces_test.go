@@ -1,7 +1,7 @@
 package dbus
 
 import (
-	"fmt"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -83,7 +83,7 @@ func (t *tester) LookupMethod(name string) (Method, bool) {
 		return t, true
 	case "Error":
 		return terrfn(func(in string) error {
-			return fmt.Errorf(in)
+			return errors.New(in)
 		}), true
 	case "Introspect":
 		return intro_fn(func() string {
@@ -243,7 +243,7 @@ func TestHandlerCall(t *testing.T) {
 	defer conn.Close()
 	obj := conn.Object(tester.Name(), "/com/github/godbus/tester")
 	var out string
-	in := "foo"
+	in := fooString
 	err = obj.Call("com.github.godbus.dbus.Tester.Test", 0, in).Store(&out)
 	if err != nil {
 		t.Errorf("Unexpected error: %s", err)
@@ -266,7 +266,7 @@ func TestHandlerCallGenericError(t *testing.T) {
 	defer conn.Close()
 	obj := conn.Object(tester.Name(), "/com/github/godbus/tester")
 	var out string
-	in := "foo"
+	in := fooString
 	err = obj.Call("com.github.godbus.dbus.Tester.Error", 0, in).Store(&out)
 	if err != nil && err.(Error).Body[0].(string) != "foo" {
 		t.Errorf("Unexpected error: %s", err)
@@ -287,7 +287,7 @@ func TestHandlerCallNonExistent(t *testing.T) {
 	defer conn.Close()
 	obj := conn.Object(tester.Name(), "/com/github/godbus/tester/nonexist")
 	var out string
-	in := "foo"
+	in := fooString
 	err = obj.Call("com.github.godbus.dbus.Tester.Test", 0, in).Store(&out)
 	if err != nil {
 		if err.Error() != "Object does not implement the interface 'com.github.godbus.dbus.Tester'" {
@@ -309,7 +309,7 @@ func TestHandlerInvalidFunc(t *testing.T) {
 	defer conn.Close()
 	obj := conn.Object(tester.Name(), "/com/github/godbus/tester")
 	var out string
-	in := "foo"
+	in := fooString
 	err = obj.Call("com.github.godbus.dbus.Tester.Notexist", 0, in).Store(&out)
 	if err == nil {
 		t.Errorf("didn't get expected error")
@@ -438,7 +438,7 @@ func TestHandlerSignal(t *testing.T) {
 	}
 	select {
 	case sig := <-tester.sigs:
-		if sig.Body[0] != "foo" {
+		if sig.Body[0] != fooString {
 			t.Errorf("Unexpected signal got %s, expected %s", sig.Body[0], "foo")
 		}
 	case <-time.After(time.Second * 10): // overly generous timeout

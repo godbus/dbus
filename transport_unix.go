@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"sync"
 	"syscall"
 )
 
@@ -29,21 +30,23 @@ type oobReader struct {
 	buf  [4096]byte
 
 	// The following fields are used to reduce memory allocs.
-	headers  []header
 	csheader []byte
 	b        *bytes.Buffer
-	r        *bytes.Reader
-	dec      *decoder
 	msghead
 }
+
+const defaultBufferSize uint32 = 4096
 
 func (o *oobReader) Read(b []byte) (n int, err error) {
 	n, oobn, flags, _, err := o.conn.ReadMsgUnix(b, o.buf[:])
 	if err != nil {
-		return n, err
+		return 0, err
 	}
 	if flags&syscall.MSG_CTRUNC != 0 {
 		return n, errors.New("dbus: control data truncated (too many fds received)")
+	}
+	if oobn == 0 {
+		return n, nil
 	}
 	o.oob = append(o.oob, o.buf[:oobn]...)
 	return n, nil
@@ -89,6 +92,12 @@ func (t *unixTransport) EnableUnixFDs() {
 	t.hasUnixFDs = true
 }
 
+var decodePool = sync.Pool{
+	New: func() interface{} {
+		return new(decoder)
+	},
+}
+
 func (t *unixTransport) ReadMessage() (*Message, error) {
 	// To be sure that all bytes of out-of-band data are read, we use a special
 	// reader that uses ReadUnix on the underlying connection instead of Read
@@ -98,28 +107,26 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 			conn: t.UnixConn,
 			// This buffer is used to decode the part of the header that has a constant size.
 			csheader: make([]byte, 16),
-			b:        &bytes.Buffer{},
-			// The reader helps to read from the buffer several times.
-			r:   &bytes.Reader{},
-			dec: &decoder{},
+			b:        bytes.NewBuffer(make([]byte, defaultBufferSize)),
 		}
 	} else {
 		t.rdr.oob = t.rdr.oob[:0]
-		t.rdr.headers = t.rdr.headers[:0]
 	}
 	var (
-		r   = t.rdr.r
 		b   = t.rdr.b
-		dec = t.rdr.dec
+		dec = decodePool.Get().(*decoder)
 	)
+	// Put the decoder back in the pool for others to use.
+	defer decodePool.Put(dec)
 
-	_, err := io.ReadFull(t.rdr, t.rdr.csheader)
-	if err != nil {
+	b.Reset()
+	if _, err := io.CopyN(b, t.rdr, 16); err != nil {
 		return nil, err
 	}
+	endianByte, _ := b.ReadByte()
 
 	var order binary.ByteOrder
-	switch t.rdr.csheader[0] {
+	switch endianByte {
 	case 'l':
 		order = binary.LittleEndian
 	case 'B':
@@ -128,8 +135,7 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 		return nil, InvalidMessageError("invalid byte order")
 	}
 
-	r.Reset(t.rdr.csheader[1:])
-	if err := binary.Read(r, order, &t.rdr.msghead); err != nil {
+	if err := binary.Read(b, order, &t.rdr.msghead); err != nil {
 		return nil, err
 	}
 
@@ -149,39 +155,35 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 
 	// Decode headers and look for unix fds.
 	b.Reset()
-	if _, err = b.Write(t.rdr.csheader[12:]); err != nil {
-		return nil, err
-	}
-	if _, err = io.CopyN(b, t.rdr, int64(hlen)); err != nil {
+	if _, err := io.CopyN(b, t.rdr, int64(hlen)); err != nil {
 		return nil, err
 	}
 	dec.Reset(b, order, nil)
-	dec.pos = 12
-	vs, err := dec.Decode(Signature{"a(yv)"})
-	if err != nil {
-		return nil, err
-	}
-	if err = Store(vs, &t.rdr.headers); err != nil {
-		return nil, err
-	}
+	msg.Headers = make(map[HeaderField]Variant, 3)
+	spos := dec.pos
+	header := header{}
 	var unixfds uint32
-	for _, v := range t.rdr.headers {
-		if v.Field == byte(FieldUnixFDs) {
-			unixfds, _ = v.Variant.value.(uint32)
+	for dec.pos < spos+int(hlen) {
+		dec.align(8)
+		if dec.pos >= spos+int(hlen) {
+			break
+		}
+		header.Field = dec.decodeY()
+		header.Variant = dec.decodeV(0)
+		msg.Headers[HeaderField(header.Field)] = header.Variant
+		if header.Field == byte(FieldUnixFDs) {
+			unixfds, _ = header.Variant.value.(uint32)
 		}
 	}
 
-	msg.Headers = make(map[HeaderField]Variant)
-	for _, v := range t.rdr.headers {
-		msg.Headers[HeaderField(v.Field)] = v.Variant
-	}
-
 	dec.align(8)
-	body := make([]byte, t.rdr.BodyLen)
-	if _, err = io.ReadFull(t.rdr, body); err != nil {
+	if t.rdr.BodyLen > defaultBufferSize {
+		b.Grow(int(t.rdr.BodyLen))
+	}
+	b.Reset()
+	if _, err := io.CopyN(b, t.rdr, int64(t.rdr.BodyLen)); err != nil {
 		return nil, err
 	}
-	r.Reset(body)
 
 	if unixfds != 0 {
 		if !t.hasUnixFDs {
@@ -199,7 +201,7 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 		if err != nil {
 			return nil, err
 		}
-		dec.Reset(r, order, fds)
+		dec.Reset(b, order, fds)
 		if err = decodeMessageBody(msg, dec); err != nil {
 			return nil, err
 		}
@@ -226,8 +228,8 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 		return msg, nil
 	}
 
-	dec.Reset(r, order, nil)
-	if err = decodeMessageBody(msg, dec); err != nil {
+	dec.Reset(b, order, nil)
+	if err := decodeMessageBody(msg, dec); err != nil {
 		return nil, err
 	}
 	return msg, nil
