@@ -3,7 +3,6 @@ package dbus
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"io"
 	"reflect"
 	"strconv"
@@ -203,33 +202,20 @@ func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 	return DecodeMessageWithFDs(rd, make([]int, 0))
 }
 
-type nullwriter struct{}
-
-func (nullwriter) Write(p []byte) (cnt int, err error) {
-	return len(p), nil
-}
-
 func (msg *Message) CountFds() (int, error) {
 	if len(msg.Body) == 0 {
 		return 0, nil
 	}
-	enc := newEncoder(nullwriter{}, nativeEndian, make([]int, 0))
-	err := enc.Encode(msg.Body...)
-	return len(enc.fds), err
+	return CountFDs(msg.Body...)
 }
 
 func (msg *Message) EncodeToWithFDs(out io.Writer, order binary.ByteOrder) (fds []int, err error) {
 	if err := msg.validateHeader(); err != nil {
 		return nil, err
 	}
-	var vs [7]interface{}
-	switch order {
-	case binary.LittleEndian:
-		vs[0] = byte('l')
-	case binary.BigEndian:
-		vs[0] = byte('B')
-	default:
-		return nil, errors.New("dbus: invalid byte order")
+	endianByte := byte('l')
+	if order == binary.BigEndian {
+		endianByte = byte('B')
 	}
 	body := new(bytes.Buffer)
 	fds = make([]int, 0)
@@ -240,30 +226,32 @@ func (msg *Message) EncodeToWithFDs(out io.Writer, order binary.ByteOrder) (fds 
 			return
 		}
 	}
-	vs[1] = msg.Type
-	vs[2] = msg.Flags
-	vs[3] = protoVersion
-	vs[4] = uint32(len(body.Bytes()))
-	vs[5] = msg.serial
 	headers := make([]header, 0, len(msg.Headers))
 	for k, v := range msg.Headers {
 		headers = append(headers, header{byte(k), v})
 	}
-	vs[6] = headers
-	var buf bytes.Buffer
-	enc = newEncoder(&buf, order, enc.fds)
-	err = enc.Encode(vs[:]...)
+	buf := bytes.NewBuffer(make([]byte, 0, 128))
+	// No need to alloc a new encoder, just reset the old one
+	enc.Reset(buf, order, enc.fds)
+	buf.WriteByte(endianByte)
+	buf.WriteByte(byte(msg.Type))
+	buf.WriteByte(byte(msg.Flags))
+	buf.WriteByte(protoVersion)
+	enc.binWriteIntType(uint32(len(body.Bytes())))
+	enc.binWriteIntType(msg.serial)
+	enc.pos = 12
+	err = enc.Encode(headers)
 	if err != nil {
 		return
 	}
 	enc.align(8)
-	if _, err := body.WriteTo(&buf); err != nil {
-		return nil, err
-	}
-	if buf.Len() > 1<<27 {
+	if buf.Len()+body.Len() > 1<<27 {
 		return nil, InvalidMessageError("message is too long")
 	}
 	if _, err := buf.WriteTo(out); err != nil {
+		return nil, err
+	}
+	if _, err := body.WriteTo(out); err != nil {
 		return nil, err
 	}
 	return enc.fds, nil

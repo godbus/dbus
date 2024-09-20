@@ -258,6 +258,18 @@ func (enc *encoder) Encode(vs ...interface{}) (err error) {
 	return nil
 }
 
+func CountFDs(vs ...interface{}) (int, error) {
+	var err error
+	defer func() {
+		err, _ = recover().(error)
+	}()
+	count := 0
+	for _, v := range vs {
+		count += fdCounter(reflect.ValueOf(v), 0)
+	}
+	return count, err
+}
+
 // encode encodes the given value to the writer and panics on error. depth holds
 // the depth of the container nesting.
 func (enc *encoder) encode(v reflect.Value, depth int) {
@@ -273,7 +285,7 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		if v.Bool() {
 			enc.binWriteIntType(uint32(1))
 		} else {
-			enc.binWriteIntType(uint32(1))
+			enc.binWriteIntType(uint32(0))
 		}
 		enc.pos += 4
 	case reflect.Int16:
@@ -412,5 +424,58 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		enc.encode(reflect.ValueOf(MakeVariant(v.Interface())), depth)
 	default:
 		panic(InvalidTypeError{v.Type()})
+	}
+}
+
+func fdCounter(v reflect.Value, depth int) int {
+	if depth > 64 {
+		panic(FormatError("input exceeds depth limitation"))
+	}
+	switch v.Kind() {
+	case reflect.Int, reflect.Int32:
+		if v.Type() == unixFDType {
+			return 1
+		}
+		return 0
+	case reflect.Ptr:
+		return fdCounter(v.Elem(), depth)
+	case reflect.Slice, reflect.Array:
+		// we don't really need the child encoder in this case since we aren't actually messing with the buffer at all
+		count := 0
+		for i := 0; i < v.Len(); i++ {
+			count += fdCounter(v.Index(i), depth+1)
+		}
+		return count
+	case reflect.Struct:
+		switch t := v.Type(); t {
+		case variantType:
+			variant := v.Interface().(Variant)
+			return fdCounter(reflect.ValueOf(variant.value), depth+1)
+		default:
+			count := 0
+			for i := 0; i < v.Type().NumField(); i++ {
+				field := t.Field(i)
+				if field.PkgPath == "" && field.Tag.Get("dbus") != "-" {
+					count += fdCounter(v.Field(i), depth+1)
+				}
+			}
+			return count
+		}
+	case reflect.Map:
+		// Maps are arrays of structures, so they actually increase the depth by
+		// 2.
+		// we don't really need the child encoder in this case since we aren't actually messing with the buffer at all
+		iter := v.MapRange()
+		count := 0
+		for iter.Next() {
+			count += fdCounter(iter.Key(), depth+2)
+			count += fdCounter(iter.Value(), depth+2)
+		}
+		return count
+	case reflect.Interface:
+		return fdCounter(reflect.ValueOf(MakeVariant(v.Interface())), depth)
+	default:
+		// do nothing we are skipping most types
+		return 0
 	}
 }

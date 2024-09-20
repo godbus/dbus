@@ -365,7 +365,7 @@ func alignment(t reflect.Type) int {
 		return 1
 	case reflect.Uint16, reflect.Int16:
 		return 2
-	case reflect.Uint, reflect.Int, reflect.Uint32, reflect.Int32, reflect.String, reflect.Array, reflect.Slice, reflect.Map:
+	case reflect.Uint, reflect.Int, reflect.Uint32, reflect.Int32, reflect.String, reflect.Array, reflect.Slice, reflect.Map, reflect.Bool:
 		return 4
 	case reflect.Uint64, reflect.Int64, reflect.Float64, reflect.Struct:
 		return 8

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"sync"
 	"syscall"
 )
 
@@ -31,7 +32,6 @@ type oobReader struct {
 	// The following fields are used to reduce memory allocs.
 	csheader []byte
 	b        *bytes.Buffer
-	dec      *decoder
 	msghead
 }
 
@@ -92,6 +92,12 @@ func (t *unixTransport) EnableUnixFDs() {
 	t.hasUnixFDs = true
 }
 
+var decodePool = sync.Pool{
+	New: func() interface{} {
+		return new(decoder)
+	},
+}
+
 func (t *unixTransport) ReadMessage() (*Message, error) {
 	// To be sure that all bytes of out-of-band data are read, we use a special
 	// reader that uses ReadUnix on the underlying connection instead of Read
@@ -102,15 +108,16 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 			// This buffer is used to decode the part of the header that has a constant size.
 			csheader: make([]byte, 16),
 			b:        bytes.NewBuffer(make([]byte, defaultBufferSize)),
-			dec:      &decoder{},
 		}
 	} else {
 		t.rdr.oob = t.rdr.oob[:0]
 	}
 	var (
 		b   = t.rdr.b
-		dec = t.rdr.dec
+		dec = decodePool.Get().(*decoder)
 	)
+	// Put the decoder back in the pool for others to use.
+	defer decodePool.Put(dec)
 
 	b.Reset()
 	if _, err := io.CopyN(b, t.rdr, 16); err != nil {
