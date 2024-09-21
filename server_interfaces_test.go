@@ -1,7 +1,7 @@
 package dbus
 
 import (
-	"fmt"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -83,7 +83,7 @@ func (t *tester) LookupMethod(name string) (Method, bool) {
 		return t, true
 	case "Error":
 		return terrfn(func(in string) error {
-			return fmt.Errorf(in)
+			return errors.New(in)
 		}), true
 	case "Introspect":
 		return intro_fn(func() string {
