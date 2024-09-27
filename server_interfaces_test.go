@@ -109,7 +109,7 @@ func (t *tester) LookupMethod(name string) (Method, bool) {
 }
 
 // Method
-func (t *tester) Call(args ...interface{}) ([]interface{}, error) {
+func (t *tester) Call(sender Sender, args ...interface{}) ([]interface{}, error) {
 	return args, nil
 }
 
@@ -131,7 +131,7 @@ func (t *tester) ReturnValue(position int) interface{} {
 
 type terrfn func(in string) error
 
-func (t terrfn) Call(args ...interface{}) ([]interface{}, error) {
+func (t terrfn) Call(sender Sender, args ...interface{}) ([]interface{}, error) {
 	return nil, t(*args[0].(*string))
 }
 
@@ -194,7 +194,7 @@ func (t *tester) RetireSerial(serial uint32) {}
 
 type intro_fn func() string
 
-func (intro intro_fn) Call(args ...interface{}) ([]interface{}, error) {
+func (intro intro_fn) Call(sender Sender, args ...interface{}) ([]interface{}, error) {
 	return []interface{}{intro()}, nil
 }
 
