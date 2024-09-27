@@ -57,7 +57,7 @@ type Conn struct {
 
 // SessionBus returns a shared connection to the session bus, connecting to it
 // if not already done.
-func SessionBus() (conn *Conn, err error) {
+func SessionBus(opts ...ConnOption) (conn *Conn, err error) {
 	sessionBusLck.Lock()
 	defer sessionBusLck.Unlock()
 	if sessionBus != nil &&
@@ -69,7 +69,7 @@ func SessionBus() (conn *Conn, err error) {
 			sessionBus = conn
 		}
 	}()
-	conn, err = ConnectSessionBus()
+	conn, err = ConnectSessionBus(opts...)
 	return
 }
 
@@ -116,7 +116,7 @@ func SessionBusPrivateHandler(handler Handler, signalHandler SignalHandler) (*Co
 
 // SystemBus returns a shared connection to the system bus, connecting to it if
 // not already done.
-func SystemBus() (conn *Conn, err error) {
+func SystemBus(opts ...ConnOption) (conn *Conn, err error) {
 	systemBusLck.Lock()
 	defer systemBusLck.Unlock()
 	if systemBus != nil &&
@@ -128,7 +128,7 @@ func SystemBus() (conn *Conn, err error) {
 			systemBus = conn
 		}
 	}()
-	conn, err = ConnectSystemBus()
+	conn, err = ConnectSystemBus(opts...)
 	return
 }
 
