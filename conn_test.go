@@ -169,6 +169,7 @@ func TestCloseBeforeSignal(t *testing.T) {
 	reader, pipewriter := io.Pipe()
 	defer pipewriter.Close()
 	defer reader.Close()
+	wg := sync.WaitGroup{}
 
 	bus, err := NewConn(rwc{Reader: reader, Writer: io.Discard})
 	if err != nil {
@@ -178,11 +179,13 @@ func TestCloseBeforeSignal(t *testing.T) {
 	ch := make(chan *Signal, 1)
 	bus.Signal(ch)
 
+	wg.Add(1)
 	go func() {
 		_, err := pipewriter.Write([]byte("REJECTED name\r\nOK myuuid\r\n"))
 		if err != nil {
 			t.Errorf("error writing to pipe: %v", err)
 		}
+		wg.Done()
 	}()
 
 	err = bus.Auth([]Auth{fakeAuth{}})
@@ -207,6 +210,7 @@ func TestCloseBeforeSignal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	wg.Wait()
 }
 
 func TestCloseChannelAfterRemoveSignal(t *testing.T) {
