@@ -73,7 +73,7 @@ func (v Variant) format() (string, bool) {
 	}
 	rv := reflect.ValueOf(v.value)
 	switch rv.Kind() {
-	case reflect.Slice:
+	case reflect.Slice, reflect.Array:
 		if rv.Len() == 0 {
 			return "[]", false
 		}
@@ -119,6 +119,22 @@ func (v Variant) format() (string, bool) {
 		}
 		buf.WriteByte('}')
 		return buf.String(), unamb
+	case reflect.Struct:
+		if rv.NumField() == 0 {
+			return "()", false
+		}
+		unamb := true
+		var buf bytes.Buffer
+		buf.WriteByte('(')
+		for i := 0; i < rv.NumField(); i++ {
+			s, b := MakeVariant(rv.Field(i).Interface()).format()
+			unamb = unamb && b
+			buf.WriteString(s)
+			buf.WriteString(", ")
+		}
+		buf.WriteByte(')')
+		return buf.String(), unamb
+
 	}
 	return `"INVALID"`, true
 }
