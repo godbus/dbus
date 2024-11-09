@@ -130,7 +130,10 @@ func (v Variant) format() (string, bool) {
 			s, b := MakeVariant(rv.Field(i).Interface()).format()
 			unamb = unamb && b
 			buf.WriteString(s)
-			buf.WriteString(", ")
+			buf.WriteString(",")
+			if i != rv.NumField()-1 {
+				buf.WriteString(" ")
+			}
 		}
 		buf.WriteByte(')')
 		return buf.String(), unamb
