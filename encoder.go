@@ -35,6 +35,13 @@ func newEncoderAtOffset(out io.Writer, offset int, order binary.ByteOrder, fds [
 	return enc
 }
 
+func (enc *encoder) Reset(out io.Writer, order binary.ByteOrder, fds []int) {
+	enc.out = out
+	enc.order = order
+	enc.pos = 0
+	enc.fds = fds
+}
+
 // Aligns the next output to be on a multiple of n. Panics on write errors.
 func (enc *encoder) align(n int) {
 	pad := enc.padding(0, n)

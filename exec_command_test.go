@@ -56,9 +56,7 @@ DBUS_SESSION_BUS_WINDOWID=16777217`
 	}
 	if err == nil {
 		t.Error("Excepted error, got none")
-	} else {
-		if err.Error() != expErr {
-			t.Errorf("Expected error to be %q, got %q", expErr, err.Error())
-		}
+	} else if err.Error() != expErr {
+		t.Errorf("Expected error to be %q, got %q", expErr, err.Error())
 	}
 }
