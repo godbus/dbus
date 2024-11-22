@@ -31,7 +31,7 @@ type Object struct {
 
 // Call calls a method with (*Object).Go and waits for its reply.
 func (o *Object) Call(method string, flags Flags, args ...interface{}) *Call {
-	return <-o.createCall(context.Background(), method, flags, make(chan *Call, 1), args...).Done
+	return <-o.createCall(context.TODO(), method, flags, make(chan *Call, 1), args...).Done
 }
 
 // CallWithContext acts like Call but takes a context
@@ -90,7 +90,7 @@ func (o *Object) RemoveMatchSignal(iface, member string, options ...MatchOption)
 // If the method parameter contains a dot ('.'), the part before the last dot
 // specifies the interface on which the method is called.
 func (o *Object) Go(method string, flags Flags, ch chan *Call, args ...interface{}) *Call {
-	return o.createCall(context.Background(), method, flags, ch, args...)
+	return o.createCall(context.TODO(), method, flags, ch, args...)
 }
 
 // GoWithContext acts like Go but takes a context
