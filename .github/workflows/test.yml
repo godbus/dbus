@@ -12,22 +12,22 @@ permissions:
 jobs:
 
   lint:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
         with:
-          go-version: 1.19
-      - uses: golangci/golangci-lint-action@v3
+          go-version: 1.23
+      - uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.50
+          version: v1.60
 
   test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        go-version: ['1.16', '1.17', '1.18', '1.19', '1.20']
+        go-version: ['1.20', '1.21', '1.22', '1.23']
 
     steps:
 
@@ -49,7 +49,7 @@ jobs:
       run: go test -race -v ./...
 
   codespell:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v3
     - uses: codespell-project/actions-codespell@master

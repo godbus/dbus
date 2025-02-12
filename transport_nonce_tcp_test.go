@@ -2,7 +2,6 @@ package dbus
 
 import (
 	"bufio"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"testing"
@@ -38,7 +37,7 @@ func TestTcpNonceConnection(t *testing.T) {
 // startDaemon starts a dbus-daemon instance with the given config
 // and returns its address string and underlying process.
 func startDaemon(t *testing.T, config string) (string, *os.Process) {
-	cfg, err := ioutil.TempFile("", "")
+	cfg, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -49,10 +49,10 @@ func TestSig(t *testing.T) {
 
 var getSigTest = []interface{}{
 	[]struct {
-		b byte
-		i int32
-		t uint64
-		s string
+		B byte
+		I int32
+		T uint64
+		S string
 	}{},
 	map[string]Variant{},
 }

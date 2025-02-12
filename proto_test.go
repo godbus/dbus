@@ -3,7 +3,7 @@ package dbus
 import (
 	"bytes"
 	"encoding/binary"
-	"io/ioutil"
+	"io"
 	"math"
 	"reflect"
 	"testing"
@@ -371,7 +371,7 @@ func BenchmarkDecodeMessageBig(b *testing.B) {
 func BenchmarkEncodeMessageSmall(b *testing.B) {
 	var err error
 	for i := 0; i < b.N; i++ {
-		err = smallMessage.EncodeTo(ioutil.Discard, binary.LittleEndian)
+		err = smallMessage.EncodeTo(io.Discard, binary.LittleEndian)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -381,7 +381,7 @@ func BenchmarkEncodeMessageSmall(b *testing.B) {
 func BenchmarkEncodeMessageBig(b *testing.B) {
 	var err error
 	for i := 0; i < b.N; i++ {
-		err = bigMessage.EncodeTo(ioutil.Discard, binary.LittleEndian)
+		err = bigMessage.EncodeTo(io.Discard, binary.LittleEndian)
 		if err != nil {
 			b.Fatal(err)
 		}
