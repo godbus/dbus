@@ -190,11 +190,7 @@ func (dec *decoder) decode(s string, depth int) interface{} {
 		variant.value = dec.decode(sig.str, depth+1)
 		return variant
 	case 'h':
-		idx := dec.decodeU()
-		if int(idx) < len(dec.fds) {
-			return UnixFD(dec.fds[idx])
-		}
-		return UnixFDIndex(idx)
+		return UnixFDIndex(dec.decodeU())
 	case 'a':
 		if len(s) > 1 && s[1] == '{' {
 			ksig := s[2:3]
