@@ -24,11 +24,11 @@ func newNonceTcpTransport(keys string) (transport, error) {
 	if err != nil {
 		return nil, err
 	}
-	socket, err := net.Dial(protocol, net.JoinHostPort(host, port))
+	b, err := os.ReadFile(noncefile)
 	if err != nil {
 		return nil, err
 	}
-	b, err := os.ReadFile(noncefile)
+	socket, err := net.Dial(protocol, net.JoinHostPort(host, port))
 	if err != nil {
 		return nil, err
 	}
