@@ -97,7 +97,7 @@ func SessionBusPrivate(opts ...ConnOption) (*Conn, error) {
 	return Dial(address, opts...)
 }
 
-// SessionBusPrivate returns a new private connection to the session bus.  If
+// SessionBusPrivateNoAutoStartup returns a new private connection to the session bus.  If
 // the session bus is not already open, do not attempt to launch it.
 func SessionBusPrivateNoAutoStartup(opts ...ConnOption) (*Conn, error) {
 	address, err := getSessionBusAddress(false)
@@ -108,7 +108,7 @@ func SessionBusPrivateNoAutoStartup(opts ...ConnOption) (*Conn, error) {
 	return Dial(address, opts...)
 }
 
-// SessionBusPrivate returns a new private connection to the session bus.
+// SessionBusPrivateHandler returns a new private connection to the session bus.
 //
 // Deprecated: use SessionBusPrivate with options instead.
 func SessionBusPrivateHandler(handler Handler, signalHandler SignalHandler) (*Conn, error) {
