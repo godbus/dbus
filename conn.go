@@ -301,6 +301,11 @@ func newConn(tr transport, opts ...ConnOption) (*Conn, error) {
 
 	go func() {
 		<-conn.ctx.Done()
+		defer func() {
+			if v := recover(); v != nil {
+				fmt.Printf("DBus connection panic during close: %v\n", v)
+			}
+		}()
 		conn.Close()
 	}()
 	return conn, nil
