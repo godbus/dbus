@@ -520,7 +520,8 @@ func (conn *Conn) handleSendError(msg *Message, err error) {
 			// the application code tried to respond, but the resulting message
 			// was malformed in the end
 			returnedErr := fmt.Errorf("destination tried to respond with invalid message (%w)", err)
-			conn.sendError(returnedErr, msg.Headers[FieldDestination].value.(string), msg.Headers[FieldReplySerial].value.(uint32))
+			dest, _ := msg.Headers[FieldDestination].value.(string)
+			conn.sendError(returnedErr, dest, msg.Headers[FieldReplySerial].value.(uint32))
 		}
 	}
 	conn.serialGen.RetireSerial(msg.serial)
