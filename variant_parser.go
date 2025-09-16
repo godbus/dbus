@@ -220,13 +220,13 @@ func varNumAs(s string, sig Signature) (any, error) {
 		return nil, varTypeError{s, sig}
 	}
 	base := 10
-	if strings.HasPrefix(s, "0x") {
+	if after, ok := strings.CutPrefix(s, "0x"); ok {
 		base = 16
-		s = s[2:]
+		s = after
 	}
-	if strings.HasPrefix(s, "0") && len(s) != 1 {
+	if after, ok := strings.CutPrefix(s, "0"); ok && len(s) != 1 {
 		base = 8
-		s = s[1:]
+		s = after
 	}
 	if isUnsigned {
 		i, err := strconv.ParseUint(s, base, size)

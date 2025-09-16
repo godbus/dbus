@@ -787,10 +787,10 @@ func getTransport(address string) (transport, error) {
 
 // getKey gets a key from a the list of keys. Returns "" on error / not found...
 func getKey(s, key string) string {
-	for _, keyEqualsValue := range strings.Split(s, ",") {
-		keyValue := strings.SplitN(keyEqualsValue, "=", 2)
-		if len(keyValue) == 2 && keyValue[0] == key {
-			val, err := UnescapeBusAddressValue(keyValue[1])
+	keyEq := key + "="
+	for _, kv := range strings.Split(s, ",") {
+		if v, ok := strings.CutPrefix(kv, keyEq); ok {
+			val, err := UnescapeBusAddressValue(v)
 			if err != nil {
 				// No way to return an error.
 				return ""

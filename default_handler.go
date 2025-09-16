@@ -52,9 +52,9 @@ func (h *defaultHandler) introspectPath(path ObjectPath) string {
 		if p != "/" {
 			p += "/"
 		}
-		if strings.HasPrefix(string(obj), p) {
-			node_name := strings.Split(string(obj[len(p):]), "/")[0]
-			subpath[node_name] = struct{}{}
+		if after, ok := strings.CutPrefix(string(obj), p); ok {
+			name, _, _ := strings.Cut(after, "/")
+			subpath[name] = struct{}{}
 		}
 	}
 	for s := range subpath {
