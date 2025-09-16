@@ -117,7 +117,7 @@ type exportedMethod struct {
 	reflect.Value
 }
 
-func (m exportedMethod) Call(args ...interface{}) ([]interface{}, error) {
+func (m exportedMethod) Call(args ...any) ([]any, error) {
 	t := m.Type()
 
 	params := make([]reflect.Value, len(args))
@@ -143,7 +143,7 @@ func (m exportedMethod) Call(args ...interface{}) ([]interface{}, error) {
 			ret = ret[:t.NumOut()-1]
 		}
 	}
-	out := make([]interface{}, len(ret))
+	out := make([]any, len(ret))
 	for i, val := range ret {
 		out[i] = val.Interface()
 	}
@@ -158,7 +158,7 @@ func (m exportedMethod) NumArguments() int {
 	return m.Value.Type().NumIn()
 }
 
-func (m exportedMethod) ArgumentValue(i int) interface{} {
+func (m exportedMethod) ArgumentValue(i int) any {
 	return reflect.Zero(m.Type().In(i)).Interface()
 }
 
@@ -166,7 +166,7 @@ func (m exportedMethod) NumReturns() int {
 	return m.Value.Type().NumOut()
 }
 
-func (m exportedMethod) ReturnValue(i int) interface{} {
+func (m exportedMethod) ReturnValue(i int) any {
 	return reflect.Zero(m.Type().Out(i)).Interface()
 }
 

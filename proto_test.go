@@ -10,77 +10,77 @@ import (
 )
 
 var protoTests = []struct {
-	vs           []interface{}
+	vs           []any
 	bigEndian    []byte
 	littleEndian []byte
 }{
 	{
-		[]interface{}{int32(0)},
+		[]any{int32(0)},
 		[]byte{0, 0, 0, 0},
 		[]byte{0, 0, 0, 0},
 	},
 	{
-		[]interface{}{true, false},
+		[]any{true, false},
 		[]byte{0, 0, 0, 1, 0, 0, 0, 0},
 		[]byte{1, 0, 0, 0, 0, 0, 0, 0},
 	},
 	{
-		[]interface{}{byte(0), uint16(12), int16(32), uint32(43)},
+		[]any{byte(0), uint16(12), int16(32), uint32(43)},
 		[]byte{0, 0, 0, 12, 0, 32, 0, 0, 0, 0, 0, 43},
 		[]byte{0, 0, 12, 0, 32, 0, 0, 0, 43, 0, 0, 0},
 	},
 	{
-		[]interface{}{int64(-1), uint64(1<<64 - 1)},
+		[]any{int64(-1), uint64(1<<64 - 1)},
 		bytes.Repeat([]byte{255}, 16),
 		bytes.Repeat([]byte{255}, 16),
 	},
 	{
-		[]interface{}{math.Inf(+1)},
+		[]any{math.Inf(+1)},
 		[]byte{0x7f, 0xf0, 0, 0, 0, 0, 0, 0},
 		[]byte{0, 0, 0, 0, 0, 0, 0xf0, 0x7f},
 	},
 	{
-		[]interface{}{"foo"},
+		[]any{"foo"},
 		[]byte{0, 0, 0, 3, 'f', 'o', 'o', 0},
 		[]byte{3, 0, 0, 0, 'f', 'o', 'o', 0},
 	},
 	{
-		[]interface{}{Signature{"ai"}},
+		[]any{Signature{"ai"}},
 		[]byte{2, 'a', 'i', 0},
 		[]byte{2, 'a', 'i', 0},
 	},
 	{
-		[]interface{}{[]int16{42, 256}},
+		[]any{[]int16{42, 256}},
 		[]byte{0, 0, 0, 4, 0, 42, 1, 0},
 		[]byte{4, 0, 0, 0, 42, 0, 0, 1},
 	},
 	{
-		[]interface{}{MakeVariant("foo")},
+		[]any{MakeVariant("foo")},
 		[]byte{1, 's', 0, 0, 0, 0, 0, 3, 'f', 'o', 'o', 0},
 		[]byte{1, 's', 0, 0, 3, 0, 0, 0, 'f', 'o', 'o', 0},
 	},
 	{
-		[]interface{}{MakeVariant(MakeVariant(Signature{"v"}))},
+		[]any{MakeVariant(MakeVariant(Signature{"v"}))},
 		[]byte{1, 'v', 0, 1, 'g', 0, 1, 'v', 0},
 		[]byte{1, 'v', 0, 1, 'g', 0, 1, 'v', 0},
 	},
 	{
-		[]interface{}{map[int32]bool{42: true}},
+		[]any{map[int32]bool{42: true}},
 		[]byte{0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 42, 0, 0, 0, 1},
 		[]byte{8, 0, 0, 0, 0, 0, 0, 0, 42, 0, 0, 0, 1, 0, 0, 0},
 	},
 	{
-		[]interface{}{map[string]Variant{}, byte(42)},
+		[]any{map[string]Variant{}, byte(42)},
 		[]byte{0, 0, 0, 0, 0, 0, 0, 0, 42},
 		[]byte{0, 0, 0, 0, 0, 0, 0, 0, 42},
 	},
 	{
-		[]interface{}{[]uint64{}, byte(42)},
+		[]any{[]uint64{}, byte(42)},
 		[]byte{0, 0, 0, 0, 0, 0, 0, 0, 42},
 		[]byte{0, 0, 0, 0, 0, 0, 0, 0, 42},
 	},
 	{
-		[]interface{}{uint16(1), true},
+		[]any{uint16(1), true},
 		[]byte{0, 1, 0, 0, 0, 0, 0, 1},
 		[]byte{1, 0, 0, 0, 1, 0, 0, 0},
 	},
@@ -183,7 +183,7 @@ func TestProtoVariantStruct(t *testing.T) {
 	if err = Store(vs, &variant); err != nil {
 		t.Fatal(err)
 	}
-	sl := variant.Value().([]interface{})
+	sl := variant.Value().([]any)
 	v1, v2 := sl[0].(int32), sl[1].(int16)
 	if v1 != int32(1) {
 		t.Error("got", v1, "as first int")
@@ -196,7 +196,7 @@ func TestProtoVariantStruct(t *testing.T) {
 func TestProtoStructTag(t *testing.T) {
 	type Bar struct {
 		A int32
-		B chan interface{} `dbus:"-"`
+		B chan any `dbus:"-"`
 		C int32
 	}
 	var bar1, bar2 Bar
@@ -225,10 +225,10 @@ func TestProtoStoreStruct(t *testing.T) {
 	var foo struct {
 		A int32
 		B string
-		c chan interface{}
-		D interface{} `dbus:"-"`
+		c chan any
+		D any `dbus:"-"`
 	}
-	src := []interface{}{[]interface{}{int32(42), "foo"}}
+	src := []any{[]any{int32(42), "foo"}}
 	err := Store(src, &foo)
 	if err != nil {
 		t.Fatal(err)
@@ -243,10 +243,10 @@ func TestProtoStoreNestedStruct(t *testing.T) {
 			D float64
 		}
 	}
-	src := []interface{}{
-		[]interface{}{
+	src := []any{
+		[]any{
 			int32(42),
-			[]interface{}{
+			[]any{
 				"foo",
 				3.14,
 			},
@@ -267,7 +267,7 @@ func TestMessage(t *testing.T) {
 		FieldPath:   MakeVariant(ObjectPath("/org/foo/bar")),
 		FieldMember: MakeVariant("baz"),
 	}
-	message.Body = make([]interface{}, 0)
+	message.Body = make([]any, 0)
 	err := message.EncodeTo(buf, binary.LittleEndian)
 	if err != nil {
 		t.Error(err)
@@ -284,7 +284,7 @@ func TestProtoStructInterfaces(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if vs[0].([]interface{})[0].(byte) != 42 {
+	if vs[0].([]any)[0].(byte) != 42 {
 		t.Errorf("wrongs results (got %v)", vs)
 	}
 }
@@ -312,7 +312,7 @@ var bigMessage = &Message{
 		FieldMember:      MakeVariant("Notify"),
 		FieldSignature:   MakeVariant(Signature{"susssasa{sv}i"}),
 	},
-	Body: []interface{}{
+	Body: []any{
 		"app_name",
 		uint32(0),
 		"dialog-information",

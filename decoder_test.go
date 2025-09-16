@@ -46,7 +46,7 @@ func TestDecodeArrayEmptyStruct(t *testing.T) {
 				},
 			},
 		},
-		Body: []interface{}{
+		Body: []any{
 			Variant{
 				sig: Signature{
 					str: "(sa(iiay)ss)",

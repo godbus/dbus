@@ -129,7 +129,7 @@ type Prop struct {
 	// Initial value. Must be a DBus-representable type. This is not modified
 	// after Properties has been initialized; use Get or GetMust to access the
 	// value.
-	Value interface{}
+	Value any
 
 	// If true, the value can be modified by calls to Set.
 	Writable bool
@@ -168,7 +168,7 @@ type Change struct {
 	Props *Properties
 	Iface string
 	Name  string
-	Value interface{}
+	Value any
 }
 
 // Properties is a set of values that can be made available to the message bus
@@ -257,7 +257,7 @@ func (p *Properties) GetAll(iface string) (map[string]dbus.Variant, *dbus.Error)
 
 // GetMust returns the value of the given property and panics if either the
 // interface or the property name are invalid.
-func (p *Properties) GetMust(iface, property string) interface{} {
+func (p *Properties) GetMust(iface, property string) any {
 	p.mut.RLock()
 	defer p.mut.RUnlock()
 	return reflect.ValueOf(p.m[iface][property].Value).Elem().Interface()
@@ -278,9 +278,9 @@ func (p *Properties) Introspection(iface string) []introspect.Property {
 
 // set sets the given property and emits PropertyChanged if appropriate. p.mut
 // must already be locked.
-func (p *Properties) set(iface, property string, v interface{}) error {
+func (p *Properties) set(iface, property string, v any) error {
 	prop := p.m[iface][property]
-	err := dbus.Store([]interface{}{v}, prop.Value)
+	err := dbus.Store([]any{v}, prop.Value)
 	if err != nil {
 		return err
 	}
@@ -338,7 +338,7 @@ func (p *Properties) Set(iface, property string, newv dbus.Variant) *dbus.Error 
 
 // SetMust sets the value of the given property and panics if the interface or
 // the property name are invalid.
-func (p *Properties) SetMust(iface, property string, v interface{}) {
+func (p *Properties) SetMust(iface, property string, v any) {
 	p.mut.Lock()
 	defer p.mut.Unlock() // unlock in case of panic
 	err := p.set(iface, property, v)

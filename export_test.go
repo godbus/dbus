@@ -579,7 +579,7 @@ func TestExportMethodTable(t *testing.T) {
 
 	name := connection.Names()[0]
 	export := &fooExport{}
-	tbl := make(map[string]interface{})
+	tbl := make(map[string]any)
 	tbl["Foo"] = func(message Message, param string) (string, *Error) {
 		return export.Foo(message, param)
 	}
@@ -640,7 +640,7 @@ func TestExportSubtreeMethodTable(t *testing.T) {
 	name := connection.Names()[0]
 
 	export := &fooExport{}
-	tbl := make(map[string]interface{})
+	tbl := make(map[string]any)
 	tbl["Foo"] = func(message Message, param string) (string, *Error) {
 		return export.Foo(message, param)
 	}
@@ -701,7 +701,7 @@ func TestExportMethodTable_NotFunc(t *testing.T) {
 
 	name := connection.Names()[0]
 	export := &fooExport{}
-	tbl := make(map[string]interface{})
+	tbl := make(map[string]any)
 	tbl["Foo"] = func(message Message, param string) (string, *Error) {
 		return export.Foo(message, param)
 	}
@@ -743,7 +743,7 @@ func TestExportMethodTable_ReturnNotError(t *testing.T) {
 
 	name := connection.Names()[0]
 	export := &fooExport{}
-	tbl := make(map[string]interface{})
+	tbl := make(map[string]any)
 	tbl["Foo"] = func(message Message, param string) (string, string) {
 		out, _ := export.Foo(message, param)
 		return out, out

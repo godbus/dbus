@@ -52,7 +52,7 @@ func (t unixFDTest) Teststruct(s unixfdContainer) (string, *Error) {
 
 func (t unixFDTest) Testvariantstruct(vs Variant) (string, *Error) {
 	var b [4096]byte
-	s := vs.Value().([]interface{})
+	s := vs.Value().([]any)
 	u := s[0].(UnixFD)
 	file := os.NewFile(uintptr(u), "testfile")
 	defer file.Close()

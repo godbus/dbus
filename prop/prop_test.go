@@ -12,13 +12,13 @@ type Foo struct {
 	Value string
 }
 
-func comparePropValue(obj dbus.BusObject, name string, want interface{}, t *testing.T) {
+func comparePropValue(obj dbus.BusObject, name string, want any, t *testing.T) {
 	r, err := obj.GetProperty("org.guelfey.DBus.Test." + name)
 	if err != nil {
 		t.Fatal(err)
 	}
 	haveValue := reflect.New(reflect.TypeOf(want)).Interface()
-	err = dbus.Store([]interface{}{r.Value()}, haveValue)
+	err = dbus.Store([]any{r.Value()}, haveValue)
 	if err != nil {
 		t.Fatal(err)
 	}

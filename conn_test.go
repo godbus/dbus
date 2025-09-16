@@ -493,7 +493,7 @@ process:
 				reply.Headers = make(map[HeaderField]Variant)
 				reply.Headers[FieldDestination] = msg.Headers[FieldSender]
 				reply.Headers[FieldReplySerial] = MakeVariant(msg.serial)
-				reply.Body = make([]interface{}, 1)
+				reply.Body = make([]any, 1)
 				reply.Body[0] = state
 				reply.Headers[FieldSignature] = MakeVariant(SignatureOf(reply.Body...))
 				_ = srv.sendMessageAndIfClosed(reply, nil)

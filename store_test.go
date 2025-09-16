@@ -6,8 +6,8 @@ import (
 )
 
 func TestStoreStringToInterface(t *testing.T) {
-	var dest interface{}
-	err := Store([]interface{}{"foobar"}, &dest)
+	var dest any
+	err := Store([]any{"foobar"}, &dest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -16,8 +16,8 @@ func TestStoreStringToInterface(t *testing.T) {
 
 func TestStoreVariantToInterface(t *testing.T) {
 	src := MakeVariant("foobar")
-	var dest interface{}
-	err := Store([]interface{}{src}, &dest)
+	var dest any
+	err := Store([]any{src}, &dest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,8 +26,8 @@ func TestStoreVariantToInterface(t *testing.T) {
 
 func TestStoreMapStringToMapInterface(t *testing.T) {
 	src := map[string]string{"foo": "bar"}
-	dest := map[string]interface{}{}
-	err := Store([]interface{}{src}, &dest)
+	dest := map[string]any{}
+	err := Store([]any{src}, &dest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,8 +36,8 @@ func TestStoreMapStringToMapInterface(t *testing.T) {
 
 func TestStoreMapVariantToMapInterface(t *testing.T) {
 	src := map[string]Variant{"foo": MakeVariant("foobar")}
-	dest := map[string]interface{}{}
-	err := Store([]interface{}{src}, &dest)
+	dest := map[string]any{}
+	err := Store([]any{src}, &dest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,8 +46,8 @@ func TestStoreMapVariantToMapInterface(t *testing.T) {
 
 func TestStoreSliceStringToSliceInterface(t *testing.T) {
 	src := []string{"foo"}
-	dest := []interface{}{}
-	err := Store([]interface{}{src}, &dest)
+	dest := []any{}
+	err := Store([]any{src}, &dest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,8 +56,8 @@ func TestStoreSliceStringToSliceInterface(t *testing.T) {
 
 func TestStoreSliceVariantToSliceInterface(t *testing.T) {
 	src := []Variant{MakeVariant("foo")}
-	dest := []interface{}{}
-	err := Store([]interface{}{src}, &dest)
+	dest := []any{}
+	err := Store([]any{src}, &dest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,8 +66,8 @@ func TestStoreSliceVariantToSliceInterface(t *testing.T) {
 
 func TestStoreSliceVariantToSliceInterfaceMulti(t *testing.T) {
 	src := []Variant{MakeVariant("foo"), MakeVariant(int32(1))}
-	dest := []interface{}{}
-	err := Store([]interface{}{src}, &dest)
+	dest := []any{}
+	err := Store([]any{src}, &dest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,20 +76,20 @@ func TestStoreSliceVariantToSliceInterfaceMulti(t *testing.T) {
 }
 
 func TestStoreNested(t *testing.T) {
-	src := map[string]interface{}{
-		"foo": []interface{}{
+	src := map[string]any{
+		"foo": []any{
 			"1", "2", "3", "5",
-			map[string]interface{}{
+			map[string]any{
 				"bar": "baz",
 			},
 		},
-		"bar": map[string]interface{}{
+		"bar": map[string]any{
 			"baz":  "quux",
 			"quux": "quuz",
 		},
 	}
-	dest := map[string]interface{}{}
-	err := Store([]interface{}{src}, &dest)
+	dest := map[string]any{}
+	err := Store([]any{src}, &dest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,8 +101,8 @@ func TestStoreNested(t *testing.T) {
 
 func TestStoreSmallerSliceToLargerSlice(t *testing.T) {
 	src := []string{"baz"}
-	dest := []interface{}{"foo", "bar"}
-	err := Store([]interface{}{src}, &dest)
+	dest := []any{"foo", "bar"}
+	err := Store([]any{src}, &dest)
 	if err != nil {
 		t.Fatal(err)
 	}

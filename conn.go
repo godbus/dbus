@@ -625,7 +625,7 @@ func (conn *Conn) sendError(err error, dest string, serial uint32) {
 
 // sendReply creates a method reply message corresponding to the parameters and
 // sends it to conn.out.
-func (conn *Conn) sendReply(dest string, serial uint32, values ...interface{}) {
+func (conn *Conn) sendReply(dest string, serial uint32, values ...any) {
 	msg := new(Message)
 	msg.Type = TypeMethodReply
 	msg.Headers = make(map[HeaderField]Variant)
@@ -713,10 +713,10 @@ func (conn *Conn) SupportsUnixFDs() bool {
 // Error represents a D-Bus message of type Error.
 type Error struct {
 	Name string
-	Body []interface{}
+	Body []any
 }
 
-func NewError(name string, body []interface{}) *Error {
+func NewError(name string, body []any) *Error {
 	return &Error{name, body}
 }
 
@@ -736,7 +736,7 @@ type Signal struct {
 	Sender   string
 	Path     ObjectPath
 	Name     string
-	Body     []interface{}
+	Body     []any
 	Sequence Sequence
 }
 
@@ -963,7 +963,7 @@ func (tracker *callTracker) handleSendError(msg *Message, err error) {
 	}
 }
 
-func (tracker *callTracker) finalizeWithBody(sn uint32, sequence Sequence, body []interface{}) {
+func (tracker *callTracker) finalizeWithBody(sn uint32, sequence Sequence, body []any) {
 	tracker.lck.Lock()
 	c, ok := tracker.calls[sn]
 	if ok {

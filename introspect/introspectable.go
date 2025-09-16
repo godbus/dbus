@@ -59,7 +59,7 @@ func (i Introspectable) Introspect() (string, *dbus.Error) {
 
 // Methods returns the description of the methods of v. This can be used to
 // create a Node which can be passed to NewIntrospectable.
-func Methods(v interface{}) []Method {
+func Methods(v any) []Method {
 	t := reflect.TypeOf(v)
 	ms := make([]Method, 0, t.NumMethod())
 	for i := 0; i < t.NumMethod(); i++ {

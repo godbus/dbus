@@ -109,7 +109,7 @@ func (t *tester) LookupMethod(name string) (Method, bool) {
 }
 
 // Method
-func (t *tester) Call(args ...interface{}) ([]interface{}, error) {
+func (t *tester) Call(args ...any) ([]any, error) {
 	return args, nil
 }
 
@@ -121,17 +121,17 @@ func (t *tester) NumReturns() int {
 	return 1
 }
 
-func (t *tester) ArgumentValue(position int) interface{} {
+func (t *tester) ArgumentValue(position int) any {
 	return ""
 }
 
-func (t *tester) ReturnValue(position int) interface{} {
+func (t *tester) ReturnValue(position int) any {
 	return ""
 }
 
 type terrfn func(in string) error
 
-func (t terrfn) Call(args ...interface{}) ([]interface{}, error) {
+func (t terrfn) Call(args ...any) ([]any, error) {
 	return nil, t(*args[0].(*string))
 }
 
@@ -143,11 +143,11 @@ func (t terrfn) NumReturns() int {
 	return 0
 }
 
-func (t terrfn) ArgumentValue(position int) interface{} {
+func (t terrfn) ArgumentValue(position int) any {
 	return ""
 }
 
-func (t terrfn) ReturnValue(position int) interface{} {
+func (t terrfn) ReturnValue(position int) any {
 	return ""
 }
 
@@ -194,8 +194,8 @@ func (t *tester) RetireSerial(serial uint32) {}
 
 type intro_fn func() string
 
-func (intro intro_fn) Call(args ...interface{}) ([]interface{}, error) {
-	return []interface{}{intro()}, nil
+func (intro intro_fn) Call(args ...any) ([]any, error) {
+	return []any{intro()}, nil
 }
 
 func (_ intro_fn) NumArguments() int {
@@ -206,11 +206,11 @@ func (_ intro_fn) NumReturns() int {
 	return 1
 }
 
-func (_ intro_fn) ArgumentValue(position int) interface{} {
+func (_ intro_fn) ArgumentValue(position int) any {
 	return nil
 }
 
-func (_ intro_fn) ReturnValue(position int) interface{} {
+func (_ intro_fn) ReturnValue(position int) any {
 	return ""
 }
 
