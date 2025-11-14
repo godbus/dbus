@@ -20,10 +20,7 @@ func getSystemBusPlatformAddress() string {
 
 // DialUnix establishes a new private connection to the message bus specified by UnixConn.
 func DialUnix(conn *net.UnixConn, opts ...ConnOption) (*Conn, error) {
-	tr, err := newUnixTransportFromConn(conn)
-	if err != nil {
-		return nil, err
-	}
+	tr := newUnixTransportFromConn(conn)
 	return newConn(tr, opts...)
 }
 

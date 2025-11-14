@@ -55,12 +55,12 @@ type unixTransport struct {
 	hasUnixFDs bool
 }
 
-func newUnixTransportFromConn(conn *net.UnixConn) (transport, error) {
+func newUnixTransportFromConn(conn *net.UnixConn) transport {
 	t := new(unixTransport)
 	t.UnixConn = conn
 	t.hasUnixFDs = true
 
-	return t, nil
+	return t
 }
 
 func newUnixTransport(keys string) (transport, error) {
