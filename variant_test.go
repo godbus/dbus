@@ -6,7 +6,7 @@ import (
 )
 
 var variantFormatTests = []struct {
-	v interface{}
+	v any
 	s string
 }{
 	{int32(1), `1`},
@@ -33,7 +33,7 @@ func TestFormatVariant(t *testing.T) {
 
 var variantParseTests = []struct {
 	s string
-	v interface{}
+	v any
 }{
 	{"1", int32(1)},
 	{"true", true},

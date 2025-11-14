@@ -13,9 +13,9 @@ type TestStruct struct {
 
 func Test_VariantOfStruct(t *testing.T) {
 	tester := TestStruct{TestInt: 123, TestStr: "foobar"}
-	testerDecoded := []interface{}{123, "foobar"}
+	testerDecoded := []any{123, "foobar"}
 	variant := MakeVariant(testerDecoded)
-	input := []interface{}{variant}
+	input := []any{variant}
 	var output TestStruct
 	if err := Store(input, &output); err != nil {
 		t.Fatal(err)
@@ -37,7 +37,7 @@ func Test_VariantOfSlicePtr(t *testing.T) {
 			FieldDestination: MakeVariant(""),
 			FieldMember:      MakeVariant("call"),
 		},
-		Body: []interface{}{value},
+		Body: []any{value},
 	}
 	param.Headers[FieldSignature] = MakeVariant(SignatureOf(param.Body...))
 	buf := new(bytes.Buffer)

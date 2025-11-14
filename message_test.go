@@ -91,7 +91,7 @@ func TestMessage_validateHeader(t *testing.T) {
 					FieldReplySerial: MakeVariant(uint32(0)),
 					FieldErrorName:   MakeVariant("error.name"),
 				},
-				Body: []interface{}{
+				Body: []any{
 					"break",
 				},
 			},

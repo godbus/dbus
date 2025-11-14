@@ -10,11 +10,11 @@ import (
 func TestEncodeArrayOfMaps(t *testing.T) {
 	tests := []struct {
 		name string
-		vs   []interface{}
+		vs   []any
 	}{
 		{
 			"aligned at 8 at start of array",
-			[]interface{}{
+			[]any{
 				"12345",
 				[]map[string]Variant{
 					{
@@ -26,7 +26,7 @@ func TestEncodeArrayOfMaps(t *testing.T) {
 		},
 		{
 			"not aligned at 8 for start of array",
-			[]interface{}{
+			[]any{
 				"1234567890",
 				[]map[string]Variant{
 					{
@@ -61,7 +61,7 @@ func TestEncodeArrayOfMaps(t *testing.T) {
 }
 
 func TestEncodeMapStringInterface(t *testing.T) {
-	val := map[string]interface{}{"foo": "bar"}
+	val := map[string]any{"foo": "bar"}
 	buf := new(bytes.Buffer)
 	fds := make([]int, 0)
 	order := binary.LittleEndian
@@ -76,7 +76,7 @@ func TestEncodeMapStringInterface(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := map[string]interface{}{}
+	out := map[string]any{}
 	if err := Store(v, &out); err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestEncodeMapStringInterface(t *testing.T) {
 	}
 }
 
-type empty interface{}
+type empty any
 
 func TestEncodeMapStringNamedInterface(t *testing.T) {
 	val := map[string]empty{"foo": "bar"}
@@ -146,7 +146,7 @@ func TestEncodeMapStringNonEmptyInterface(t *testing.T) {
 }
 
 func TestEncodeSliceInterface(t *testing.T) {
-	val := []interface{}{"foo", "bar"}
+	val := []any{"foo", "bar"}
 	buf := new(bytes.Buffer)
 	fds := make([]int, 0)
 	order := binary.LittleEndian
@@ -161,7 +161,7 @@ func TestEncodeSliceInterface(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := []interface{}{}
+	out := []any{}
 	if err := Store(v, &out); err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func TestEncodeSliceInterface(t *testing.T) {
 }
 
 func BenchmarkEncodeSliceInterface(b *testing.B) {
-	val := []interface{}{"foo", "bar"}
+	val := []any{"foo", "bar"}
 	sig := SignatureOf(val)
 	buf := &bytes.Buffer{}
 	fds := make([]int, 0)
@@ -223,14 +223,14 @@ func TestEncodeSliceNamedInterface(t *testing.T) {
 }
 
 func TestEncodeNestedInterface(t *testing.T) {
-	val := map[string]interface{}{
-		"foo": []interface{}{
+	val := map[string]any{
+		"foo": []any{
 			"1", "2", "3", "5",
-			map[string]interface{}{
+			map[string]any{
 				"bar": "baz",
 			},
 		},
-		"bar": map[string]interface{}{
+		"bar": map[string]any{
 			"baz":  "quux",
 			"quux": "quuz",
 		},
@@ -249,7 +249,7 @@ func TestEncodeNestedInterface(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := map[string]interface{}{}
+	out := map[string]any{}
 	if err := Store(v, &out); err != nil {
 		t.Fatal(err)
 	}
@@ -420,8 +420,8 @@ func TestEncodeVariant(t *testing.T) {
 
 func TestEncodeVariantToList(t *testing.T) {
 	var res map[string]Variant
-	src := map[string]interface{}{
-		"foo": []interface{}{"a", "b", "c"},
+	src := map[string]any{
+		"foo": []any{"a", "b", "c"},
 	}
 	buf := new(bytes.Buffer)
 	fds := make([]int, 0)
@@ -446,7 +446,7 @@ func TestEncodeVariantToList(t *testing.T) {
 
 func TestEncodeVariantToUint64(t *testing.T) {
 	var res map[string]Variant
-	src := map[string]interface{}{
+	src := map[string]any{
 		"foo": uint64(10),
 	}
 	buf := new(bytes.Buffer)

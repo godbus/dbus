@@ -11,17 +11,17 @@ import (
 // Variant represents the D-Bus variant type.
 type Variant struct {
 	sig   Signature
-	value interface{}
+	value any
 }
 
 // MakeVariant converts the given value to a Variant. It panics if v cannot be
 // represented as a D-Bus type.
-func MakeVariant(v interface{}) Variant {
+func MakeVariant(v any) Variant {
 	return MakeVariantWithSignature(v, SignatureOf(v))
 }
 
 // MakeVariantWithSignature converts the given value to a Variant.
-func MakeVariantWithSignature(v interface{}, s Signature) Variant {
+func MakeVariantWithSignature(v any, s Signature) Variant {
 	return Variant{s, v}
 }
 
@@ -139,12 +139,12 @@ func (v Variant) String() string {
 }
 
 // Value returns the underlying value of v.
-func (v Variant) Value() interface{} {
+func (v Variant) Value() any {
 	return v.value
 }
 
 // Store converts the variant into a native go type using the same
 // mechanism as the "Store" function.
-func (v Variant) Store(value interface{}) error {
+func (v Variant) Store(value any) error {
 	return storeInterfaces(v.value, value)
 }

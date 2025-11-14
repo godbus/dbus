@@ -108,7 +108,7 @@ func TestObjectSignalHandling(t *testing.T) {
 			}
 		}()
 
-		emit := func(path ObjectPath, name string, values ...interface{}) {
+		emit := func(path ObjectPath, name string, values ...any) {
 			t.Helper()
 			if err := bus.Emit(path, name, values...); err != nil {
 				t.Error("Emit:", err)
@@ -156,7 +156,7 @@ func TestObjectSignalHandling(t *testing.T) {
 			return
 		}
 
-		if sig.Body[0] != interface{}(value) {
+		if sig.Body[0] != any(value) {
 			t.Errorf("signal value mismatch: %d != %d", value, sig.Body[0])
 		}
 	}

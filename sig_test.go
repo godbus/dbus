@@ -5,35 +5,35 @@ import (
 )
 
 var sigTests = []struct {
-	vs  []interface{}
+	vs  []any
 	sig Signature
 }{
 	{
-		[]interface{}{new(int32)},
+		[]any{new(int32)},
 		Signature{"i"},
 	},
 	{
-		[]interface{}{new(string)},
+		[]any{new(string)},
 		Signature{"s"},
 	},
 	{
-		[]interface{}{new(Signature)},
+		[]any{new(Signature)},
 		Signature{"g"},
 	},
 	{
-		[]interface{}{new([]int16)},
+		[]any{new([]int16)},
 		Signature{"an"},
 	},
 	{
-		[]interface{}{new(int16), new(uint32)},
+		[]any{new(int16), new(uint32)},
 		Signature{"nu"},
 	},
 	{
-		[]interface{}{new(map[byte]Variant)},
+		[]any{new(map[byte]Variant)},
 		Signature{"a{yv}"},
 	},
 	{
-		[]interface{}{new(Variant), new([]map[int32]string)},
+		[]any{new(Variant), new([]map[int32]string)},
 		Signature{"vaa{is}"},
 	},
 }
@@ -47,7 +47,7 @@ func TestSig(t *testing.T) {
 	}
 }
 
-var getSigTest = []interface{}{
+var getSigTest = []any{
 	[]struct {
 		B byte
 		I int32
