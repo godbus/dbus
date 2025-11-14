@@ -438,6 +438,18 @@ const (
 	ReleaseNameReplyNotOwner
 )
 
+func (rep ReleaseNameReply) String() string {
+	switch rep {
+	case ReleaseNameReplyReleased:
+		return "released"
+	case ReleaseNameReplyNonExistent:
+		return "non existent"
+	case ReleaseNameReplyNotOwner:
+		return "not owner"
+	}
+	return "unknown"
+}
+
 // RequestNameFlags represents the possible flags for a RequestName call.
 type RequestNameFlags uint32
 
@@ -456,3 +468,17 @@ const (
 	RequestNameReplyExists
 	RequestNameReplyAlreadyOwner
 )
+
+func (rep RequestNameReply) String() string {
+	switch rep {
+	case RequestNameReplyPrimaryOwner:
+		return "primary owner"
+	case RequestNameReplyInQueue:
+		return "in queue"
+	case RequestNameReplyExists:
+		return "exists"
+	case RequestNameReplyAlreadyOwner:
+		return "already owner"
+	}
+	return "unknown"
+}
