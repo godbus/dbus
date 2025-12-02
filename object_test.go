@@ -68,7 +68,7 @@ func TestObjectGoWithContext(t *testing.T) {
 
 type nopServer struct{}
 
-func (_ nopServer) Nop() *Error {
+func (nopServer) Nop() *Error {
 	return nil
 }
 
