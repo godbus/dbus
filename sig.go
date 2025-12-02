@@ -203,7 +203,7 @@ func (cnt depthCounter) EnterDictEntry() *depthCounter {
 // and rem is the remaining unparsed part. Otherwise, err is a non-nil
 // SignatureError and rem is "". depth is the current recursion depth which may
 // not be greater than 64 and should be given as 0 on the first call.
-func validSingle(s string, depth *depthCounter) (err error, rem string) {
+func validSingle(s string, depth *depthCounter) (err error, rem string) { //nolint:staticcheck // Ignore "ST1008: error should be returned as the last argument".
 	if s == "" {
 		return SignatureError{Sig: s, Reason: "empty signature"}, ""
 	}
