@@ -198,19 +198,19 @@ func (intro intro_fn) Call(args ...any) ([]any, error) {
 	return []any{intro()}, nil
 }
 
-func (_ intro_fn) NumArguments() int {
+func (intro_fn) NumArguments() int {
 	return 0
 }
 
-func (_ intro_fn) NumReturns() int {
+func (intro_fn) NumReturns() int {
 	return 1
 }
 
-func (_ intro_fn) ArgumentValue(position int) any {
+func (intro_fn) ArgumentValue(position int) any {
 	return nil
 }
 
-func (_ intro_fn) ReturnValue(position int) any {
+func (intro_fn) ReturnValue(position int) any {
 	return ""
 }
 
