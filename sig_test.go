@@ -4,6 +4,42 @@ import (
 	"testing"
 )
 
+type structWithManyFields struct {
+	A01 int32
+	A02 int32
+	A03 int32
+	A04 int32
+	A05 int32
+	A06 int32
+	A07 int32
+	A08 int32
+	A09 int32
+	A10 int32
+	A11 int32
+	A12 int32
+	A13 int32
+	A14 int32
+	A15 int32
+	A16 int32
+	A17 int32
+	A18 int32
+	A19 int32
+	A20 int32
+	A21 int32
+	A22 int32
+	A23 int32
+	A24 int32
+	A25 int32
+	A26 int32
+	A27 int32
+	A28 int32
+	A29 int32
+	A30 int32
+	A31 int32
+	A32 int32
+	A33 int32
+}
+
 var sigTests = []struct {
 	vs  []any
 	sig Signature
@@ -35,6 +71,10 @@ var sigTests = []struct {
 	{
 		[]any{new(Variant), new([]map[int32]string)},
 		Signature{"vaa{is}"},
+	},
+	{
+		[]any{new(structWithManyFields)},
+		Signature{"(iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii)"},
 	},
 }
 
