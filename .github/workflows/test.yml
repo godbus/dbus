@@ -57,3 +57,12 @@ jobs:
     steps:
     - uses: actions/checkout@v6
     - uses: codespell-project/actions-codespell@v2
+
+  all-done:
+    runs-on: ubuntu-latest
+    needs:
+      - lint
+      - test
+      - codespell
+    steps:
+    - run: echo "All jobs completed"
