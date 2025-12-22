@@ -53,3 +53,12 @@ jobs:
     steps:
     - uses: actions/checkout@v6
     - uses: codespell-project/actions-codespell@v2
+
+  all-done:
+    runs-on: ububtu-24.04
+    needs:
+      - lint
+      - test
+      - codespell
+    steps:
+    - run: echo "All jobs completed"
