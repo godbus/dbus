@@ -18,9 +18,9 @@ type BusObject interface {
 	GetProperty(p string) (Variant, error)
 	GetPropertyWithContext(ctx context.Context, p string) (Variant, error)
 	StoreProperty(p string, value any) error
-	StorePropertyWithContext(ctx context.Context, p string, value interface{}) error
+	StorePropertyWithContext(ctx context.Context, p string, value any) error
 	SetProperty(p string, v any) error
-	SetPropertyWithContext(ctx context.Context, p string, v interface{}) error
+	SetPropertyWithContext(ctx context.Context, p string, v any) error
 	Destination() string
 	Path() ObjectPath
 }
@@ -160,7 +160,7 @@ func (o *Object) StoreProperty(p string, value any) error {
 }
 
 // StorePropertyWithContext acts like StoreProperty but takes a context
-func (o *Object) StorePropertyWithContext(ctx context.Context, p string, value interface{}) error {
+func (o *Object) StorePropertyWithContext(ctx context.Context, p string, value any) error {
 	idx := strings.LastIndex(p, ".")
 	if idx == -1 || idx+1 == len(p) {
 		return errors.New("dbus: invalid property " + p)
@@ -195,7 +195,7 @@ func (o *Object) SetProperty(p string, v any) error {
 }
 
 // SetPropertyWithContext acts like SetProperty but takes a context
-func (o *Object) SetPropertyWithContext(ctx context.Context, p string, v interface{}) error {
+func (o *Object) SetPropertyWithContext(ctx context.Context, p string, v any) error {
 	idx := strings.LastIndex(p, ".")
 	if idx == -1 || idx+1 == len(p) {
 		return errors.New("dbus: invalid property " + p)
