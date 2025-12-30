@@ -16,8 +16,11 @@ type BusObject interface {
 	AddMatchSignal(iface, member string, options ...MatchOption) *Call
 	RemoveMatchSignal(iface, member string, options ...MatchOption) *Call
 	GetProperty(p string) (Variant, error)
+	GetPropertyWithContext(ctx context.Context, p string) (Variant, error)
 	StoreProperty(p string, value any) error
+	StorePropertyWithContext(ctx context.Context, p string, value any) error
 	SetProperty(p string, v any) error
+	SetPropertyWithContext(ctx context.Context, p string, v any) error
 	Destination() string
 	Path() ObjectPath
 }
@@ -133,6 +136,13 @@ func (o *Object) GetProperty(p string) (Variant, error) {
 	return result, err
 }
 
+// GetPropertyWithContext acts like GetProperty but takes a context
+func (o *Object) GetPropertyWithContext(ctx context.Context, p string) (Variant, error) {
+	var result Variant
+	err := o.StorePropertyWithContext(ctx, p, &result)
+	return result, err
+}
+
 // StoreProperty calls org.freedesktop.DBus.Properties.Get on the given
 // object. The property name must be given in interface.member notation.
 // It stores the returned property into the provided value.
@@ -146,6 +156,20 @@ func (o *Object) StoreProperty(p string, value any) error {
 	prop := p[idx+1:]
 
 	return o.Call("org.freedesktop.DBus.Properties.Get", 0, iface, prop).
+		Store(value)
+}
+
+// StorePropertyWithContext acts like StoreProperty but takes a context
+func (o *Object) StorePropertyWithContext(ctx context.Context, p string, value any) error {
+	idx := strings.LastIndex(p, ".")
+	if idx == -1 || idx+1 == len(p) {
+		return errors.New("dbus: invalid property " + p)
+	}
+
+	iface := p[:idx]
+	prop := p[idx+1:]
+
+	return o.CallWithContext(ctx, "org.freedesktop.DBus.Properties.Get", 0, iface, prop).
 		Store(value)
 }
 
@@ -168,6 +192,19 @@ func (o *Object) SetProperty(p string, v any) error {
 	prop := p[idx+1:]
 
 	return o.Call("org.freedesktop.DBus.Properties.Set", 0, iface, prop, variant).Err
+}
+
+// SetPropertyWithContext acts like SetProperty but takes a context
+func (o *Object) SetPropertyWithContext(ctx context.Context, p string, v any) error {
+	idx := strings.LastIndex(p, ".")
+	if idx == -1 || idx+1 == len(p) {
+		return errors.New("dbus: invalid property " + p)
+	}
+
+	iface := p[:idx]
+	prop := p[idx+1:]
+
+	return o.CallWithContext(ctx, "org.freedesktop.DBus.Properties.Set", 0, iface, prop, v).Err
 }
 
 // Destination returns the destination that calls on (o *Object) are sent to.
