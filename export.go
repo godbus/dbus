@@ -363,8 +363,7 @@ func (conn *Conn) exportMethodTable(methods map[string]any, path ObjectPath, ifa
 }
 
 func (conn *Conn) unexport(h *defaultHandler, path ObjectPath, iface string) error {
-	if h.PathExists(path) {
-		obj := h.objects[path]
+	if obj, ok := h.GetExportedObject(path); ok {
 		obj.DeleteInterface(iface)
 		if len(obj.interfaces) == 0 {
 			h.DeleteObject(path)
@@ -391,21 +390,18 @@ func (conn *Conn) export(methods map[string]reflect.Value, path ObjectPath, ifac
 		return conn.unexport(h, path, iface)
 	}
 
-	// If this is the first handler for this path, make a new map to hold all
-	// handlers for this path.
-	if !h.PathExists(path) {
-		h.AddObject(path, newExportedObject())
-	}
-
+	// Get all Methods that should be exported
+	// Get all Methods that should be exported
 	exportedMethods := make(map[string]Method)
 	for name, method := range methods {
 		exportedMethods[name] = exportedMethod{method}
 	}
 
-	// Finally, save this handler
-	obj := h.objects[path]
-	obj.AddInterface(iface, newExportedIntf(exportedMethods, includeSubtree))
+	// Get a handler for the path, either an existing or a new fresh one
+	obj := h.GetOrAddExportedObject(path)
 
+	// Finally, save this handler
+	obj.AddInterface(iface, newExportedIntf(exportedMethods, includeSubtree))
 	return nil
 }
 
