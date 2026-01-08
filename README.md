@@ -18,13 +18,11 @@ The complete package documentation and some simple examples are available at
 gives a short overview over the basic usage.
 
 #### Projects using godbus
-- [fyne](https://github.com/fyne-io/fyne) a cross platform GUI in Go inspired by Material Design.
-- [fynedesk](https://github.com/fyne-io/fynedesk) a full desktop environment for Linux/Unix using Fyne.
-- [go-bluetooth](https://github.com/muka/go-bluetooth) provides a bluetooth client over bluez dbus API.
-- [iwd](https://github.com/shibumi/iwd) go bindings for the internet wireless daemon "iwd".
+- [bluetooth](https://github.com/tinygo-org/bluetooth): cross-platform Bluetooth API for Go and TinyGo.
+- [fyne](https://github.com/fyne-io/fyne): a cross platform GUI in Go inspired by Material Design.
+- [fynedesk](https://github.com/fyne-io/fynedesk): a full desktop environment for Linux/Unix using Fyne.
+- [go-systemd](https://github.com/coreos/go-systemd): Go bindings to systemd.
 - [notify](https://github.com/esiqveland/notify) provides desktop notifications over dbus into a library.
-- [playerbm](https://github.com/altdesktop/playerbm) a bookmark utility for media players.
-- [rpic](https://github.com/stephenhu/rpic) lightweight web app and RESTful API for managing a Raspberry Pi
 
 Please note that the API is considered unstable for now and may change without
 further notice.
