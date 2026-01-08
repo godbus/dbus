@@ -1,5 +1,3 @@
-![Build Status](https://github.com/godbus/dbus/workflows/Go/badge.svg)
-
 dbus
 ----
 
@@ -12,20 +10,12 @@ D-Bus message bus system.
 * Go-like API (channels for signals / asynchronous method calls, Goroutine-safe connections)
 * Subpackages that help with the introspection / property interfaces
 
-### Installation
-
-This packages requires Go 1.20 or later. It can be installed by running the command below:
-
-```
-go get github.com/godbus/dbus/v5
-```
-
 ### Usage
 
 The complete package documentation and some simple examples are available at
 [pkg.go.dev](https://pkg.go.dev/github.com/godbus/dbus/v5). Also, the
-[_examples](https://github.com/godbus/dbus/tree/master/_examples) directory
-gives a short overview over the basic usage. 
+[\_examples](https://github.com/godbus/dbus/tree/master/_examples) directory
+gives a short overview over the basic usage.
 
 #### Projects using godbus
 - [fyne](https://github.com/fyne-io/fyne) a cross platform GUI in Go inspired by Material Design.
@@ -41,7 +31,7 @@ further notice.
 
 ### License
 
-go.dbus is available under the Simplified BSD License; see LICENSE for the full
+The library is available under the Simplified BSD License; see LICENSE for the full
 text.
 
-Nearly all of the credit for this library goes to github.com/guelfey/go.dbus.
+Nearly all of the credit for this library goes to https://github.com/guelfey.
