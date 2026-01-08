@@ -148,7 +148,7 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 			panic(err)
 		}
 		enc.pos += n
-	case reflect.Ptr:
+	case reflect.Pointer:
 		enc.encode(v.Elem(), depth)
 	case reflect.Slice, reflect.Array:
 		// Lookahead offset: 4 bytes for uint32 length (with alignment),
