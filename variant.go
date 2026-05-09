@@ -57,7 +57,12 @@ func (v Variant) format() (string, bool) {
 	case 'n', 'q', 'u', 'x', 't', 'd', 'h':
 		return fmt.Sprint(v.value), false
 	case 's':
-		return strconv.Quote(v.value.(string)), true
+		switch v.value.(type) {
+		case string:
+			return strconv.Quote(v.value.(string)), true
+		case *string:
+			return strconv.Quote(*v.value.(*string)), true
+		}
 	case 'o':
 		return strconv.Quote(string(v.value.(ObjectPath))), false
 	case 'g':
