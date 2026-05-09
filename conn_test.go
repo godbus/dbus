@@ -825,3 +825,142 @@ func TestTimeoutContextClosesConnection(t *testing.T) {
 		t.Errorf("expected connection to be closed, but got: %v", err)
 	}
 }
+
+var (
+	// some test vars we'll use to simplify result validation in PropertiesChanged testing
+	pciface = "totally.real.interface"
+	changedprop = "iChanged"
+	changedval = "12345"
+	changes = map[string]Variant{
+		changedprop: Variant{value: changedval},
+	}
+	invalidated = []string{"imInvalidNow"}
+)
+
+func TestParsePropertiesChanged(t *testing.T) {
+	// Case 1 - Expected pass, coverage on parsing accuracy
+
+	testSignal := Signal{
+		Body: []interface{}{
+			// all three are here and happy
+			pciface,
+			changes,
+			invalidated,
+		},
+	}
+
+	got, err := testSignal.ParsePropertiesChanged()
+	if err != nil {
+		t.Fatalf("case 1 err - %v", err)
+	}
+
+	if got.Iface != pciface {
+		t.Fatalf("case 1 - iface mismatch expected %s got %s", pciface, got.Iface)
+	}
+
+	if v, found := got.GetChangedProperty(changedprop); !found || v != changedval {
+		t.Fatalf("case 1 - changed prop mismatch expected %v got %v", changes, got.Changes)
+	}
+
+	if len(got.InvalidatedProperties) != 1 || got.InvalidatedProperties[0] != "imInvalidNow" {
+		t.Fatalf("case 1 - invalidated props mismatch expected %v got %v", invalidated, got.InvalidatedProperties)
+	}
+
+	// Case 2 - Expected fail, coverage on Body length validation
+
+	testSignal = Signal{
+		Body: []interface{}{
+			// only have one entry in the body, oh no!
+			invalidated,
+		},
+	}
+
+	_, err = testSignal.ParsePropertiesChanged()
+	if err == nil {
+		t.Fatal("case 2 - expected err but err is nil")
+	}
+
+	// Case 3 - Expected fail, coverage on the parsing of interface name
+
+	testSignal = Signal{
+		Body: []interface{}{
+			// all three are present but iface is the wrong type
+			changes,
+			changes,
+			invalidated,
+		},
+	}
+
+	_, err = testSignal.ParsePropertiesChanged()
+	if err == nil {
+		t.Fatal("case 3 - expected err but err is nil")
+	}
+
+	// Case 4 - Expected fail, coverage on the properties_changed parsing
+
+	testSignal = Signal{
+		Body: []interface{}{
+			// all three are present but changes is the wrong type
+			pciface,
+			pciface,
+			invalidated,
+		},
+	}
+
+	_, err = testSignal.ParsePropertiesChanged()
+	if err == nil {
+		t.Fatal("case 4 - expected err but err is nil")
+	}
+
+	// Case 5 - Expected fail, coverage on the the invalidated_properties parsing
+
+	testSignal = Signal{
+		Body: []interface{}{
+			// all three are present but invalidated props are the wrong type
+			pciface,
+			changes,
+			changes,
+		},
+	}
+
+	_, err = testSignal.ParsePropertiesChanged()
+	if err == nil {
+		t.Fatal("case 5 - expected err but err is nil")
+	}
+}
+
+func TestIsPropertyChanged(t *testing.T) {
+	testPC := PropertiesChanged{
+		Changes: changes,
+	}
+
+	// Case 1 - Expected pass, changed property found
+
+	if !testPC.IsPropertyChanged(changedprop) {
+		t.Fatal("case 1 - IsPropertyChanged mismatch")
+	}
+
+	// Case 2 - Expected fail, changed property not found
+
+	if testPC.IsPropertyChanged("did I change? no") {
+		t.Fatal("case 2 - IsPropertyChanged mismatch")
+	}
+}
+
+func TestGetChangedProperty(t *testing.T) {
+	testPC := PropertiesChanged{
+		Changes: changes,
+	}
+
+	// Case 1 - Expected pass, able to find property and we get the correct value
+
+	if val, found := testPC.GetChangedProperty(changedprop); !found || val != changedval {
+		t.Fatalf("case 1 - GetChangedProperty expected %s:true got %v:%v", changedval, val, found)
+	}
+
+	// Case 2 - expected fail, unable to find property
+
+	if _, found := testPC.GetChangedProperty("If you read this, hello"); found {
+		t.Fatal("case 2 - GetChangedProperty found property when property shouldn't exist")
+	}
+}
