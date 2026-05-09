@@ -58,6 +58,7 @@ type Conn struct {
 
 // SessionBus returns a shared connection to the session bus, connecting to it
 // if not already done.
+// If you would prefer a private connection, use [ConnectSessionBus].
 func SessionBus() (conn *Conn, err error) {
 	sessionBusLck.Lock()
 	defer sessionBusLck.Unlock()
@@ -88,6 +89,8 @@ func getSessionBusAddress(autolaunch bool) (string, error) {
 }
 
 // SessionBusPrivate returns a new private connection to the session bus.
+//
+// Deprecated: use [ConnectSessionBus] instead.
 func SessionBusPrivate(opts ...ConnOption) (*Conn, error) {
 	address, err := getSessionBusAddress(true)
 	if err != nil {
@@ -110,13 +113,14 @@ func SessionBusPrivateNoAutoStartup(opts ...ConnOption) (*Conn, error) {
 
 // SessionBusPrivateHandler returns a new private connection to the session bus.
 //
-// Deprecated: use SessionBusPrivate with options instead.
+// Deprecated: use [ConnectSessionBus] with options instead.
 func SessionBusPrivateHandler(handler Handler, signalHandler SignalHandler) (*Conn, error) {
 	return SessionBusPrivate(WithHandler(handler), WithSignalHandler(signalHandler))
 }
 
 // SystemBus returns a shared connection to the system bus, connecting to it if
-// not already done.
+// not already done. Because the returned connection is shared, do not close the connection.
+// If you would prefer a private connection which you may close, use [ConnectSystemBus].
 func SystemBus() (conn *Conn, err error) {
 	systemBusLck.Lock()
 	defer systemBusLck.Unlock()
@@ -170,13 +174,15 @@ func Connect(address string, opts ...ConnOption) (*Conn, error) {
 // SystemBusPrivate returns a new private connection to the system bus.
 // Note: this connection is not ready to use. One must perform Auth and Hello
 // on the connection before it is usable.
+//
+// Deprecated: use [ConnectSystemBus] instead.
 func SystemBusPrivate(opts ...ConnOption) (*Conn, error) {
 	return Dial(getSystemBusPlatformAddress(), opts...)
 }
 
 // SystemBusPrivateHandler returns a new private connection to the system bus, using the provided handlers.
 //
-// Deprecated: use SystemBusPrivate with options instead.
+// Deprecated: use [ConnectSystemBus] with options instead.
 func SystemBusPrivateHandler(handler Handler, signalHandler SignalHandler) (*Conn, error) {
 	return SystemBusPrivate(WithHandler(handler), WithSignalHandler(signalHandler))
 }
