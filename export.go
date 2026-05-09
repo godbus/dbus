@@ -3,8 +3,10 @@ package dbus
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"reflect"
+	"runtime/debug"
 	"strings"
 )
 
@@ -24,6 +26,10 @@ var (
 	ErrMsgUnknownInterface = Error{
 		"org.freedesktop.DBus.Error.UnknownInterface",
 		[]any{"Object does not implement the interface"},
+	}
+	ErrMsgServerErrInterface = Error{
+		"org.freedesktop.DBus.Error.ServerErrInterface",
+		[]interface{}{"Server Err method"},
 	}
 )
 
@@ -150,7 +156,12 @@ func (conn *Conn) handleCall(msg *Message) {
 	ifaceName, _ := msg.Headers[FieldInterface].value.(string)
 	sender, hasSender := msg.Headers[FieldSender].value.(string)
 	serial := msg.serial
-
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("err:%v,stack:%s", r, string(debug.Stack()))
+			conn.sendError(ErrMsgServerErrInterface, sender, serial)
+		}
+	}()
 	if len(name) == 0 {
 		conn.sendError(ErrMsgUnknownMethod, sender, serial)
 	}
