@@ -58,9 +58,58 @@ jobs:
     - uses: actions/checkout@v6
     - uses: codespell-project/actions-codespell@v2
 
+  lima:
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        template: [freebsd-15]
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - uses: lima-vm/lima-actions/setup@v1
+      id: lima-actions-setup
+
+    - uses: actions/cache@v5
+      with:
+        path: ~/.cache/lima
+        key: lima-${{ steps.lima-actions-setup.outputs.version }}-${{ matrix.template }}
+
+    - name: Install xorriso (needed by lima)
+      run: sudo apt-get install -qqy xorriso
+
+    - name: Start VM
+      # --plain is set to disable file sharing, port forwarding, built-in containerd, etc. for faster start up
+      #
+      # CPUs: min(4, host CPU cores)
+      # RAM:  min(4 GiB, half of host memory)
+      # Disk: 100 GiB
+      run: limactl start --plain --name=default template:${{ matrix.template }}
+
+    - name: Setup VM
+      run: |
+        set -eux
+        limactl cp -r . default:/tmp/godbus
+        lima sudo chmod a-x /usr/bin/fortune
+        lima sudo pkg install -y go dbus
+        lima sudo /usr/local/etc/rc.d/dbus onestart
+
+    - name: VM info
+      run: |
+        set -eux
+        lima uname -a
+        lima go version
+
+    - name: Run tests
+      run: |
+        lima sh -c 'eval $(dbus-launch --sh-syntax) && cd /tmp/godbus && go test -v ./...'
+
   all-done:
     runs-on: ubuntu-latest
     needs:
+      - lima
       - lint
       - test
       - codespell
