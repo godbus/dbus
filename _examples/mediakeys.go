@@ -26,7 +26,7 @@ func main() {
 	bus := conn.Object("org.gnome.SettingsDaemon", "/org/gnome/SettingsDaemon/MediaKeys")
 	call := bus.Call("org.gnome.SettingsDaemon.MediaKeys.GrabMediaPlayerKeys", 0, "test app", uint(0))
 	if call.Err != nil {
-		panic(err)
+		panic(call.Err)
 	}
 
 	signals := make(chan *dbus.Signal, 10)
