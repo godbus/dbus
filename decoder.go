@@ -61,13 +61,19 @@ func (dec *decoder) binread(v any) {
 
 func (dec *decoder) Decode(sig Signature) (vs []any, err error) {
 	defer func() {
-		var ok bool
 		v := recover()
-		if err, ok = v.(error); ok {
-			if err == io.EOF || err == io.ErrUnexpectedEOF {
-				err = FormatError("unexpected EOF")
-			}
+		if v == nil {
+			return
 		}
+		e, ok := v.(error)
+		if !ok {
+			// Not ours; re-panic.
+			panic(v)
+		}
+		if e == io.EOF || e == io.ErrUnexpectedEOF {
+			e = FormatError("unexpected EOF")
+		}
+		err = e
 	}()
 	vs = make([]any, 0)
 	s := sig.str

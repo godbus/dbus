@@ -469,3 +469,22 @@ func TestEncodeVariantToUint64(t *testing.T) {
 	}
 	_ = res["foo"].Value().(uint64)
 }
+
+type panicWriter struct{}
+
+func (panicWriter) Write([]byte) (int, error) {
+	panic("boom")
+}
+
+// TestEncodeNonErrorPanic checks that a panic with a non-error value
+// is not swallowed by Encode.
+func TestEncodeNonErrorPanic(t *testing.T) {
+	defer func() {
+		if v := recover(); v != "boom" {
+			t.Fatalf("expected panic %q, got %v", "boom", v)
+		}
+	}()
+	enc := newEncoder(panicWriter{}, binary.LittleEndian, nil)
+	err := enc.Encode(uint32(1))
+	t.Fatalf("expected panic, got %v", err)
+}
