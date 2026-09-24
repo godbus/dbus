@@ -69,7 +69,16 @@ func (enc *encoder) binwrite(v any) {
 // are aligned properly as required by the D-Bus spec.
 func (enc *encoder) Encode(vs ...any) (err error) {
 	defer func() {
-		err, _ = recover().(error)
+		v := recover()
+		if v == nil {
+			return
+		}
+		e, ok := v.(error)
+		if !ok {
+			// Not ours; re-panic.
+			panic(v)
+		}
+		err = e
 	}()
 	for _, v := range vs {
 		enc.encode(reflect.ValueOf(v), 0)

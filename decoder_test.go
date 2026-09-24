@@ -86,3 +86,22 @@ func TestSigByteSize(t *testing.T) {
 		}
 	}
 }
+
+type panicReader struct{}
+
+func (panicReader) Read([]byte) (int, error) {
+	panic("boom")
+}
+
+// TestDecodeNonErrorPanic checks that a panic with a non-error value
+// is not swallowed by Decode.
+func TestDecodeNonErrorPanic(t *testing.T) {
+	defer func() {
+		if v := recover(); v != "boom" {
+			t.Fatalf("expected panic %q, got %v", "boom", v)
+		}
+	}()
+	dec := newDecoder(panicReader{}, binary.LittleEndian, nil)
+	vs, err := dec.Decode(Signature{"u"})
+	t.Fatalf("expected panic, got %v, %v", vs, err)
+}
