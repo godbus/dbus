@@ -382,6 +382,17 @@ func (conn *Conn) Hello() error {
 	return nil
 }
 
+// Start begins message dispatch on the connection without performing
+// authentication. Use this for pre-authenticated transports like a trusted
+// socketpair between cooperating processes.
+func (conn *Conn) Start() {
+	if conn.transport.SupportsUnixFDs() {
+		conn.EnableUnixFDs()
+		conn.unixFD = true
+	}
+	go conn.inWorker()
+}
+
 // inWorker runs in an own goroutine, reading incoming messages from the
 // transport and dispatching them appropriately.
 func (conn *Conn) inWorker() {
