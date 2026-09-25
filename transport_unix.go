@@ -206,6 +206,7 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 		if err != nil {
 			return nil, err
 		}
+		msg.fds = fds
 		dec.Reset(r, order, fds)
 		if err = decodeMessageBody(msg, dec); err != nil {
 			return nil, err
