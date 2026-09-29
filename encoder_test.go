@@ -488,3 +488,20 @@ func TestEncodeNonErrorPanic(t *testing.T) {
 	err := enc.Encode(uint32(1))
 	t.Fatalf("expected panic, got %v", err)
 }
+
+func TestEncodeNil(t *testing.T) {
+	for _, v := range []any{
+		nil,
+		(*int)(nil),
+		[]any{nil},
+		map[string]any{"a": nil},
+		struct{ A any }{},
+		struct{ A *int }{},
+		Variant{},
+	} {
+		enc := newEncoder(new(bytes.Buffer), binary.LittleEndian, nil)
+		if err := enc.Encode(v); err != errNilValue {
+			t.Errorf("%#v: expected %v, got %v", v, errNilValue, err)
+		}
+	}
+}

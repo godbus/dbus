@@ -3,11 +3,14 @@ package dbus
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"io"
 	"reflect"
 	"strings"
 	"unicode/utf8"
 )
+
+var errNilValue = errors.New("dbus: cannot encode nil value")
 
 // An encoder encodes values to the D-Bus wire format.
 type encoder struct {
@@ -91,6 +94,9 @@ func (enc *encoder) Encode(vs ...any) (err error) {
 func (enc *encoder) encode(v reflect.Value, depth int) {
 	if depth > 64 {
 		panic(FormatError("input exceeds depth limitation"))
+	}
+	if !v.IsValid() {
+		panic(errNilValue)
 	}
 	enc.align(alignment(v.Type()))
 	switch v.Kind() {
@@ -237,6 +243,9 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		}
 		enc.pos += length
 	case reflect.Interface:
+		if v.IsNil() {
+			panic(errNilValue)
+		}
 		enc.encode(reflect.ValueOf(MakeVariant(v.Interface())), depth)
 	default:
 		panic(InvalidTypeError{v.Type()})
