@@ -186,12 +186,9 @@ func DecodeMessageWithFDs(rd io.Reader, fds []int) (msg *Message, err error) {
 			return nil, err
 		}
 	}
-	body := make([]byte, int(length))
-	if length != 0 {
-		_, err := io.ReadFull(rd, body)
-		if err != nil {
-			return nil, err
-		}
+	body, err := readFull(rd, nil, int(length))
+	if err != nil {
+		return nil, err
 	}
 
 	if err = msg.validateHeader(); err != nil {
