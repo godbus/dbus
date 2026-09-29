@@ -44,7 +44,7 @@ func (enc *encoder) align(n int) {
 	if pad > 0 {
 		empty := make([]byte, pad)
 		if _, err := enc.out.Write(empty); err != nil {
-			panic(err)
+			panic(codecError{err})
 		}
 		enc.pos += pad
 	}
@@ -64,7 +64,7 @@ func (enc *encoder) padding(offset, algn int) int {
 // Calls binary.Write(enc.out, enc.order, v) and panics on write errors.
 func (enc *encoder) binwrite(v any) {
 	if err := binary.Write(enc.out, enc.order, v); err != nil {
-		panic(err)
+		panic(codecError{err})
 	}
 }
 
@@ -76,12 +76,12 @@ func (enc *encoder) Encode(vs ...any) (err error) {
 		if v == nil {
 			return
 		}
-		e, ok := v.(error)
+		e, ok := v.(codecError)
 		if !ok {
 			// Not ours; re-panic.
 			panic(v)
 		}
-		err = e
+		err = e.err
 	}()
 	for _, v := range vs {
 		enc.encode(reflect.ValueOf(v), 0)
@@ -93,10 +93,10 @@ func (enc *encoder) Encode(vs ...any) (err error) {
 // the depth of the container nesting.
 func (enc *encoder) encode(v reflect.Value, depth int) {
 	if depth > 64 {
-		panic(FormatError("input exceeds depth limitation"))
+		panic(codecError{FormatError("input exceeds depth limitation")})
 	}
 	if !v.IsValid() {
-		panic(errNilValue)
+		panic(codecError{errNilValue})
 	}
 	enc.align(alignment(v.Type()))
 	switch v.Kind() {
@@ -104,7 +104,7 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		var b [1]byte
 		b[0] = byte(v.Uint())
 		if _, err := enc.out.Write(b[:]); err != nil {
-			panic(err)
+			panic(codecError{err})
 		}
 		enc.pos++
 	case reflect.Bool:
@@ -144,14 +144,14 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 	case reflect.String:
 		str := v.String()
 		if !utf8.ValidString(str) {
-			panic(FormatError("input has a not-utf8 char in string"))
+			panic(codecError{FormatError("input has a not-utf8 char in string")})
 		}
 		if strings.IndexByte(str, byte(0)) != -1 {
-			panic(FormatError("input has a null char('\\000') in string"))
+			panic(codecError{FormatError("input has a null char('\\000') in string")})
 		}
 		if v.Type() == objectPathType {
 			if !ObjectPath(str).IsValid() {
-				panic(FormatError("invalid object path"))
+				panic(codecError{FormatError("invalid object path")})
 			}
 		}
 		enc.encode(reflect.ValueOf(uint32(len(str))), depth)
@@ -160,7 +160,7 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		b[len(b)-1] = 0
 		n, err := enc.out.Write(b)
 		if err != nil {
-			panic(err)
+			panic(codecError{err})
 		}
 		enc.pos += n
 	case reflect.Pointer:
@@ -179,7 +179,7 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		}
 
 		if buf.Len() > maxArrayLen {
-			panic(FormatError("input exceeds array size limitation"))
+			panic(codecError{FormatError("input exceeds array size limitation")})
 		}
 
 		enc.fds = bufenc.fds
@@ -187,7 +187,7 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		length := buf.Len()
 		enc.align(alignment(v.Type().Elem()))
 		if _, err := buf.WriteTo(enc.out); err != nil {
-			panic(err)
+			panic(codecError{err})
 		}
 		enc.pos += length
 	case reflect.Struct:
@@ -200,7 +200,7 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 			b[len(b)-1] = 0
 			n, err := enc.out.Write(b)
 			if err != nil {
-				panic(err)
+				panic(codecError{err})
 			}
 			enc.pos += n
 		case variantType:
@@ -219,7 +219,7 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		// Maps are arrays of structures, so they actually increase the depth by
 		// 2.
 		if !isKeyType(v.Type().Key()) {
-			panic(InvalidTypeError{v.Type()})
+			panic(codecError{InvalidTypeError{v.Type()}})
 		}
 		keys := v.MapKeys()
 		// Lookahead offset: 4 bytes for uint32 length (with alignment),
@@ -239,15 +239,15 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		length := buf.Len()
 		enc.align(8)
 		if _, err := buf.WriteTo(enc.out); err != nil {
-			panic(err)
+			panic(codecError{err})
 		}
 		enc.pos += length
 	case reflect.Interface:
 		if v.IsNil() {
-			panic(errNilValue)
+			panic(codecError{errNilValue})
 		}
 		enc.encode(reflect.ValueOf(MakeVariant(v.Interface())), depth)
 	default:
-		panic(InvalidTypeError{v.Type()})
+		panic(codecError{InvalidTypeError{v.Type()}})
 	}
 }

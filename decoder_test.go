@@ -3,6 +3,7 @@ package dbus
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"io"
 	"runtime"
 	"testing"
@@ -89,23 +90,27 @@ func TestSigByteSize(t *testing.T) {
 	}
 }
 
-type panicReader struct{}
+type panicReader struct{ v any }
 
-func (panicReader) Read([]byte) (int, error) {
-	panic("boom")
+func (r panicReader) Read([]byte) (int, error) {
+	panic(r.v)
 }
 
-// TestDecodeNonErrorPanic checks that a panic with a non-error value
-// is not swallowed by Decode.
-func TestDecodeNonErrorPanic(t *testing.T) {
-	defer func() {
-		if v := recover(); v != "boom" {
-			t.Fatalf("expected panic %q, got %v", "boom", v)
-		}
-	}()
-	dec := newDecoder(panicReader{}, binary.LittleEndian, nil)
-	vs, err := dec.Decode(Signature{"u"})
-	t.Fatalf("expected panic, got %v, %v", vs, err)
+// TestDecodeForeignPanic checks that Decode does not swallow panics
+// other than those raised by the decoder itself.
+func TestDecodeForeignPanic(t *testing.T) {
+	for _, pv := range []any{"boom", errors.New("boom")} {
+		func() {
+			defer func() {
+				if v := recover(); v != pv {
+					t.Errorf("expected panic %v, got %v", pv, v)
+				}
+			}()
+			dec := newDecoder(panicReader{pv}, binary.LittleEndian, nil)
+			vs, err := dec.Decode(Signature{"u"})
+			t.Errorf("expected panic, got %v, %v", vs, err)
+		}()
+	}
 }
 
 func TestReadFull(t *testing.T) {

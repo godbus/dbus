@@ -3,6 +3,7 @@ package dbus
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -470,23 +471,69 @@ func TestEncodeVariantToUint64(t *testing.T) {
 	_ = res["foo"].Value().(uint64)
 }
 
-type panicWriter struct{}
+type panicWriter struct{ v any }
 
-func (panicWriter) Write([]byte) (int, error) {
-	panic("boom")
+func (w panicWriter) Write([]byte) (int, error) {
+	panic(w.v)
 }
 
-// TestEncodeNonErrorPanic checks that a panic with a non-error value
-// is not swallowed by Encode.
-func TestEncodeNonErrorPanic(t *testing.T) {
-	defer func() {
-		if v := recover(); v != "boom" {
-			t.Fatalf("expected panic %q, got %v", "boom", v)
+// TestEncodeForeignPanic checks that Encode does not swallow panics
+// other than those raised by the encoder itself.
+func TestEncodeForeignPanic(t *testing.T) {
+	for _, pv := range []any{"boom", errors.New("boom")} {
+		func() {
+			defer func() {
+				if v := recover(); v != pv {
+					t.Errorf("expected panic %v, got %v", pv, v)
+				}
+			}()
+			enc := newEncoder(panicWriter{pv}, binary.LittleEndian, nil)
+			err := enc.Encode(uint32(1))
+			t.Errorf("expected panic, got %v", err)
+		}()
+	}
+}
+
+var errWrite = errors.New("write failed")
+
+// failWriter accepts n bytes, then fails.
+type failWriter struct{ n int }
+
+func (w *failWriter) Write(b []byte) (int, error) {
+	if len(b) > w.n {
+		return 0, errWrite
+	}
+	w.n -= len(b)
+	return len(b), nil
+}
+
+// TestEncodeWriteError checks that Encode returns write errors
+// from every place the encoder writes to the output.
+func TestEncodeWriteError(t *testing.T) {
+	for _, v := range []any{
+		byte(1),
+		uint32(1),
+		"foo",
+		Signature{"u"},
+		[]int32{1, 2},
+		map[string]uint32{"a": 1},
+		struct {
+			A byte
+			B uint64
+		}{1, 2},
+	} {
+		var buf bytes.Buffer
+		if err := newEncoder(&buf, binary.LittleEndian, nil).Encode(v); err != nil {
+			t.Fatalf("%#v: %v", v, err)
 		}
-	}()
-	enc := newEncoder(panicWriter{}, binary.LittleEndian, nil)
-	err := enc.Encode(uint32(1))
-	t.Fatalf("expected panic, got %v", err)
+		// Fail at every possible offset.
+		for n := 0; n < buf.Len(); n++ {
+			enc := newEncoder(&failWriter{n}, binary.LittleEndian, nil)
+			if err := enc.Encode(v); err != errWrite {
+				t.Errorf("%#v (fail after %d bytes): expected %v, got %v", v, n, errWrite, err)
+			}
+		}
+	}
 }
 
 func TestEncodeNil(t *testing.T) {
