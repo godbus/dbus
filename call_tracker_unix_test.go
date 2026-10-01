@@ -1,4 +1,4 @@
-//go:build !windows && !solaris
+//go:build !windows && !solaris && !js
 
 package dbus
 
