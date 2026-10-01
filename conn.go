@@ -932,23 +932,17 @@ func (tracker *callTracker) track(sn uint32, call *Call) {
 
 func (tracker *callTracker) handleReply(sequence Sequence, msg *Message) uint32 {
 	serial := msg.Headers[FieldReplySerial].value.(uint32)
-	tracker.lck.RLock()
-	_, ok := tracker.calls[serial]
-	tracker.lck.RUnlock()
-	if ok {
-		tracker.finalizeWithBody(serial, sequence, msg.Body)
+	if !tracker.finalizeWithBody(serial, sequence, msg.Body) {
+		msg.closeFDs()
 	}
 	return serial
 }
 
 func (tracker *callTracker) handleDBusError(sequence Sequence, msg *Message) uint32 {
 	serial := msg.Headers[FieldReplySerial].value.(uint32)
-	tracker.lck.RLock()
-	_, ok := tracker.calls[serial]
-	tracker.lck.RUnlock()
-	if ok {
-		name, _ := msg.Headers[FieldErrorName].value.(string)
-		tracker.finalizeWithError(serial, sequence, Error{name, msg.Body})
+	name, _ := msg.Headers[FieldErrorName].value.(string)
+	if !tracker.finalizeWithError(serial, sequence, Error{name, msg.Body}) {
+		msg.closeFDs()
 	}
 	return serial
 }
@@ -965,7 +959,10 @@ func (tracker *callTracker) handleSendError(msg *Message, err error) {
 	}
 }
 
-func (tracker *callTracker) finalizeWithBody(sn uint32, sequence Sequence, body []any) {
+// finalizeWithBody reports whether the call took ownership of body. The lookup
+// and removal must be atomic with respect to cancellation, which can otherwise
+// win after handleReply has checked for a pending call.
+func (tracker *callTracker) finalizeWithBody(sn uint32, sequence Sequence, body []any) bool {
 	tracker.lck.Lock()
 	c, ok := tracker.calls[sn]
 	if ok {
@@ -977,9 +974,12 @@ func (tracker *callTracker) finalizeWithBody(sn uint32, sequence Sequence, body 
 		c.ResponseSequence = sequence
 		c.done()
 	}
+	return ok
 }
 
-func (tracker *callTracker) finalizeWithError(sn uint32, sequence Sequence, err error) {
+// finalizeWithError reports whether the call took ownership of err, including
+// any received descriptors in a D-Bus error body.
+func (tracker *callTracker) finalizeWithError(sn uint32, sequence Sequence, err error) bool {
 	tracker.lck.Lock()
 	c, ok := tracker.calls[sn]
 	if ok {
@@ -991,6 +991,7 @@ func (tracker *callTracker) finalizeWithError(sn uint32, sequence Sequence, err 
 		c.ResponseSequence = sequence
 		c.done()
 	}
+	return ok
 }
 
 func (tracker *callTracker) finalizeAllWithError(sequenceGen *sequenceGenerator, err error) {
