@@ -3,6 +3,8 @@ package dbus
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
+	"io"
 	"testing"
 )
 
@@ -105,3 +107,74 @@ func TestDecodeNonErrorPanic(t *testing.T) {
 	vs, err := dec.Decode(Signature{"u"})
 	t.Fatalf("expected panic, got %v, %v", vs, err)
 }
+
+type panicErrorReader struct {
+	err error
+}
+
+func (r panicErrorReader) Read([]byte) (int, error) {
+	panic(r.err)
+}
+
+type errorReader struct {
+	err error
+}
+
+func (r errorReader) Read([]byte) (int, error) {
+	return 0, r.err
+}
+
+// TestDecodeErrorPanic checks that a panic with an error value
+// from an underlying reader is not swallowed by Decode.
+func TestDecodeErrorPanic(t *testing.T) {
+	expectedErr := errors.New("boom error")
+	defer func() {
+		v := recover()
+		if v != expectedErr {
+			t.Fatalf("expected panic %v, got %v", expectedErr, v)
+		}
+	}()
+	dec := newDecoder(panicErrorReader{err: expectedErr}, binary.LittleEndian, nil)
+	vs, err := dec.Decode(Signature{"u"})
+	t.Fatalf("expected panic, got %v, %v", vs, err)
+}
+
+// TestDecodeEOFPanic checks that a panic with io.EOF is propagated
+// rather than translated to a FormatError return.
+func TestDecodeEOFPanic(t *testing.T) {
+	defer func() {
+		v := recover()
+		if v != io.EOF {
+			t.Fatalf("expected panic %v, got %v", io.EOF, v)
+		}
+	}()
+	dec := newDecoder(panicErrorReader{err: io.EOF}, binary.LittleEndian, nil)
+	vs, err := dec.Decode(Signature{"u"})
+	t.Fatalf("expected panic, got %v, %v", vs, err)
+}
+
+// TestDecodeNormalReaderError checks that standard (non-panicking) reader errors
+// are returned gracefully by Decode.
+func TestDecodeNormalReaderError(t *testing.T) {
+	expectedErr := errors.New("read failed")
+	dec := newDecoder(errorReader{err: expectedErr}, binary.LittleEndian, nil)
+	_, err := dec.Decode(Signature{"u"})
+	if !errors.Is(err, expectedErr) {
+		t.Fatalf("expected error %v, got %v", expectedErr, err)
+	}
+}
+
+// TestDecodeNormalEOF checks that standard (non-panicking) EOF
+// is converted to FormatError("unexpected EOF").
+func TestDecodeNormalEOF(t *testing.T) {
+	dec := newDecoder(errorReader{err: io.EOF}, binary.LittleEndian, nil)
+	_, err := dec.Decode(Signature{"u"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	var fmtErr FormatError
+	if !errors.As(err, &fmtErr) {
+		t.Fatalf("expected FormatError, got %T: %v", err, err)
+	}
+}
+

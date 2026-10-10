@@ -3,6 +3,7 @@ package dbus
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -488,3 +489,74 @@ func TestEncodeNonErrorPanic(t *testing.T) {
 	err := enc.Encode(uint32(1))
 	t.Fatalf("expected panic, got %v", err)
 }
+
+type panicErrorWriter struct {
+	err error
+}
+
+func (w panicErrorWriter) Write([]byte) (int, error) {
+	panic(w.err)
+}
+
+type errorWriter struct {
+	err error
+}
+
+func (w errorWriter) Write([]byte) (int, error) {
+	return 0, w.err
+}
+
+// TestEncodeErrorPanic checks that a panic with an error value
+// from an underlying writer is not swallowed by Encode.
+func TestEncodeErrorPanic(t *testing.T) {
+	expectedErr := errors.New("boom error")
+	defer func() {
+		v := recover()
+		if v != expectedErr {
+			t.Fatalf("expected panic %v, got %v", expectedErr, v)
+		}
+	}()
+	enc := newEncoder(panicErrorWriter{err: expectedErr}, binary.LittleEndian, nil)
+	err := enc.Encode(uint32(1))
+	t.Fatalf("expected panic, got %v", err)
+}
+
+// TestEncodeNormalWriterError checks that standard (non-panicking) writer errors
+// are returned gracefully by Encode.
+func TestEncodeNormalWriterError(t *testing.T) {
+	expectedErr := errors.New("write failed")
+	enc := newEncoder(errorWriter{err: expectedErr}, binary.LittleEndian, nil)
+	err := enc.Encode(uint32(1))
+	if !errors.Is(err, expectedErr) {
+		t.Fatalf("expected error %v, got %v", expectedErr, err)
+	}
+}
+
+// TestEncodeFormatError checks that internal FormatError is returned gracefully.
+func TestEncodeFormatError(t *testing.T) {
+	var buf bytes.Buffer
+	enc := newEncoder(&buf, binary.LittleEndian, nil)
+	err := enc.Encode("invalid\x00string")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	var fmtErr FormatError
+	if !errors.As(err, &fmtErr) {
+		t.Fatalf("expected FormatError, got %T: %v", err, err)
+	}
+}
+
+// TestEncodeInvalidTypeError checks that internal InvalidTypeError is returned gracefully.
+func TestEncodeInvalidTypeError(t *testing.T) {
+	var buf bytes.Buffer
+	enc := newEncoder(&buf, binary.LittleEndian, nil)
+	err := enc.Encode(make(chan int))
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	var typeErr InvalidTypeError
+	if !errors.As(err, &typeErr) {
+		t.Fatalf("expected InvalidTypeError, got %T: %v", err, err)
+	}
+}
+

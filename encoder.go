@@ -35,13 +35,25 @@ func newEncoderAtOffset(out io.Writer, offset int, order binary.ByteOrder, fds [
 	return enc
 }
 
+type encoderError struct {
+	err error
+}
+
+func (e encoderError) Error() string {
+	return e.err.Error()
+}
+
+func (e encoderError) Unwrap() error {
+	return e.err
+}
+
 // Aligns the next output to be on a multiple of n. Panics on write errors.
 func (enc *encoder) align(n int) {
 	pad := enc.padding(0, n)
 	if pad > 0 {
 		empty := make([]byte, pad)
 		if _, err := enc.out.Write(empty); err != nil {
-			panic(err)
+			panic(encoderError{err})
 		}
 		enc.pos += pad
 	}
@@ -61,7 +73,7 @@ func (enc *encoder) padding(offset, algn int) int {
 // Calls binary.Write(enc.out, enc.order, v) and panics on write errors.
 func (enc *encoder) binwrite(v any) {
 	if err := binary.Write(enc.out, enc.order, v); err != nil {
-		panic(err)
+		panic(encoderError{err})
 	}
 }
 
@@ -73,12 +85,17 @@ func (enc *encoder) Encode(vs ...any) (err error) {
 		if v == nil {
 			return
 		}
-		e, ok := v.(error)
-		if !ok {
+		switch e := v.(type) {
+		case encoderError:
+			err = e.err
+		case FormatError:
+			err = e
+		case InvalidTypeError:
+			err = e
+		default:
 			// Not ours; re-panic.
 			panic(v)
 		}
-		err = e
 	}()
 	for _, v := range vs {
 		enc.encode(reflect.ValueOf(v), 0)
@@ -98,7 +115,7 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		var b [1]byte
 		b[0] = byte(v.Uint())
 		if _, err := enc.out.Write(b[:]); err != nil {
-			panic(err)
+			panic(encoderError{err})
 		}
 		enc.pos++
 	case reflect.Bool:
@@ -154,7 +171,7 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		b[len(b)-1] = 0
 		n, err := enc.out.Write(b)
 		if err != nil {
-			panic(err)
+			panic(encoderError{err})
 		}
 		enc.pos += n
 	case reflect.Pointer:
@@ -181,7 +198,7 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		length := buf.Len()
 		enc.align(alignment(v.Type().Elem()))
 		if _, err := buf.WriteTo(enc.out); err != nil {
-			panic(err)
+			panic(encoderError{err})
 		}
 		enc.pos += length
 	case reflect.Struct:
@@ -194,7 +211,7 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 			b[len(b)-1] = 0
 			n, err := enc.out.Write(b)
 			if err != nil {
-				panic(err)
+				panic(encoderError{err})
 			}
 			enc.pos += n
 		case variantType:
@@ -233,7 +250,7 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 		length := buf.Len()
 		enc.align(8)
 		if _, err := buf.WriteTo(enc.out); err != nil {
-			panic(err)
+			panic(encoderError{err})
 		}
 		enc.pos += length
 	case reflect.Interface:

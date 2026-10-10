@@ -52,10 +52,22 @@ func (dec *decoder) align(n int) {
 	}
 }
 
+type decoderError struct {
+	err error
+}
+
+func (e decoderError) Error() string {
+	return e.err.Error()
+}
+
+func (e decoderError) Unwrap() error {
+	return e.err
+}
+
 // Calls binary.Read(dec.in, dec.order, v) and panics on read errors.
 func (dec *decoder) binread(v any) {
 	if err := binary.Read(dec.in, dec.order, v); err != nil {
-		panic(err)
+		panic(decoderError{err})
 	}
 }
 
@@ -65,15 +77,22 @@ func (dec *decoder) Decode(sig Signature) (vs []any, err error) {
 		if v == nil {
 			return
 		}
-		e, ok := v.(error)
-		if !ok {
+		switch e := v.(type) {
+		case decoderError:
+			err = e.err
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
+				err = FormatError("unexpected EOF")
+			}
+		case FormatError:
+			err = e
+		case InvalidTypeError:
+			err = e
+		case SignatureError:
+			err = e
+		default:
 			// Not ours; re-panic.
 			panic(v)
 		}
-		if e == io.EOF || e == io.ErrUnexpectedEOF {
-			e = FormatError("unexpected EOF")
-		}
-		err = e
 	}()
 	vs = make([]any, 0)
 	s := sig.str
@@ -99,7 +118,7 @@ func (dec *decoder) read2buf(n int) {
 		dec.buf = dec.buf[:n]
 	}
 	if _, err := io.ReadFull(dec.in, dec.buf); err != nil {
-		panic(err)
+		panic(decoderError{err})
 	}
 }
 
@@ -117,7 +136,7 @@ func (dec *decoder) decode(s string, depth int) any {
 	switch s[0] {
 	case 'y':
 		if _, err := dec.in.Read(dec.y[:]); err != nil {
-			panic(err)
+			panic(decoderError{err})
 		}
 		dec.pos++
 		return dec.y[0]
