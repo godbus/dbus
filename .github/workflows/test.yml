@@ -52,6 +52,9 @@ jobs:
     - name: Test
       run: go test -race -v ./...
 
+    - name: Test with godbus_no_tcp build tag
+      run: go test -race -v -tags godbus_no_tcp ./...
+
   codespell:
     runs-on: ubuntu-24.04
     steps:
