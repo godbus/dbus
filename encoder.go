@@ -172,7 +172,7 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 			bufenc.encode(v.Index(i), depth+1)
 		}
 
-		if buf.Len() > 1<<26 {
+		if buf.Len() > maxArrayLen {
 			panic(FormatError("input exceeds array size limitation"))
 		}
 
