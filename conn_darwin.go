@@ -26,7 +26,7 @@ func getSessionBusPlatformAddress() (string, error) {
 func getSystemBusPlatformAddress() (string, error) {
 	address := os.Getenv("DBUS_LAUNCHD_SESSION_BUS_SOCKET")
 	if address != "" {
-		return fmt.Sprintf("unix:path=%s", address)
+		return fmt.Sprintf("unix:path=%s", address), nil
 	}
 	return defaultSystemBusAddress, nil
 }

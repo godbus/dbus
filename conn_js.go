@@ -1,5 +1,5 @@
 package dbus
 
-func getSystemBusPlatformAddress() string {
+func getSystemBusPlatformAddress() (string, error) {
 	panic("not implemented")
 }
