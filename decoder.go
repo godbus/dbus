@@ -55,7 +55,7 @@ func (dec *decoder) align(n int) {
 // Calls binary.Read(dec.in, dec.order, v) and panics on read errors.
 func (dec *decoder) binread(v any) {
 	if err := binary.Read(dec.in, dec.order, v); err != nil {
-		panic(err)
+		panic(codecError{err})
 	}
 }
 
@@ -65,15 +65,15 @@ func (dec *decoder) Decode(sig Signature) (vs []any, err error) {
 		if v == nil {
 			return
 		}
-		e, ok := v.(error)
+		e, ok := v.(codecError)
 		if !ok {
 			// Not ours; re-panic.
 			panic(v)
 		}
-		if e == io.EOF || e == io.ErrUnexpectedEOF {
-			e = FormatError("unexpected EOF")
+		err = e.err
+		if err == io.EOF || err == io.ErrUnexpectedEOF {
+			err = FormatError("unexpected EOF")
 		}
-		err = e
 	}()
 	vs = make([]any, 0)
 	s := sig.str
@@ -96,7 +96,7 @@ func (dec *decoder) read2buf(n int) {
 	var err error
 	dec.buf, err = readFull(dec.in, dec.buf, n)
 	if err != nil {
-		panic(err)
+		panic(codecError{err})
 	}
 }
 
@@ -161,7 +161,7 @@ func (dec *decoder) decode(s string, depth int) any {
 	switch s[0] {
 	case 'y':
 		if _, err := dec.in.Read(dec.y[:]); err != nil {
-			panic(err)
+			panic(codecError{err})
 		}
 		dec.pos++
 		return dec.y[0]
@@ -172,7 +172,7 @@ func (dec *decoder) decode(s string, depth int) any {
 		case 1:
 			return true
 		default:
-			panic(FormatError("invalid value for boolean"))
+			panic(codecError{FormatError("invalid value for boolean")})
 		}
 	case 'n':
 		dec.read2buf(2)
@@ -217,24 +217,24 @@ func (dec *decoder) decode(s string, depth int) any {
 			dec.conv.String(dec.buf[:len(dec.buf)-1]),
 		)
 		if err != nil {
-			panic(err)
+			panic(codecError{err})
 		}
 		return sig
 	case 'v':
 		if depth >= 64 {
-			panic(FormatError("input exceeds container depth limit"))
+			panic(codecError{FormatError("input exceeds container depth limit")})
 		}
 		var variant Variant
 		sig := dec.decode("g", depth).(Signature)
 		if len(sig.str) == 0 {
-			panic(FormatError("variant signature is empty"))
+			panic(codecError{FormatError("variant signature is empty")})
 		}
 		err, rem := validSingle(sig.str, &depthCounter{})
 		if err != nil {
-			panic(err)
+			panic(codecError{err})
 		}
 		if rem != "" {
-			panic(FormatError("variant signature has multiple types"))
+			panic(codecError{FormatError("variant signature has multiple types")})
 		}
 		variant.sig = sig
 		variant.value = dec.decode(sig.str, depth+1)
@@ -251,11 +251,11 @@ func (dec *decoder) decode(s string, depth int) any {
 			vsig := s[3 : len(s)-1]
 			v := reflect.MakeMap(reflect.MapOf(typeFor(ksig), typeFor(vsig)))
 			if depth >= 63 {
-				panic(FormatError("input exceeds container depth limit"))
+				panic(codecError{FormatError("input exceeds container depth limit")})
 			}
 			length := dec.decodeU()
 			if length > maxArrayLen {
-				panic(FormatError("input exceeds array size limitation"))
+				panic(codecError{FormatError("input exceeds array size limitation")})
 			}
 			// Even for empty maps, the correct padding must be included
 			dec.align(8)
@@ -263,7 +263,7 @@ func (dec *decoder) decode(s string, depth int) any {
 			for dec.pos < spos+int(length) {
 				dec.align(8)
 				if !isKeyType(v.Type().Key()) {
-					panic(InvalidTypeError{v.Type()})
+					panic(codecError{InvalidTypeError{v.Type()}})
 				}
 				kv := dec.decode(ksig, depth+2)
 				vv := dec.decode(vsig, depth+2)
@@ -272,12 +272,12 @@ func (dec *decoder) decode(s string, depth int) any {
 			return v.Interface()
 		}
 		if depth >= 64 {
-			panic(FormatError("input exceeds container depth limit"))
+			panic(codecError{FormatError("input exceeds container depth limit")})
 		}
 		sig := s[1:]
 		length := dec.decodeU()
 		if length > maxArrayLen {
-			panic(FormatError("input exceeds array size limitation"))
+			panic(codecError{FormatError("input exceeds array size limitation")})
 		}
 		// capacity can be determined only for fixed-size element types
 		var capacity int
@@ -308,7 +308,7 @@ func (dec *decoder) decode(s string, depth int) any {
 		return v.Interface()
 	case '(':
 		if depth >= 64 {
-			panic(FormatError("input exceeds container depth limit"))
+			panic(codecError{FormatError("input exceeds container depth limit")})
 		}
 		dec.align(8)
 		v := make([]any, 0)
@@ -316,7 +316,7 @@ func (dec *decoder) decode(s string, depth int) any {
 		for s != "" {
 			err, rem := validSingle(s, &depthCounter{})
 			if err != nil {
-				panic(err)
+				panic(codecError{err})
 			}
 			ev := dec.decode(s[:len(s)-len(rem)], depth+1)
 			v = append(v, ev)
@@ -324,7 +324,7 @@ func (dec *decoder) decode(s string, depth int) any {
 		}
 		return v
 	default:
-		panic(SignatureError{Sig: s})
+		panic(codecError{SignatureError{Sig: s}})
 	}
 }
 
@@ -373,6 +373,10 @@ func sigByteSize(sig string) int {
 	}
 	return total
 }
+
+// codecError is used by the decoder and the encoder to pass an error via
+// panic, so it can be told apart from other panics when recovered.
+type codecError struct{ err error }
 
 // A FormatError is an error in the wire format.
 type FormatError string
