@@ -111,6 +111,9 @@ type Message struct {
 	Body    []any
 
 	serial uint32
+	// fds holds the actual received descriptors, independently of how often
+	// (or whether) they are referenced in Body.
+	fds []int
 }
 
 type header struct {
