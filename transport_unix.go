@@ -1,4 +1,4 @@
-//go:build !windows && !solaris && !js
+//go:build !windows && !solaris && !js && !wasip1
 
 package dbus
 
