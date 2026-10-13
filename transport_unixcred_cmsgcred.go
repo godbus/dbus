@@ -3,47 +3,50 @@
 // https://golang.org/s/go1.4-syscall
 // http://code.google.com/p/go/source/browse/unix/sockcmsg_linux.go?repo=sys
 
-// Local implementation of the UnixCredentials system call for DragonFly BSD
+// Local implementation of the UnixCredentials system call for FreeBSD
+// and DragonFly BSD.
+
+//go:build freebsd || dragonfly
 
 package dbus
-
-/*
-#include <sys/ucred.h>
-*/
-import "C"
 
 import (
 	"io"
 	"os"
 	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 // http://golang.org/src/pkg/syscall/ztypes_linux_amd64.go
-// http://golang.org/src/pkg/syscall/ztypes_dragonfly_amd64.go
+// https://golang.org/src/syscall/ztypes_freebsd_amd64.go
+//
+// Note: FreeBSD and DragonFly BSD actually use a 'struct cmsgcred'
+// which starts with these fields and adds a list of the additional
+// groups for the sender.
 type Ucred struct {
-	Pid int32
-	Uid uint32
-	Gid uint32
+	Pid  int32
+	Uid  uint32
+	Euid uint32
+	Gid  uint32
 }
 
-// http://golang.org/src/pkg/syscall/types_linux.go
-// http://golang.org/src/pkg/syscall/types_dragonfly.go
-// https://github.com/DragonFlyBSD/DragonFlyBSD/blob/master/sys/sys/ucred.h
+// https://github.com/freebsd/freebsd/blob/master/sys/sys/socket.h
+// https://github.com/DragonFlyBSD/DragonFlyBSD/blob/master/sys/sys/socket.h
+//
+// The cmsgcred structure contains the above four fields, followed by
+// a uint16 count of additional groups, uint16 padding to align and a
+// 16 element array of uint32 for the additional groups. The size is
+// the same across all supported platforms.
 const (
-	SizeofUcred = C.sizeof_struct_ucred
+	SizeofCmsgcred = 84 // 4*4 + 2*2 + 16*4
 )
 
 // http://golang.org/src/pkg/syscall/sockcmsg_unix.go
 func cmsgAlignOf(salen int) int {
-	// From http://golang.org/src/pkg/syscall/sockcmsg_unix.go
-	//salign := sizeofPtr
-	// NOTE: It seems like 64-bit Darwin and DragonFly BSD kernels
-	// still require 32-bit aligned access to network subsystem.
-	//if darwin64Bit || dragonfly64Bit {
-	//	salign = 4
-	//}
-	salign := 4
+	salign := unix.SizeofPtr
+
 	return (salen + salign - 1) & ^(salign - 1)
 }
 
@@ -57,11 +60,11 @@ func cmsgData(h *syscall.Cmsghdr) unsafe.Pointer {
 // for sending to another process. This can be used for
 // authentication.
 func UnixCredentials(ucred *Ucred) []byte {
-	b := make([]byte, syscall.CmsgSpace(SizeofUcred))
+	b := make([]byte, syscall.CmsgSpace(SizeofCmsgcred))
 	h := (*syscall.Cmsghdr)(unsafe.Pointer(&b[0]))
 	h.Level = syscall.SOL_SOCKET
 	h.Type = syscall.SCM_CREDS
-	h.SetLen(syscall.CmsgLen(SizeofUcred))
+	h.SetLen(syscall.CmsgLen(SizeofCmsgcred))
 	*((*Ucred)(cmsgData(h))) = *ucred
 	return b
 }
