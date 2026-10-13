@@ -55,6 +55,37 @@ jobs:
     - name: Test with godbus_no_tcp build tag
       run: go test -race -v -tags godbus_no_tcp ./...
 
+  cross:
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v6
+    - uses: actions/setup-go@v6
+      with:
+        go-version: stable
+    - name: Build tests for other GOOS/GOARCH
+      run: |
+        out=$(mktemp -d)
+        fail=
+        for t in \
+          linux/386 linux/arm linux/arm64 linux/loong64 linux/mips64le \
+          linux/ppc64le linux/riscv64 linux/s390x \
+          android/arm64 \
+          darwin/amd64 darwin/arm64 \
+          dragonfly/amd64 freebsd/amd64 netbsd/amd64 openbsd/amd64 \
+          windows/386 windows/amd64 windows/arm64 \
+          js/wasm wasip1/wasm \
+          ; do
+          for tags in "" godbus_no_tcp; do
+            echo "::group::$t ${tags:-(no tags)}"
+            GOOS=${t%/*} GOARCH=${t#*/} go test -c -o "$out" -tags "$tags" ./... || fail+=" $t${tags:+/$tags}"
+            echo "::endgroup::"
+          done
+        done
+        if [ -n "$fail" ]; then
+          echo "::error::Failed to build for:$fail"
+          exit 1
+        fi
+
   codespell:
     runs-on: ubuntu-24.04
     steps:
@@ -115,6 +146,7 @@ jobs:
       - lima
       - lint
       - test
+      - cross
       - codespell
     steps:
     - run: echo "All jobs completed"
