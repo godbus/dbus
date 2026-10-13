@@ -38,14 +38,37 @@ type oobReader struct {
 
 func (o *oobReader) Read(b []byte) (n int, err error) {
 	n, oobn, flags, _, err := o.conn.ReadMsgUnix(b, o.buf[:])
+	// Retain received descriptors even when the read reports an error or
+	// truncated control data, so ReadMessage can release them on failure.
+	if oobn > 0 {
+		o.oob = append(o.oob, o.buf[:oobn]...)
+	}
 	if err != nil {
 		return n, err
 	}
 	if flags&syscall.MSG_CTRUNC != 0 {
 		return n, errors.New("dbus: control data truncated (too many fds received)")
 	}
-	o.oob = append(o.oob, o.buf[:oobn]...)
 	return n, nil
+}
+
+// closeFDs releases all received rights, independently of whether the message
+// header or body was decoded successfully.
+func (o *oobReader) closeFDs() {
+	scms, _ := syscall.ParseSocketControlMessage(o.oob)
+	for _, scm := range scms {
+		if scm.Header.Level != syscall.SOL_SOCKET || scm.Header.Type != syscall.SCM_RIGHTS {
+			continue
+		}
+		fds, err := syscall.ParseUnixRights(&scm)
+		if err != nil {
+			continue
+		}
+		for _, fd := range fds {
+			_ = syscall.Close(fd)
+		}
+	}
+	o.oob = o.oob[:0]
 }
 
 type unixTransport struct {
@@ -96,7 +119,7 @@ func (t *unixTransport) EnableUnixFDs() {
 	t.hasUnixFDs = true
 }
 
-func (t *unixTransport) ReadMessage() (*Message, error) {
+func (t *unixTransport) ReadMessage() (_ *Message, err error) {
 	// To be sure that all bytes of out-of-band data are read, we use a special
 	// reader that uses ReadUnix on the underlying connection instead of Read
 	// and gathers the out-of-band data in a buffer.
@@ -114,13 +137,21 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 		t.rdr.oob = t.rdr.oob[:0]
 		t.rdr.headers = t.rdr.headers[:0]
 	}
+	defer func() {
+		if err != nil {
+			// SCM_RIGHTS installs descriptors before the message is decoded.
+			// No caller takes ownership when ReadMessage fails, and closing
+			// the socket does not release these descriptors.
+			t.rdr.closeFDs()
+		}
+	}()
 	var (
 		r   = t.rdr.r
 		b   = t.rdr.b
 		dec = t.rdr.dec
 	)
 
-	_, err := io.ReadFull(t.rdr, t.rdr.csheader)
+	_, err = io.ReadFull(t.rdr, t.rdr.csheader)
 	if err != nil {
 		return nil, err
 	}
