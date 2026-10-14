@@ -241,15 +241,18 @@ func (dec *decoder) decode(s string, depth int) any {
 		return variant
 	case 'h':
 		idx := dec.decodeU()
-		if int(idx) < len(dec.fds) {
-			return UnixFD(dec.fds[idx])
+		if dec.fds == nil {
+			return UnixFDIndex(idx)
 		}
-		return UnixFDIndex(idx)
+		if uint64(idx) >= uint64(len(dec.fds)) {
+			panic(InvalidMessageError("invalid index for unix fd"))
+		}
+		return UnixFD(dec.fds[idx])
 	case 'a':
 		if len(s) > 1 && s[1] == '{' {
 			ksig := s[2:3]
 			vsig := s[3 : len(s)-1]
-			v := reflect.MakeMap(reflect.MapOf(typeFor(ksig), typeFor(vsig)))
+			v := reflect.MakeMap(reflect.MapOf(dec.typeFor(ksig), dec.typeFor(vsig)))
 			if depth >= 63 {
 				panic(FormatError("input exceeds container depth limit"))
 			}
@@ -290,7 +293,7 @@ func (dec *decoder) decode(s string, depth int) any {
 			}
 			capacity /= s
 		}
-		v := reflect.MakeSlice(reflect.SliceOf(typeFor(sig)), 0, capacity)
+		v := reflect.MakeSlice(reflect.SliceOf(dec.typeFor(sig)), 0, capacity)
 		// Even for empty arrays, the correct padding must be included
 		align := alignment(typeFor(s[1:]))
 		if len(s) > 1 && s[1] == '(' {
@@ -326,6 +329,33 @@ func (dec *decoder) decode(s string, depth int) any {
 	default:
 		panic(SignatureError{Sig: s})
 	}
+}
+
+// typeFor selects container element types matching decoded FD values.
+func (dec *decoder) typeFor(sig string) reflect.Type {
+	t := typeFor(sig)
+	if dec.fds == nil {
+		return t
+	}
+	return unixFDValueType(t)
+}
+
+func unixFDValueType(t reflect.Type) reflect.Type {
+	if t == unixFDIndexType {
+		return unixFDType
+	}
+	switch t.Kind() {
+	case reflect.Slice:
+		if elem := unixFDValueType(t.Elem()); elem != t.Elem() {
+			return reflect.SliceOf(elem)
+		}
+	case reflect.Map:
+		key, elem := unixFDValueType(t.Key()), unixFDValueType(t.Elem())
+		if key != t.Key() || elem != t.Elem() {
+			return reflect.MapOf(key, elem)
+		}
+	}
+	return t
 }
 
 // sigByteSize tries to calculates size of the given signature in bytes.

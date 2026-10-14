@@ -23,9 +23,10 @@ type msghead struct {
 }
 
 type oobReader struct {
-	conn *net.UnixConn
-	oob  []byte
-	buf  [4096]byte
+	conn       *net.UnixConn
+	fds        []int
+	buf        [4096]byte
+	controlErr error
 
 	// The following fields are used to reduce memory allocs.
 	headers  []header
@@ -37,38 +38,20 @@ type oobReader struct {
 }
 
 func (o *oobReader) Read(b []byte) (n int, err error) {
+	if o.controlErr != nil {
+		return 0, o.controlErr
+	}
 	n, oobn, flags, _, err := o.conn.ReadMsgUnix(b, o.buf[:])
-	// Retain received descriptors even when the read reports an error or
-	// truncated control data, so ReadMessage can release them on failure.
-	if oobn > 0 {
-		o.oob = append(o.oob, o.buf[:oobn]...)
+	// Collect rights before checking errors: recvmsg has already installed
+	// these descriptors, including any complete rights in truncated data.
+	o.controlErr = o.readFDs(o.buf[:oobn])
+	if flags&syscall.MSG_CTRUNC != 0 {
+		o.controlErr = errors.New("dbus: control data truncated (too many fds received)")
 	}
 	if err != nil {
 		return n, err
 	}
-	if flags&syscall.MSG_CTRUNC != 0 {
-		return n, errors.New("dbus: control data truncated (too many fds received)")
-	}
-	return n, nil
-}
-
-// closeFDs releases all received rights, independently of whether the message
-// header or body was decoded successfully.
-func (o *oobReader) closeFDs() {
-	scms, _ := syscall.ParseSocketControlMessage(o.oob)
-	for _, scm := range scms {
-		if scm.Header.Level != syscall.SOL_SOCKET || scm.Header.Type != syscall.SCM_RIGHTS {
-			continue
-		}
-		fds, err := syscall.ParseUnixRights(&scm)
-		if err != nil {
-			continue
-		}
-		for _, fd := range fds {
-			_ = syscall.Close(fd)
-		}
-	}
-	o.oob = o.oob[:0]
+	return n, o.controlErr
 }
 
 type unixTransport struct {
@@ -119,10 +102,10 @@ func (t *unixTransport) EnableUnixFDs() {
 	t.hasUnixFDs = true
 }
 
-func (t *unixTransport) ReadMessage() (_ *Message, err error) {
+func (t *unixTransport) ReadMessage() (*Message, error) {
 	// To be sure that all bytes of out-of-band data are read, we use a special
 	// reader that uses ReadUnix on the underlying connection instead of Read
-	// and gathers the out-of-band data in a buffer.
+	// and collects the file descriptors from each read.
 	if t.rdr == nil {
 		t.rdr = &oobReader{
 			conn: t.UnixConn,
@@ -134,16 +117,19 @@ func (t *unixTransport) ReadMessage() (_ *Message, err error) {
 			dec: &decoder{},
 		}
 	} else {
-		t.rdr.oob = t.rdr.oob[:0]
 		t.rdr.headers = t.rdr.headers[:0]
 	}
+	var delivered map[int]struct{}
 	defer func() {
-		if err != nil {
-			// SCM_RIGHTS installs descriptors before the message is decoded.
-			// No caller takes ownership when ReadMessage fails, and closing
-			// the socket does not release these descriptors.
-			t.rdr.closeFDs()
+		// Ownership transfers only after the entire message succeeds. Until
+		// then, every received descriptor belongs to this read.
+		for _, fd := range t.rdr.fds {
+			if _, ok := delivered[fd]; !ok {
+				_ = syscall.Close(fd)
+			}
 		}
+		t.rdr.fds = t.rdr.fds[:0]
+		t.rdr.controlErr = nil
 	}()
 	var (
 		r   = t.rdr.r
@@ -151,7 +137,7 @@ func (t *unixTransport) ReadMessage() (_ *Message, err error) {
 		dec = t.rdr.dec
 	)
 
-	_, err = io.ReadFull(t.rdr, t.rdr.csheader)
+	_, err := io.ReadFull(t.rdr, t.rdr.csheader)
 	if err != nil {
 		return nil, err
 	}
@@ -220,54 +206,34 @@ func (t *unixTransport) ReadMessage() (_ *Message, err error) {
 		return nil, err
 	}
 	r.Reset(body)
+	// io.ReadFull can discard an error when the read also fills its buffer.
+	// Ancillary-data errors must still prevent successful FD delivery.
+	if t.rdr.controlErr != nil {
+		return nil, t.rdr.controlErr
+	}
 
+	var fds []int
 	if unixfds != 0 {
 		if !t.hasUnixFDs {
 			return nil, errors.New("dbus: got unix fds on unsupported transport")
 		}
-		// read the fds from the OOB data
-		scms, err := syscall.ParseSocketControlMessage(t.rdr.oob)
-		if err != nil {
-			return nil, err
+		if uint64(unixfds) > uint64(len(t.rdr.fds)) {
+			return nil, InvalidMessageError("not enough unix file descriptors")
 		}
-		if len(scms) != 1 {
-			return nil, errors.New("dbus: received more than one socket control message")
-		}
-		fds, err := syscall.ParseUnixRights(&scms[0])
-		if err != nil {
-			return nil, err
-		}
-		dec.Reset(r, order, fds)
-		if err = decodeMessageBody(msg, dec); err != nil {
-			return nil, err
-		}
-		// substitute the values in the message body (which are indices for the
-		// array receiver via OOB) with the actual values
-		for i, v := range msg.Body {
-			switch index := v.(type) {
-			case UnixFDIndex:
-				if uint32(index) >= unixfds {
-					return nil, InvalidMessageError("invalid index for unix fd")
-				}
-				msg.Body[i] = UnixFD(fds[index])
-			case []UnixFDIndex:
-				fdArray := make([]UnixFD, len(index))
-				for k, j := range index {
-					if uint32(j) >= unixfds {
-						return nil, InvalidMessageError("invalid index for unix fd")
-					}
-					fdArray[k] = UnixFD(fds[j])
-				}
-				msg.Body[i] = fdArray
-			}
-		}
-		return msg, nil
+		fds = t.rdr.fds[:unixfds]
 	}
 
-	dec.Reset(r, order, nil)
+	dec.Reset(r, order, fds)
 	if err = decodeMessageBody(msg, dec); err != nil {
 		return nil, err
 	}
+	used := make(map[int]struct{})
+	for _, value := range msg.Body {
+		if err = collectUnixFDs(value, used); err != nil {
+			return nil, err
+		}
+	}
+	delivered = used
 	return msg, nil
 }
 

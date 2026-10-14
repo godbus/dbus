@@ -118,6 +118,10 @@ type header struct {
 	Variant
 }
 
+// DecodeMessageWithFDs decodes a message, resolving Unix FD indices against fds.
+// A nil fds slice leaves indices as UnixFDIndex values. A non-nil slice requires
+// every index to refer to a supplied descriptor, including in nested containers.
+// The caller retains ownership of fds, including when decoding fails.
 func DecodeMessageWithFDs(rd io.Reader, fds []int) (msg *Message, err error) {
 	var order binary.ByteOrder
 	var hlength, length uint32
@@ -210,10 +214,11 @@ func DecodeMessageWithFDs(rd io.Reader, fds []int) (msg *Message, err error) {
 
 // DecodeMessage tries to decode a single message in the D-Bus wire format
 // from the given reader. The byte order is figured out from the first byte.
+// Unix FD indices are returned as UnixFDIndex values without resolving them.
 // The possibly returned error can be an error of the underlying reader, an
 // InvalidMessageError or a FormatError.
 func DecodeMessage(rd io.Reader) (msg *Message, err error) {
-	return DecodeMessageWithFDs(rd, make([]int, 0))
+	return DecodeMessageWithFDs(rd, nil)
 }
 
 type nullwriter struct{}
