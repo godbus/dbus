@@ -21,6 +21,10 @@ type Call struct {
 	// Holds the response once the call is done.
 	Body []any
 
+	// UnixFDs holds file descriptors received with the response message,
+	// including descriptors that are not referenced by Body.
+	UnixFDs []UnixFD
+
 	// ResponseSequence stores the sequence number of the DBus message containing
 	// the call response (or error). This can be compared to the sequence number
 	// of other call responses and signals on this connection to determine their

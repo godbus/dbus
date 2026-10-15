@@ -944,7 +944,7 @@ func (tracker *callTracker) handleReply(sequence Sequence, msg *Message) uint32 
 	_, ok := tracker.calls[serial]
 	tracker.lck.RUnlock()
 	if ok {
-		tracker.finalizeWithBody(serial, sequence, msg.Body)
+		tracker.finalizeWithReply(serial, sequence, msg.Body, msg.fds)
 	}
 	return serial
 }
@@ -973,7 +973,7 @@ func (tracker *callTracker) handleSendError(msg *Message, err error) {
 	}
 }
 
-func (tracker *callTracker) finalizeWithBody(sn uint32, sequence Sequence, body []any) {
+func (tracker *callTracker) finalizeWithReply(sn uint32, sequence Sequence, body []any, unixFDs []int) {
 	tracker.lck.Lock()
 	c, ok := tracker.calls[sn]
 	if ok {
@@ -982,6 +982,10 @@ func (tracker *callTracker) finalizeWithBody(sn uint32, sequence Sequence, body 
 	tracker.lck.Unlock()
 	if ok {
 		c.Body = body
+		c.UnixFDs = make([]UnixFD, len(unixFDs))
+		for i, fd := range unixFDs {
+			c.UnixFDs[i] = UnixFD(fd)
+		}
 		c.ResponseSequence = sequence
 		c.done()
 	}

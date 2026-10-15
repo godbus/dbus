@@ -111,6 +111,7 @@ type Message struct {
 	Body    []any
 
 	serial uint32
+	fds    []int
 }
 
 type header struct {
