@@ -3,7 +3,6 @@
 package dbus
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -16,23 +15,12 @@ import (
 var execCommand = exec.Command
 
 func getSessionBusPlatformAddress() (string, error) {
-	cmd := execCommand("dbus-launch")
-	b, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", err
-	}
-
-	i := bytes.IndexByte(b, '=')
-	j := bytes.IndexByte(b, '\n')
-
-	if i == -1 || j == -1 || i > j {
+	rundir, ok := os.LookupEnv("XDG_RUNTIME_DIR")
+	if !ok {
 		return "", errors.New("dbus: couldn't determine address of session bus")
 	}
 
-	env, addr := string(b[0:i]), string(b[i+1:j])
-	os.Setenv(env, addr)
-
-	return addr, nil
+	return path.Join(rundir, "bus"), nil
 }
 
 // tryDiscoverDbusSessionBusAddress tries to discover an existing dbus session
