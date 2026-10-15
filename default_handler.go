@@ -33,7 +33,7 @@ func NewDefaultHandler() *defaultHandler {
 }
 
 type defaultHandler struct {
-	sync.RWMutex
+	mu          sync.RWMutex
 	objects     map[ObjectPath]*exportedObj
 	defaultIntf map[string]*exportedIntf
 }
@@ -65,8 +65,8 @@ func (h *defaultHandler) introspectPath(path ObjectPath) string {
 }
 
 func (h *defaultHandler) LookupObject(path ObjectPath) (ServerObject, bool) {
-	h.RLock()
-	defer h.RUnlock()
+	h.mu.RLock()
+	defer h.mu.RUnlock()
 	object, ok := h.objects[path]
 	if ok {
 		return object, ok
@@ -102,15 +102,15 @@ func (h *defaultHandler) LookupObject(path ObjectPath) (ServerObject, bool) {
 }
 
 func (h *defaultHandler) AddObject(path ObjectPath, object *exportedObj) {
-	h.Lock()
+	h.mu.Lock()
 	h.objects[path] = object
-	h.Unlock()
+	h.mu.Unlock()
 }
 
 func (h *defaultHandler) DeleteObject(path ObjectPath) {
-	h.Lock()
+	h.mu.Lock()
 	delete(h.objects, path)
-	h.Unlock()
+	h.mu.Unlock()
 }
 
 type exportedMethod struct {
