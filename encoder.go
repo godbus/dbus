@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+	"math"
 	"reflect"
 	"strings"
 	"unicode/utf8"
@@ -113,7 +114,13 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 	case reflect.Uint16:
 		enc.binwrite(uint16(v.Uint()))
 		enc.pos += 2
-	case reflect.Int, reflect.Int32:
+	case reflect.Int:
+		if v.Int() < math.MinInt32 || v.Int() > math.MaxInt32 {
+			panic(FormatError("int value is out of range for int32"))
+		}
+		enc.binwrite(int32(v.Int()))
+		enc.pos += 4
+	case reflect.Int32:
 		if v.Type() == unixFDType {
 			fd := v.Int()
 			idx := len(enc.fds)
@@ -123,7 +130,13 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 			enc.binwrite(int32(v.Int()))
 		}
 		enc.pos += 4
-	case reflect.Uint, reflect.Uint32:
+	case reflect.Uint:
+		if v.Uint() > math.MaxUint32 {
+			panic(FormatError("uint value is out of range for uint32"))
+		}
+		enc.binwrite(uint32(v.Uint()))
+		enc.pos += 4
+	case reflect.Uint32:
 		enc.binwrite(uint32(v.Uint()))
 		enc.pos += 4
 	case reflect.Int64:

@@ -3,6 +3,7 @@ package dbus
 import (
 	"bytes"
 	"encoding/binary"
+	"math"
 	"reflect"
 	"testing"
 )
@@ -488,3 +489,58 @@ func TestEncodeNonErrorPanic(t *testing.T) {
 	err := enc.Encode(uint32(1))
 	t.Fatalf("expected panic, got %v", err)
 }
+func TestEncodeIntOverflow(t *testing.T) {
+	tests := []struct {
+		name string
+		val  any
+	}{
+		{"int too large", int(math.MaxInt32) + 1},
+		{"int too small", int(math.MinInt32) - 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := new(bytes.Buffer)
+			enc := newEncoder(buf, binary.LittleEndian, make([]int, 0))
+			err := enc.Encode(tt.val)
+			if err == nil {
+				t.Fatal("expected error for out-of-range int, got nil")
+			}
+			if _, ok := err.(FormatError); !ok {
+				t.Fatalf("expected FormatError, got %T: %v", err, err)
+			}
+		})
+	}
+}
+
+func TestEncodeUintOverflow(t *testing.T) {
+	tests := []struct {
+		name string
+		val  any
+	}{
+		{"uint too large", uint(math.MaxUint32) + 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := new(bytes.Buffer)
+			enc := newEncoder(buf, binary.LittleEndian, make([]int, 0))
+			err := enc.Encode(tt.val)
+			if err == nil {
+				t.Fatal("expected error for out-of-range uint, got nil")
+			}
+			if _, ok := err.(FormatError); !ok {
+				t.Fatalf("expected FormatError, got %T: %v", err, err)
+			}
+		})
+	}
+}
+
+func TestEncodeIntBounds(t *testing.T) {
+	for _, val := range []any{int(math.MaxInt32), int(math.MinInt32), uint(math.MaxUint32), uint(0)} {
+		buf := new(bytes.Buffer)
+		enc := newEncoder(buf, binary.LittleEndian, make([]int, 0))
+		if err := enc.Encode(val); err != nil {
+			t.Errorf("encode %v: unexpected error: %v", val, err)
+		}
+	}
+}
+
