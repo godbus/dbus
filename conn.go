@@ -397,7 +397,7 @@ func (conn *Conn) inWorker() {
 	for {
 		msg, err := conn.ReadMessage()
 		if err != nil {
-			if _, ok := err.(InvalidMessageError); !ok {
+			if _, ok := err.(InvalidMessageError); !ok || err == errInvalidByteOrder || err == errMessageTooLong {
 				// Some read error occurred (usually EOF); we can't really do
 				// anything but to shut down all stuff and returns errors to all
 				// pending replies.
@@ -405,7 +405,9 @@ func (conn *Conn) inWorker() {
 				conn.calls.finalizeAllWithError(sequenceGen, err)
 				return
 			}
-			// invalid messages are ignored
+			// Only invalid messages that were read in full can be ignored.
+			// A framing error leaves unread bytes that cannot be treated as
+			// the start of the next message.
 			continue
 		}
 		conn.eavesdroppedLck.Lock()

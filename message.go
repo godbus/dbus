@@ -77,6 +77,12 @@ const (
 // invalid.
 type InvalidMessageError string
 
+const (
+	// These errors occur before the whole message has been consumed.
+	errInvalidByteOrder = InvalidMessageError("invalid byte order")
+	errMessageTooLong   = InvalidMessageError("message is too long")
+)
+
 func (e InvalidMessageError) Error() string {
 	return "dbus: invalid message: " + string(e)
 }
@@ -135,7 +141,7 @@ func DecodeMessageWithFDs(rd io.Reader, fds []int) (msg *Message, err error) {
 	case 'B':
 		order = binary.BigEndian
 	default:
-		return nil, InvalidMessageError("invalid byte order")
+		return nil, errInvalidByteOrder
 	}
 
 	dec := newDecoder(rd, order, fds)
@@ -162,7 +168,7 @@ func DecodeMessageWithFDs(rd io.Reader, fds []int) (msg *Message, err error) {
 		return nil, err
 	}
 	if hlength+length+16 > 1<<27 {
-		return nil, InvalidMessageError("message is too long")
+		return nil, errMessageTooLong
 	}
 	dec = newDecoder(io.MultiReader(bytes.NewBuffer(b), rd), order, fds)
 	dec.pos = 12
@@ -274,7 +280,7 @@ func (msg *Message) EncodeToWithFDs(out io.Writer, order binary.ByteOrder) (fds 
 		return nil, err
 	}
 	if buf.Len() > 1<<27 {
-		return nil, InvalidMessageError("message is too long")
+		return nil, errMessageTooLong
 	}
 	if _, err := buf.WriteTo(out); err != nil {
 		return nil, err

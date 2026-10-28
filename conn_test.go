@@ -1,8 +1,10 @@
 package dbus
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -10,6 +12,69 @@ import (
 	"testing"
 	"time"
 )
+
+func TestInvalidFramingClosesConnection(t *testing.T) {
+	testInvalidFramingClosesConnection(t, func(_ *testing.T, wire []byte) transport {
+		return genericTransport{rwc{Reader: bytes.NewReader(wire), Writer: io.Discard}}
+	})
+}
+
+func testInvalidFramingClosesConnection(t *testing.T, newTransport func(*testing.T, []byte) transport) {
+	t.Helper()
+	var valid bytes.Buffer
+	msg := &Message{
+		Type: TypeSignal,
+		Headers: map[HeaderField]Variant{
+			FieldPath:      MakeVariant(ObjectPath("/example")),
+			FieldInterface: MakeVariant("org.example.Peer"),
+			FieldMember:    MakeVariant("After"),
+		},
+	}
+	if err := msg.EncodeTo(&valid, binary.LittleEndian); err != nil {
+		t.Fatal(err)
+	}
+	invalidFlags := append([]byte(nil), valid.Bytes()...)
+	invalidFlags[2] = 0xff
+	unknownType := append([]byte(nil), valid.Bytes()...)
+	unknownType[1] = 0xff
+
+	for _, tc := range []struct {
+		name       string
+		prefix     []byte
+		want       error
+		wantSignal bool
+	}{
+		{"byte order", []byte{'x', 4, 0, 1, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0}, InvalidMessageError("invalid byte order"), false},
+		{"length", []byte{'l', 4, 0, 1, 0, 0, 0, 8, 2, 0, 0, 0, 0, 0, 0, 0}, InvalidMessageError("message is too long"), false},
+		{"complete message", invalidFlags, io.EOF, true},
+		{"unknown message type", unknownType, io.EOF, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			wire := append(append([]byte(nil), tc.prefix...), valid.Bytes()...)
+			conn, err := newConn(newTransport(t, wire))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer conn.Close()
+			signals := make(chan *Signal, 1)
+			conn.Signal(signals)
+			call := &Call{Done: make(chan *Call, 1)}
+			conn.calls.track(1, call)
+
+			conn.inWorker()
+
+			if conn.Connected() {
+				t.Error("connection remains open after its reader exits")
+			}
+			if signal, ok := <-signals; ok != tc.wantSignal {
+				t.Errorf("signal = %v, delivered = %v, want %v", signal, ok, tc.wantSignal)
+			}
+			if got := (<-call.Done).Err; !errors.Is(got, tc.want) {
+				t.Errorf("pending call error = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
 
 func TestSessionBus(t *testing.T) {
 	oldConn, err := SessionBus()

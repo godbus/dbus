@@ -132,7 +132,7 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 	case 'B':
 		order = binary.BigEndian
 	default:
-		return nil, InvalidMessageError("invalid byte order")
+		return nil, errInvalidByteOrder
 	}
 
 	r.Reset(t.rdr.csheader[1:])
@@ -151,7 +151,7 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 		hlen += 8 - (hlen % 8)
 	}
 	if hlen+t.rdr.BodyLen+16 > 1<<27 {
-		return nil, InvalidMessageError("message is too long")
+		return nil, errMessageTooLong
 	}
 
 	// Decode headers and look for unix fds.
