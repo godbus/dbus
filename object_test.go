@@ -7,14 +7,15 @@ import (
 )
 
 type objectGoContextServer struct {
-	t     *testing.T
-	sleep time.Duration
+	started chan struct{}
+	release chan struct{}
+	done    chan struct{}
 }
 
 func (o objectGoContextServer) Sleep() *Error {
-	o.t.Log("Got object call and sleeping for ", o.sleep)
-	time.Sleep(o.sleep)
-	o.t.Log("Completed sleeping for ", o.sleep)
+	defer close(o.done)
+	close(o.started)
+	<-o.release
 	return nil
 }
 
@@ -26,16 +27,37 @@ func TestObjectGoWithContextTimeout(t *testing.T) {
 	defer bus.Close()
 
 	name := bus.Names()[0]
-	err = bus.Export(objectGoContextServer{t, time.Second}, "/org/dannin/DBus/Test", "org.dannin.DBus.Test")
+	server := objectGoContextServer{
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+		done:    make(chan struct{}),
+	}
+	err = bus.Export(server, "/org/dannin/DBus/Test", "org.dannin.DBus.Test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
+	call := bus.Object(name, "/org/dannin/DBus/Test").GoWithContext(ctx, "org.dannin.DBus.Test.Sleep", 0, nil)
+	defer func() {
+		close(server.release)
+		select {
+		case <-server.done:
+		case <-time.After(time.Second):
+			t.Error("Timed out waiting for the exported method to finish")
+		}
+	}()
 	select {
-	case call := <-bus.Object(name, "/org/dannin/DBus/Test").GoWithContext(ctx, "org.dannin.DBus.Test.Sleep", 0, nil).Done:
-		if call.Err != ctx.Err() {
-			t.Fatal("Expected ", ctx.Err(), " but got ", call.Err)
+	case <-server.started:
+	case <-ctx.Done():
+		t.Fatal("Context expired before the exported method started")
+	}
+	// Keep the method blocked until the deadline expires, so a successful
+	// reply cannot race the timeout and accidentally satisfy a nil == nil check.
+	select {
+	case call := <-call.Done:
+		if call.Err != context.DeadlineExceeded {
+			t.Fatal("Expected ", context.DeadlineExceeded, " but got ", call.Err)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("Expected call to not respond in time")
@@ -50,19 +72,19 @@ func TestObjectGoWithContext(t *testing.T) {
 	defer bus.Close()
 
 	name := bus.Names()[0]
-	err = bus.Export(objectGoContextServer{t, time.Millisecond}, "/org/dannin/DBus/Test", "org.dannin.DBus.Test")
+	err = bus.Export(nopServer{}, "/org/dannin/DBus/Test", "org.dannin.DBus.Test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	select {
-	case call := <-bus.Object(name, "/org/dannin/DBus/Test").GoWithContext(ctx, "org.dannin.DBus.Test.Sleep", 0, nil).Done:
-		if call.Err != ctx.Err() {
-			t.Fatal("Expected ", ctx.Err(), " but got ", call.Err)
+	case call := <-bus.Object(name, "/org/dannin/DBus/Test").GoWithContext(ctx, "org.dannin.DBus.Test.Nop", 0, nil).Done:
+		if call.Err != nil {
+			t.Fatal("Expected a successful call but got ", call.Err)
 		}
 	case <-time.After(time.Second):
-		t.Fatal("Expected call to respond in 1 Millisecond")
+		t.Fatal("Expected call to respond before the context deadline")
 	}
 }
 
