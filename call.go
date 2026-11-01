@@ -64,3 +64,10 @@ func (c *Call) done() {
 	c.Done <- c
 	c.ContextCancel()
 }
+
+// fail completes a call that was never sent with err.
+func (c *Call) fail(err error) {
+	c.Err = err
+	c.ResponseSequence = NoSequence
+	c.done()
+}

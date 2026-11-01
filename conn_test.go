@@ -825,3 +825,118 @@ func TestTimeoutContextClosesConnection(t *testing.T) {
 		t.Errorf("expected connection to be closed, but got: %v", err)
 	}
 }
+
+// serialRecorder is a transport writer that parses the messages
+// written to it and counts those whose serial isn't greater than the
+// one before.
+type serialRecorder struct {
+	mu        sync.Mutex
+	recording bool
+	buf       []byte
+	last      uint32
+	messages  int
+	reordered int
+}
+
+func (r *serialRecorder) start() {
+	r.mu.Lock()
+	r.recording = true
+	r.mu.Unlock()
+}
+
+func (r *serialRecorder) result() (messages, reordered int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.messages, r.reordered
+}
+
+func (r *serialRecorder) Write(p []byte) (int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if !r.recording {
+		return len(p), nil
+	}
+	r.buf = append(r.buf, p...)
+	for len(r.buf) >= 16 {
+		var order binary.ByteOrder = binary.LittleEndian
+		if r.buf[0] == 'B' {
+			order = binary.BigEndian
+		}
+		header := 16 + int(order.Uint32(r.buf[12:16]))
+		header += (8 - header%8) % 8
+		size := header + int(order.Uint32(r.buf[4:8]))
+		if len(r.buf) < size {
+			break
+		}
+		serial := order.Uint32(r.buf[8:12])
+		if serial <= r.last {
+			r.reordered++
+		}
+		r.last = serial
+		r.messages++
+		r.buf = r.buf[size:]
+	}
+	return len(p), nil
+}
+
+// TestConcurrentSendsKeepSerialOrder checks that messages sent from
+// several goroutines are written with increasing serials.
+// xdg-dbus-proxy before 0.1.6 closes the connection as soon as a
+// client sends a serial that isn't greater than the one before.
+func TestConcurrentSendsKeepSerialOrder(t *testing.T) {
+	reader, pipewriter := io.Pipe()
+	defer pipewriter.Close()
+	defer reader.Close()
+
+	rec := new(serialRecorder)
+	bus, err := NewConn(rwc{Reader: reader, Writer: rec})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer bus.Close()
+
+	go func() {
+		_, err := pipewriter.Write([]byte("REJECTED name\r\nOK myuuid\r\n"))
+		if err != nil {
+			t.Errorf("error writing to pipe: %v", err)
+		}
+	}()
+	if err := bus.Auth([]Auth{fakeAuth{}}); err != nil {
+		t.Fatal(err)
+	}
+	rec.start()
+
+	const workers, perWorker = 8, 300
+	obj := bus.Object("org.example.Peer", "/org/example/Peer")
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			for j := 0; j < perWorker; j++ {
+				switch (i + j) % 3 {
+				case 0:
+					if err := bus.Emit("/org/example/Peer", "org.example.Peer.Changed"); err != nil {
+						t.Error(err)
+						return
+					}
+				case 1:
+					// Nothing replies, so the call stays pending until
+					// the connection is closed.
+					obj.Go("org.example.Peer.Ping", 0, nil)
+				case 2:
+					obj.Go("org.example.Peer.Ping", FlagNoReplyExpected, nil)
+				}
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	messages, reordered := rec.result()
+	if messages != workers*perWorker {
+		t.Fatalf("wrote %d messages, want %d", messages, workers*perWorker)
+	}
+	if reordered != 0 {
+		t.Errorf("%d of %d messages were written after one with a greater serial", reordered, messages)
+	}
+}
