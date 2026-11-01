@@ -252,6 +252,9 @@ func WithIncomingInterceptor(interceptor Interceptor) ConnOption {
 }
 
 // WithOutgoingInterceptor sets the given interceptor for outgoing messages.
+// It is called for each message just before the message is written, once the
+// message has its serial, while other messages wait to be sent, so it must not
+// send messages on the connection itself.
 func WithOutgoingInterceptor(interceptor Interceptor) ConnOption {
 	return func(conn *Conn) error {
 		conn.outInt = interceptor
@@ -495,16 +498,28 @@ func (conn *Conn) Object(dest string, path ObjectPath) BusObject {
 }
 
 func (conn *Conn) sendMessageAndIfClosed(msg *Message, ifClosed func()) error {
-	if msg.serial == 0 {
+	return conn.sendMessage(msg, ifClosed, nil)
+}
+
+// sendMessage sends msg, or calls ifClosed if the connection is closed. msg
+// gets its serial while the lock that writes messages is held, so that serials
+// reach the bus in increasing order even when several goroutines send at once.
+// Some proxies, such as xdg-dbus-proxy before 0.1.6, close the connection when
+// a serial isn't greater than the one before it. If beforeWrite is not nil, it
+// is called with the lock held once msg has its serial.
+func (conn *Conn) sendMessage(msg *Message, ifClosed, beforeWrite func()) error {
+	err := conn.outHandler.sendAndIfClosed(msg, ifClosed, func() {
 		msg.serial = conn.getSerial()
-	}
-	if conn.outInt != nil {
-		conn.outInt(msg)
-	}
-	err := conn.outHandler.sendAndIfClosed(msg, ifClosed)
+		if beforeWrite != nil {
+			beforeWrite()
+		}
+		if conn.outInt != nil {
+			conn.outInt(msg)
+		}
+	})
 	if err != nil {
 		conn.handleSendError(msg, err)
-	} else if msg.Type != TypeMethodCall {
+	} else if msg.serial != 0 && msg.Type != TypeMethodCall {
 		conn.serialGen.RetireSerial(msg.serial)
 	}
 	return err
@@ -563,7 +578,6 @@ func (conn *Conn) send(ctx context.Context, msg *Message, ch chan *Call) *Call {
 
 	var call *Call
 	ctx, canceler := context.WithCancel(ctx)
-	msg.serial = conn.getSerial()
 	if msg.Type == TypeMethodCall && msg.Flags&FlagNoReplyExpected == 0 {
 		call = new(Call)
 		call.Destination, _ = msg.Headers[FieldDestination].value.(string)
@@ -575,20 +589,22 @@ func (conn *Conn) send(ctx context.Context, msg *Message, ch chan *Call) *Call {
 		call.Done = ch
 		call.ctx = ctx
 		call.ctxCanceler = canceler
-		conn.calls.track(msg.serial, call)
 		if ctx.Err() != nil {
 			// short path: don't even send the message if context already cancelled
-			conn.calls.handleSendError(msg, ctx.Err())
+			call.fail(ctx.Err())
 			return call
 		}
-		go func() {
-			<-ctx.Done()
-			conn.calls.handleSendError(msg, ctx.Err())
-		}()
 		// error is handled in handleSendError
-		_ = conn.sendMessageAndIfClosed(msg, func() {
-			conn.calls.handleSendError(msg, ErrClosed)
-			canceler()
+		_ = conn.sendMessage(msg, func() {
+			call.fail(ErrClosed)
+		}, func() {
+			// Track the call before it's written so that the reply can't
+			// arrive first.
+			conn.calls.track(msg.serial, call)
+			go func() {
+				<-ctx.Done()
+				conn.calls.handleSendError(msg, ctx.Err())
+			}()
 		})
 	} else {
 		canceler()
@@ -820,7 +836,7 @@ type outputHandler struct {
 	}
 }
 
-func (h *outputHandler) sendAndIfClosed(msg *Message, ifClosed func()) error {
+func (h *outputHandler) sendAndIfClosed(msg *Message, ifClosed, beforeWrite func()) error {
 	h.closed.lck.RLock()
 	defer h.closed.lck.RUnlock()
 	if h.closed.isClosed {
@@ -831,6 +847,7 @@ func (h *outputHandler) sendAndIfClosed(msg *Message, ifClosed func()) error {
 	}
 	h.sendLck.Lock()
 	defer h.sendLck.Unlock()
+	beforeWrite()
 	return h.conn.SendMessage(msg)
 }
 
