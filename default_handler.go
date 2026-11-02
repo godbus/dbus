@@ -39,6 +39,8 @@ type defaultHandler struct {
 }
 
 func (h *defaultHandler) PathExists(path ObjectPath) bool {
+	h.RLock()
+	defer h.RUnlock()
 	_, ok := h.objects[path]
 	return ok
 }
@@ -47,6 +49,7 @@ func (h *defaultHandler) introspectPath(path ObjectPath) string {
 	subpath := make(map[string]struct{})
 	var xml bytes.Buffer
 	xml.WriteString("<node>")
+	h.RLock()
 	for obj := range h.objects {
 		p := string(path)
 		if p != "/" {
@@ -57,6 +60,7 @@ func (h *defaultHandler) introspectPath(path ObjectPath) string {
 			subpath[name] = struct{}{}
 		}
 	}
+	h.RUnlock()
 	for s := range subpath {
 		xml.WriteString("\n\t<node name=\"" + s + "\"/>")
 	}
@@ -79,12 +83,14 @@ func (h *defaultHandler) LookupObject(path ObjectPath) (ServerObject, bool) {
 	for len(path) > 0 {
 		object, ok = h.objects[path]
 		if ok {
+			object.mu.RLock()
 			for name, iface := range object.interfaces {
 				// Only include this handler if it registered for the subtree
 				if iface.isFallbackInterface() {
 					subtreeObject.interfaces[name] = iface
 				}
 			}
+			object.mu.RUnlock()
 			break
 		}
 
@@ -111,6 +117,38 @@ func (h *defaultHandler) DeleteObject(path ObjectPath) {
 	h.Lock()
 	delete(h.objects, path)
 	h.Unlock()
+}
+
+// addInterface adds iface to the object at path, creating the object if
+// needed. The lookup and the change happen under one lock, so a concurrent
+// export or unexport on the same path cannot lose the interface.
+func (h *defaultHandler) addInterface(path ObjectPath, name string, iface *exportedIntf) {
+	h.Lock()
+	defer h.Unlock()
+	obj, ok := h.objects[path]
+	if !ok {
+		obj = newExportedObject()
+		h.objects[path] = obj
+	}
+	obj.AddInterface(name, iface)
+}
+
+// deleteInterface removes an interface from the object at path, and the
+// object once it has no interfaces left.
+func (h *defaultHandler) deleteInterface(path ObjectPath, name string) {
+	h.Lock()
+	defer h.Unlock()
+	obj, ok := h.objects[path]
+	if !ok {
+		return
+	}
+	obj.mu.Lock()
+	delete(obj.interfaces, name)
+	empty := len(obj.interfaces) == 0
+	obj.mu.Unlock()
+	if empty {
+		delete(h.objects, path)
+	}
 }
 
 type exportedMethod struct {
