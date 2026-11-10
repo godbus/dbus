@@ -39,6 +39,8 @@ type defaultHandler struct {
 }
 
 func (h *defaultHandler) PathExists(path ObjectPath) bool {
+	h.RLock()
+	defer h.RUnlock()
 	_, ok := h.objects[path]
 	return ok
 }
@@ -47,6 +49,8 @@ func (h *defaultHandler) introspectPath(path ObjectPath) string {
 	subpath := make(map[string]struct{})
 	var xml bytes.Buffer
 	xml.WriteString("<node>")
+	h.RLock()
+	defer h.RUnlock()
 	for obj := range h.objects {
 		p := string(path)
 		if p != "/" {
@@ -79,12 +83,14 @@ func (h *defaultHandler) LookupObject(path ObjectPath) (ServerObject, bool) {
 	for len(path) > 0 {
 		object, ok = h.objects[path]
 		if ok {
+			object.mu.RLock()
 			for name, iface := range object.interfaces {
 				// Only include this handler if it registered for the subtree
 				if iface.isFallbackInterface() {
 					subtreeObject.interfaces[name] = iface
 				}
 			}
+			object.mu.RUnlock()
 			break
 		}
 
@@ -111,6 +117,33 @@ func (h *defaultHandler) DeleteObject(path ObjectPath) {
 	h.Lock()
 	delete(h.objects, path)
 	h.Unlock()
+}
+
+// addInterface exports iface at path, creating the path's object if it has none.
+func (h *defaultHandler) addInterface(path ObjectPath, name string, iface *exportedIntf) {
+	h.Lock()
+	defer h.Unlock()
+	obj, ok := h.objects[path]
+	if !ok {
+		obj = newExportedObject()
+		h.objects[path] = obj
+	}
+	obj.AddInterface(name, iface)
+}
+
+// deleteInterface unexports the interface called name at path. When the path
+// has no interface left, its object is removed too.
+func (h *defaultHandler) deleteInterface(path ObjectPath, name string) {
+	h.Lock()
+	defer h.Unlock()
+	obj, ok := h.objects[path]
+	if !ok {
+		return
+	}
+	obj.DeleteInterface(name)
+	if obj.isEmpty() {
+		delete(h.objects, path)
+	}
 }
 
 type exportedMethod struct {
@@ -201,6 +234,12 @@ func (obj *exportedObj) DeleteInterface(name string) {
 	obj.mu.Lock()
 	defer obj.mu.Unlock()
 	delete(obj.interfaces, name)
+}
+
+func (obj *exportedObj) isEmpty() bool {
+	obj.mu.RLock()
+	defer obj.mu.RUnlock()
+	return len(obj.interfaces) == 0
 }
 
 func (obj *exportedObj) LookupMethod(name string) (Method, bool) {
