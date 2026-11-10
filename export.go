@@ -362,17 +362,6 @@ func (conn *Conn) exportMethodTable(methods map[string]any, path ObjectPath, ifa
 	return conn.export(out, path, iface, includeSubtree)
 }
 
-func (conn *Conn) unexport(h *defaultHandler, path ObjectPath, iface string) error {
-	if h.PathExists(path) {
-		obj := h.objects[path]
-		obj.DeleteInterface(iface)
-		if len(obj.interfaces) == 0 {
-			h.DeleteObject(path)
-		}
-	}
-	return nil
-}
-
 // export is the worker function for all exports/registrations.
 func (conn *Conn) export(methods map[string]reflect.Value, path ObjectPath, iface string, includeSubtree bool) error {
 	h, ok := conn.handler.(*defaultHandler)
@@ -388,13 +377,8 @@ func (conn *Conn) export(methods map[string]reflect.Value, path ObjectPath, ifac
 
 	// Remove a previous export if the interface is nil
 	if methods == nil {
-		return conn.unexport(h, path, iface)
-	}
-
-	// If this is the first handler for this path, make a new map to hold all
-	// handlers for this path.
-	if !h.PathExists(path) {
-		h.AddObject(path, newExportedObject())
+		h.deleteInterface(path, iface)
+		return nil
 	}
 
 	exportedMethods := make(map[string]Method)
@@ -402,9 +386,7 @@ func (conn *Conn) export(methods map[string]reflect.Value, path ObjectPath, ifac
 		exportedMethods[name] = exportedMethod{method}
 	}
 
-	// Finally, save this handler
-	obj := h.objects[path]
-	obj.AddInterface(iface, newExportedIntf(exportedMethods, includeSubtree))
+	h.addInterface(path, iface, newExportedIntf(exportedMethods, includeSubtree))
 
 	return nil
 }
